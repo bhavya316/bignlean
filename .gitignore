@@ -29,3 +29,5 @@ build/
 # Cache
 .cache/
 .tmp/
+
+firebase-service-account.json
