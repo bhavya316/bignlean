@@ -1,0 +1,285 @@
+"use client";
+import { useState } from "react";
+import { toast } from "react-toastify";
+import { ProccessingIcon } from "@/Icons";
+import { OutlinedButton } from "@/components";
+import Loader from "@/components/Loader/Loader";
+import CustomPageWrapper from "@/components/Wrappers/CustomPageWrapper";
+import { useAppContext } from "@/provider/ContextProvider/ContextProvider";
+import { useCancelOrder, useGetAllOrder } from "@/queries/Order";
+
+export default function Page() {
+  const { userData } = useAppContext();
+  const { data, isLoading } = useGetAllOrder(userData?.id as number);
+
+  return (
+    <CustomPageWrapper
+      heading="Track Order"
+      className="relative flex flex-col gap-8"
+      headingClass="mb-0"
+    >
+      {data?.data?.orders?.length > 0 ? (
+        data?.data?.orders?.map((order: TrackOrder) => (
+          <div key={order?.id} className="w-full flex flex-col gap-4">
+            <p className="w-full text-end text-black text-sm not-italic font-medium max-[1000px]:top-0 max-[450px]:static">
+              AWB Tracking no: {order?.trackingID || "in process"}
+            </p>
+            <div className="flex flex-col gap-[22px]">
+              <OrderCard order={order} userId={userData?.id} />
+            </div>
+          </div>
+        ))
+      ) : isLoading ? (
+        <Loader />
+      ) : (
+        <div className="text-center py-10">
+          <p className="text-gray-600 text-lg">No orders found</p>
+        </div>
+      )}
+    </CustomPageWrapper>
+  );
+}
+
+const OrderCard = ({ order, userId }: { order: TrackOrder; userId: any }) => {
+  return (
+    <div className="sm-3 bg-white rounded-lg p-[30px] max-[550px]:p-3">
+      <div className="flex gap-2 mb-7">
+        <ProccessingIcon />
+        <div className="flex flex-col gap-1">
+          <span className="text-blue-900 text-center text-base not-italic font-semibold">
+            {order?.status} - {order?.orderID}
+          </span>
+          <span className="text-gray-500 text-center text-xs not-italic font-medium">
+            On {new Date(order?.createdAt).toDateString()}
+          </span>
+        </div>
+      </div>
+      <div className="flex gap-8 max-[1000px]:gap-4 max-[860px]:flex-col max-[600px]:gap-5">
+        <ProductDetailCard order={order} userId={userId} />
+        <ProcessingCard order={order} />
+      </div>
+    </div>
+  );
+};
+
+const ProductDetailCard = ({
+  order,
+  userId,
+}: {
+  order: TrackOrder;
+  userId: any;
+}) => {
+  const { mutate: cancelOrder } = useCancelOrder();
+  const [isCancelling, setIsCancelling] = useState(false);
+  
+  const handleCancelOrder = () => {
+    if (confirm("Are you sure you want to cancel this order?")) {
+      setIsCancelling(true);
+      cancelOrder(order.id, {
+        onSuccess: () => {
+          toast.success("Order cancelled successfully");
+          setIsCancelling(false);
+          window.location.reload();
+        },
+        onError: (error) => {
+          toast.error("Failed to cancel order: " + (error?.message || "Unknown error"));
+          setIsCancelling(false);
+        }
+      });
+    }
+  };
+
+  return (
+    <div className="flex gap-6 items-center">
+      <img
+        src={order?.product[0]?.images?.[0] || "/assets/product.png"}
+        alt="product"
+        className="w-[100px] max-[1000px]:w-[80px] max-[600px]:w-[50px]"
+      />
+      <div className="flex flex-col gap-4 w-[195px] max-[1000px]:w-[170px] max-[860px]:flex-1 max-[860px]:flex-row max-[860px]:justify-between max-[860px]:items-center max-[450px]:flex-col">
+        <div className="flex flex-col gap-2">
+          <p className="text-black text-base not-italic font-medium max-[1000px]:text-sm">
+            {order?.product[0].name}
+          </p>
+          <p className="text-black text-sm not-italic font-normal opacity-40">
+            {order?.product[0].weight}- {order?.product[0].flavor}
+          </p>
+        </div>
+        {order?.status !== "Cancelled" && (
+          <OutlinedButton
+            onClick={handleCancelOrder}
+            label={isCancelling ? "Cancelling..." : "Cancel"}
+            disable={isCancelling}
+            className="mt-auto py-[8px] px-[10px] self-start max-[860px]:mt-0"
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+const ProcessingCard = ({ order }: { order: TrackOrder }) => {
+  // Format date for display
+  const formattedDate = new Date(order?.createdAt).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric'
+  });
+  
+  // Determine status for display
+  const getOrderStatusInfo = (status: string) => {
+    switch(status) {
+      case 'Cancelled':
+        return {
+          text: "Order Cancelled",
+          date: formattedDate,
+          completed: false,
+          isSuccess: false,
+          isError: true
+        };
+      case 'PP':
+        return {
+          text: "Order Confirmed",
+          date: formattedDate,
+          completed: true,
+          isSuccess: true,
+          isError: false
+        };
+      case 'Shipped':
+        return {
+          text: "Order Shipped",
+          date: formattedDate,
+          completed: true,
+          isSuccess: true,
+          isError: false
+        };
+      case 'Delivered':
+        return {
+          text: "Order Delivered",
+          date: formattedDate,
+          completed: true,
+          isSuccess: true,
+          isError: false
+        };
+      default:
+        return {
+          text: "Processing",
+          date: "pending",
+          completed: false,
+          isSuccess: false,
+          isError: false
+        };
+    }
+  };
+  
+  const statusInfo = getOrderStatusInfo(order?.status);
+  
+  return (
+    <div className="flex flex-1 h-full justify-between relative max-[450px]:flex-col max-[450px]:items-start max-[450px]:justify-center max-[450px]:gap-5">
+      <ProcessingCompleteCard 
+        text={statusInfo.text}
+        date={statusInfo.date}
+        completed={statusInfo.completed}
+        isSuccess={statusInfo.isSuccess}
+        isError={statusInfo.isError}
+      />
+    </div>
+  );
+};
+const ProcessingCompleteCard = ({
+  completed = false,
+  text,
+  date,
+  isSuccess = false,
+  isError = false
+}: {
+  completed?: boolean;
+  text: string;
+  date: string;
+  isSuccess?: boolean;
+  isError?: boolean;
+}) => {
+  // Determine text color based on status
+  const getTextColorClass = () => {
+    if (isError) return "text-red-600";
+    if (isSuccess) return "text-green-600";
+    return "text-blue-500"; // Processing color
+  };
+  
+  return (
+    <div className="flex flex-col items-center z-50 max-[550px]:scale-95 max-[450px]:flex-row max-[450px]:gap-4">
+      <div>
+        <p className="text-black text-sm not-italic font-normal mb-1 max-[600px]:text-xs">
+          {date}
+        </p>
+      </div>
+      <div className="w-[55px] max-[550px]:w-[44px] bg-white flex items-center justify-center">
+        {isError ? (
+          // Cancelled status - Red X icon
+          <div className="w-[44px] h-[44px] flex items-center justify-center rounded-full bg-red-100 border-2 border-red-500">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+        ) : isSuccess ? (
+          // Success status - Green checkmark
+          <div className="w-[44px] h-[44px] flex items-center justify-center rounded-full bg-green-100 border-2 border-green-500">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        ) : (
+          // Processing status - Blue circular arrow/spinner
+          <div className="w-[44px] h-[44px] flex items-center justify-center rounded-full bg-blue-100 border-2 border-blue-500">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500 " fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </div>
+        )}
+      </div>
+      <p className={`mt-6 text-base not-italic font-medium max-[1000px]:text-sm max-[600px]:text-xs max-[450px]:mt-0 ${getTextColorClass()}`}>
+        {text}
+      </p>
+    </div>
+  );
+};
+type TrackOrder = {
+  id: number;
+  user: number;
+  product: [
+    {
+      id: number;
+      catId: number;
+      subCatId: number;
+      name: string;
+      price: number;
+      sellingPrice: number;
+      premiumPrice: number;
+      expireDate: string;
+      isBestSeller: boolean;
+      weight: number;
+      stock: number;
+      flavor: string;
+      images: string[];
+      qty: number;
+    }
+  ];
+  address: number;
+  usedCoupon: boolean;
+  coupon: number | string;
+  couponDiscount: number;
+  amount: number;
+  qty: number[];
+  paymentMethod: string;
+  transactionId: string | number;
+  usedBGLCash: boolean;
+  bglCash: number;
+  earnedBglCash: number;
+  shiping: number;
+  totalAmount: number;
+  orderID: string;
+  trackingID: string | number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};

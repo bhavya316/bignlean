@@ -1,0 +1,362 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.sm-1 {
+  box-shadow: 12px 12px 36px 2px rgba(14, 31, 53, 0.12);
+}
+.sm-3 {
+  box-shadow: 5px 0px 12px 1px rgba(14, 31, 53, 0.07);
+}
+.sm-2 {
+  box-shadow: 5px 4px 15px rgba(51, 51, 51, 0.05);
+}
+.linear-gradient-1 {
+  background: linear-gradient(90deg, #e70f0f 0%, #ff5f5f 100%);
+}
+.text-gradient {
+  background: linear-gradient(90deg, #e70f0f 0%, #ff5f5f 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+::-webkit-scrollbar {
+  width: 0px;
+}
+
+::-webkit-scrollbar-thumb {
+  width: 0px;
+}
+.swiper-pagination-bullet {
+  width: 50px !important;
+  height: 4px !important;
+  border-radius: 10px !important;
+  opacity: 1;
+  background: rgb(111, 111, 111) !important;
+  margin-right: 20px !important;
+}
+.swiper-pagination-bullet:last-child {
+  margin-right: 0 !important;
+}
+.swiper-pagination-bullet-active {
+  background: #fff !important;
+}
+.bg-order {
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="424" height="333" viewBox="0 0 424 333" fill="none"><g filter="url(%23filter0_d_544_2485)"><path d="M383 25C387.418 25 391 21.4183 391 17H404V300C404 305.523 399.523 310 394 310H30C24.4772 310 20 305.523 20 300V17H34C34 21.4183 37.5817 25 42 25C46.4183 25 50 21.4183 50 17H65C65 21.4183 68.5817 25 73 25C77.4183 25 81 21.4183 81 17H96C96 21.4183 99.5817 25 104 25C108.418 25 112 21.4183 112 17H127C127 21.4183 130.582 25 135 25C139.418 25 143 21.4183 143 17H158C158 21.4183 161.582 25 166 25C170.418 25 174 21.4183 174 17H189C189 21.4183 192.582 25 197 25C201.418 25 205 21.4183 205 17H220C220 21.4183 223.582 25 228 25C232.418 25 236 21.4183 236 17H251C251 21.4183 254.582 25 259 25C263.418 25 267 21.4183 267 17H282C282 21.4183 285.582 25 290 25C294.418 25 298 21.4183 298 17H313C313 21.4183 316.582 25 321 25C325.418 25 329 21.4183 329 17H344C344 21.4183 347.582 25 352 25C356.418 25 360 21.4183 360 17H375C375 21.4183 378.582 25 383 25Z" fill="white"/></g><defs><filter id="filter0_d_544_2485" x="0" y="0" width="424" height="333" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/><feOffset dy="3"/><feGaussianBlur stdDeviation="10"/><feColorMatrix type="matrix" values="0 0 0 0 0.890196 0 0 0 0 0.890196 0 0 0 0 0.890196 0 0 0 0.5 0"/><feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_544_2485"/><feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_544_2485" result="shape"/></filter></defs></svg>');
+  background-position: center;
+  background-size: cover;
+}
+
+img {
+  user-drag: none;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+@media (max-width: 550px) {
+  .sm-1 {
+    box-shadow: none;
+  }
+}
+
+.custom-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+
+.custom-grid2 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.custom-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.custom-grid4 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 1050px) {
+  .custom-grid4 {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+@media (max-width: 950px) {
+  .custom-grid2 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 800px) {
+  .custom-grid3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .custom-grid2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .swiper-pagination-bullet {
+    display: none !important;
+  }
+}
+@media (max-width: 500px) {
+  .custom-grid3 {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+@media (max-width: 450px) {
+  .custom-grid2 {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+
+@media (max-width: 1000px) {
+  .custom-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .custom-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.prev-btn {
+  background: url("https://static1.hkrtcdn.com/hknext/static/media/common/misc/homePageSlider_v1.svg");
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+.next-btn {
+  background: url("https://static1.hkrtcdn.com/hknext/static/media/common/misc/homePageSlider_v1.svg");
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type="number"] {
+  appearance: textfield;
+}
+
+
+/* New styles for Shop by Categories layout (280px to 450px only) */
+@media (min-width: 280px) and (max-width: 450px) {
+  .category-grid {
+    display: grid;
+    /* grid-template-columns: repeat(2, 1fr); */
+    gap: 10px;
+    padding: 10px;
+    background-color: #fff;
+    border-radius: 10px;
+  }
+
+  .category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 10px;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    aspect-ratio: 1 / 1;
+  }
+
+  .category-card img {
+    max-width: 80%;
+    height: auto;
+    margin-bottom: 5px;
+  }
+
+  .category-card .category-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    text-transform: uppercase;
+    margin-top: 5px;
+  }
+
+  .category-card.vitamins {
+    background-color: #ff4d4d; /* Red background for Vitamins & Minerals */
+    color: #fff;
+  }
+
+  .category-card.vitamins .category-label {
+    color: #fff;
+  }
+  /* .swiper-wrapper {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 10px; 
+   
+  }
+
+  .swiper-slide {
+    min-width: 0 !important;
+    width: 100% !important; 
+    margin-right: 0 !important; 
+  }
+
+  .swiper-button-next,
+  .swiper-button-prev,
+  .swiper-pagination {
+    display: none !important;
+  } */
+}
+
+/* Add to your global CSS file */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+.img-change img{
+  margin-top: 20px;
+  /* width: 69% !important; */
+  border-radius: 20px ;
+}
+
+.change-gap {
+  gap: 2.05rem;
+}
+.thunder-flash {
+  animation: flash-thunder 1.5s infinite ease-in-out;
+}
+.change-sidebar{
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap :2.4rem
+}
+
+/* Product Tab Styles */
+.tab-active {
+  position: relative;
+  background-color: #ffffff;
+  box-shadow: 0px -4px 8px rgba(0, 0, 0, 0.05);
+  border-radius: 8px 8px 0 0;
+}
+
+.tab-active::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background-color: #ffffff;
+}
+
+/* Product Overview Table styling */
+.overview-table {
+  width: 100%;
+}
+
+.overview-table td {
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.overview-table tr:last-child td {
+  border-bottom: none;
+}
+
+.overview-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.overview-row:last-child {
+  border-bottom: none;
+}
+
+/* Add these styles at the end of your file */
+
+/* Product Tab Styling */
+.shadow-tab {
+  box-shadow: 0px -4px 8px rgba(0, 0, 0, 0.05);
+}
+
+.tab-container {
+  background-color: #F9F9F9;
+  border-radius: 8px 8px 0 0;
+  padding: 0;
+  position: relative;
+}
+
+.active-tab {
+  position: relative;
+  background-color: #FFFFFF;
+  color: #E70F0F !important;
+  font-weight: 600;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  box-shadow: 0px -4px 8px rgba(0, 0, 0, 0.08);
+  z-index: 2;
+}
+
+.active-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background-color: #E70F0F;
+}
+
+.inactive-tab {
+  color: #6B7280;
+  background-color: transparent;
+}
+
+/* Ensure Overview Section styles match Figma design */
+.overview-section {
+  padding: 10px 10px;
+}
+
+
+/* Add this at the top of the file */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
+/* Add these class definitions */
+body, html {
+  font-family: 'Montserrat', sans-serif;
+}
+
+.montserrat {
+  font-family: 'Montserrat', sans-serif;
+}

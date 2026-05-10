@@ -1,0 +1,29 @@
+.custom-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #000;
+  border-radius: 3px;
+  position: relative;
+  cursor: pointer;
+}
+
+.custom-checkbox:checked {
+  background-color: #f00;
+  border-color: #f00;
+}
+
+.custom-checkbox:checked::before {
+  content: "";
+  position: absolute;
+  top: 0%;
+  left: 30%;
+  transform: translateX(-50%);
+  width: 3.5px;
+  height: 6.5px;
+  border: solid white;
+  border-width: 0 1px 1px 0;
+  transform: rotate(45deg);
+}
