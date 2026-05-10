@@ -1,0 +1,34 @@
+{
+  "name": "bignlean",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "seed:demo": "node seed-demo-data.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Deepak Kushwaha",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.1692.0",
+    "axios": "^1.9.0",
+    "axios-retry": "^3.9.1",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.0.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "firebase-admin": "^12.7.0",
+    "fs": "^0.0.1-security",
+    "https": "^1.0.0",
+    "msg91": "^2.2.4",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.6.3",
+    "nodemon": "^3.1.14",
+    "opossum": "^9.0.0",
+    "sequelize": "^6.34.0",
+    "twilio": "^5.6.0"
+  }
+}
