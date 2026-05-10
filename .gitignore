@@ -19,7 +19,9 @@ yarn-error.log*
 Thumbs.db
 
 # Environment variables
-# .env
+.env
+.env.*
+!.env.example
 
 
 # Build outputs
