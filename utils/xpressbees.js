@@ -1,4 +1,10 @@
 const axios = require('axios');
+const {
+  isXpressbeesTestMode,
+  createTestShipmentResponse,
+  createTestTrackingResponse,
+  createTestServiceabilityResponse,
+} = require("./xpressbeesTestMode");
 
 const BASE_URL = "https://shipment.xpressbees.com/api";
 
@@ -8,6 +14,10 @@ let tokenExpiry = null;
 
 // Get cached token or fetch new one if expired
 const getAuthToken = async () => {
+  if (isXpressbeesTestMode()) {
+    return "XPRESSBEES_TEST_TOKEN";
+  }
+
   const now = Date.now();
 
   // Check if token exists and is not expired (tokens typically last 24 hours)
@@ -43,6 +53,10 @@ const getAuthToken = async () => {
 // Create shipment
 const createShipment = async (shipmentData) => {
   try {
+    if (isXpressbeesTestMode()) {
+      return createTestShipmentResponse(shipmentData);
+    }
+
     const token = await getAuthToken();
     const response = await axios.post(`${BASE_URL}/shipments2`, shipmentData, {
       headers: {
@@ -61,6 +75,10 @@ const createShipment = async (shipmentData) => {
 // Track shipment
 const trackShipment = async (awb) => {
   try {
+    if (isXpressbeesTestMode() || String(awb || "").startsWith("XBTEST")) {
+      return createTestTrackingResponse(awb);
+    }
+
     const token = await getAuthToken();
     const response = await axios.get(`${BASE_URL}/shipments2/track/${awb}`, {
       headers: {
@@ -78,6 +96,14 @@ const trackShipment = async (awb) => {
 // Cancel shipment
 const cancelShipment = async (awb) => {
   try {
+    if (isXpressbeesTestMode() || String(awb || "").startsWith("XBTEST")) {
+      return {
+        status: true,
+        message: "Xpressbees test mode: shipment cancellation simulated",
+        data: { awb, testMode: true },
+      };
+    }
+
     const token = await getAuthToken();
     const response = await axios.post(`${BASE_URL}/shipments2/cancel`, {
       awb: awb
@@ -115,6 +141,10 @@ const getCourierList = async () => {
 // Check serviceability and rates
 const getServiceability = async (serviceabilityData) => {
   try {
+    if (isXpressbeesTestMode()) {
+      return createTestServiceabilityResponse(serviceabilityData);
+    }
+
     const token = await getAuthToken();
     const response = await axios.post(`${BASE_URL}/courier/serviceability`, serviceabilityData, {
       headers: {
@@ -211,5 +241,6 @@ module.exports = {
   getServiceability,
   generateManifest,
   getNDRList,
-  createNDRAction
+  createNDRAction,
+  isXpressbeesTestMode
 };

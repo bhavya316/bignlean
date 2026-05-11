@@ -95,26 +95,30 @@ Server/
    ```
 
 3. **Database Setup**
-   ```bash
-   # Create MySQL database
+   Start the local MySQL service, then create the database and app user:
+   ```powershell
+   Start-Service MYSQL80
    mysql -u root -p
-   CREATE DATABASE bignlean;
-   
-   # Import database schema
-   mysql -u root -p bignlean < Database/bignlean.sql
+   ```
+   ```sql
+   CREATE DATABASE IF NOT EXISTS bignlean;
+   CREATE USER IF NOT EXISTS 'bhavya'@'localhost' IDENTIFIED BY 'bhavya123';
+   GRANT ALL PRIVILEGES ON bignlean.* TO 'bhavya'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+   Import the bundled database dump:
+   ```powershell
+   mysql -u bhavya -p bignlean < Database\bignlean.sql
    ```
 
 4. **Configure Database Connection**
-   Update `config/database.js` with your MySQL credentials:
-   ```javascript
-   const sequelize = new Sequelize({
-     dialect: "mysql",
-     username: "your_username",
-     password: "your_password",
-     database: "bignlean",
-     host: "localhost",
-     port: 3306,
-   });
+   Copy `.env.example` to `.env` and update values if your local MySQL credentials differ:
+   ```env
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_NAME=bignlean
+   DB_USER=bhavya
+   DB_PASSWORD=bhavya123
    ```
 
 5. **Firebase Setup**
@@ -129,8 +133,13 @@ Server/
 Create a `.env` file in the root directory:
 
 ```env
-PORT=1123
+PORT=3002
 NODE_ENV=development
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=bignlean
+DB_USER=bhavya
+DB_PASSWORD=bhavya123
 TWOFACTOR_API_KEY=your_2factor_api_key
 FIREBASE_PROJECT_ID=your_firebase_project_id
 RAZORPAY_KEY_ID=your_razorpay_key
@@ -153,7 +162,7 @@ RAZORPAY_KEY_SECRET=your_razorpay_secret
 ```bash
 npm start
 ```
-The server will start on `http://localhost:1123`
+The server will start on `http://localhost:3002`
 
 ### Production Mode
 ```bash

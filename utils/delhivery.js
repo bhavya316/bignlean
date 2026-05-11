@@ -13,6 +13,12 @@ const Coupon = require("../admin/model/coupon");
 const { validateCouponForCart } = require("../admin/controllers/couponController");
 const { generateRandomId } = require("./functions");
 const { addTransaction } = require("../user/controllers/transactionController");
+const {
+  isXpressbeesTestMode,
+  createTestShipmentResponse,
+  createTestTrackingResponse,
+  createTestServiceabilityResponse,
+} = require("./xpressbeesTestMode");
 
 const getFlavorLabel = (flavor) => {
   if (typeof flavor === "string") return flavor;
@@ -48,12 +54,20 @@ const resolveVariantPricing = (variant, selectedFlavour) => {
 };
 
 async function loginUserAndGetToken() {
+  if (isXpressbeesTestMode()) {
+    return "XPRESSBEES_TEST_TOKEN";
+  }
+
   const apiUrl = "https://shipment.xpressbees.com/api/users/login";
 
   const requestData = {
     email: process.env.XPRESSBEES_EMAIL || "orders@bignlean.com",
     password: process.env.XPRESSBEES_PASSWORD || "Carry@2525",
   };
+
+  if (isXpressbeesTestMode()) {
+    return createTestServiceabilityResponse(requestData);
+  }
 
   const headers = {
     "Content-Type": "application/json",
@@ -157,6 +171,14 @@ async function manifestShipments(awbs, token) {
 }
 
 async function cancelShipment(awb, token) {
+  if (isXpressbeesTestMode() || String(awb || "").startsWith("XBTEST")) {
+    return {
+      status: true,
+      message: "Xpressbees test mode: shipment cancellation simulated",
+      data: { awb, testMode: true },
+    };
+  }
+
   const apiUrl = "https://shipment.xpressbees.com/api/shipments2/cancel";
 
   const requestData = {
@@ -366,10 +388,14 @@ async function calculateCartDetails(user, coupon, addressId) {
 
     let canUseBGLCash = false;
     let afterUseBGLCash = totalPrice;
+    const walletBalance = await Transaction.calculateFinalValueForUser(user);
 
-    if (totalPrice >= 3000) {
+    if (totalPrice >= 3000 && walletBalance >= 500) {
       canUseBGLCash = true;
-      afterUseBGLCash = totalPrice - userData.bglCash;
+      afterUseBGLCash = Math.max(
+        0,
+        totalPrice - Math.min(walletBalance, totalPrice)
+      );
     }
 
     return {
@@ -380,6 +406,7 @@ async function calculateCartDetails(user, coupon, addressId) {
       couponDiscount: totalCouponDiscount,
       canUseBGLCash,
       afterUseBGLCash,
+      walletBalance,
       isPremium,
     };
   } catch (error) {
@@ -389,6 +416,10 @@ async function calculateCartDetails(user, coupon, addressId) {
 }
 
 async function trackShipment(awb, token) {
+  if (isXpressbeesTestMode() || String(awb || "").startsWith("XBTEST")) {
+    return createTestTrackingResponse(awb);
+  }
+
   const apiUrl = `https://shipment.xpressbees.com/api/shipments2/track/${awb}`;
 
   const headers = {
@@ -445,12 +476,18 @@ async function createShipment(
     consignee: consignee,
     pickup: pickup,
     order_items: orderItems,
-    courier_id: courierId || "1",
     collectable_amount: collectableAmount || 0,
   };
+  if (courierId) {
+    requestData.courier_id = courierId;
+  }
 
   console.log("Shipment request data:", JSON.stringify(requestData, null, 2));
   console.log("Auth token:", authToken ? "Present" : "Missing");
+
+  if (isXpressbeesTestMode()) {
+    return createTestShipmentResponse(requestData);
+  }
 
   const headers = {
     "Content-Type": "application/json",
@@ -1010,8 +1047,9 @@ router.post("/placeOrder", async (req, res) => {
     // Loyalty redemption eligibility and limits
     const walletBalance = await Transaction.calculateFinalValueForUser(userid);
     const isCartEligibleForRedemption = amount >= 3000;
+    const requestedBGLCash = Math.floor(Number(bglCash) || 0);
 
-    if (bglCash && Number(bglCash) > 0) {
+    if (requestedBGLCash > 0) {
       if (!isCartEligibleForRedemption) {
         return res.status(400).json({
           status: false,
@@ -1024,28 +1062,28 @@ router.post("/placeOrder", async (req, res) => {
           message: "Minimum 500 Bignlean Coins required to redeem",
         });
       }
-      if (bglCash > walletBalance) {
+      if (requestedBGLCash > walletBalance) {
         return res.status(400).json({
           status: false,
           message: `Insufficient Bignlean Coins. Available: ${walletBalance}`,
         });
       }
       // Do not allow redemption to exceed payable product amount (excluding shipping)
-      const maxRedeemable = Math.max(0, amount - couponDis);
-      if (bglCash > maxRedeemable) {
+      const maxRedeemable = Math.max(0, amount);
+      if (requestedBGLCash > maxRedeemable) {
         return res.status(400).json({
           status: false,
           message: `You can redeem up to ₹${maxRedeemable} on this order`,
         });
       }
       usedBGLCash = true;
-      usedBGL = Math.floor(Number(bglCash));
+      usedBGL = requestedBGLCash;
     }
 
     // Static earning: 10 coins per ₹1000 spent on eligible amount (excluding discounts/shipping)
     const eligibleSpend = amount; // already excludes discounts per calculateCartDetails
     const earnedCoins = Math.floor(eligibleSpend / 1000) * 10;
-    const totalAmount = amount - couponDis - usedBGL;
+    const totalAmount = Math.max(0, amount - usedBGL);
 
     const orderData = {
       user: userid,
@@ -1063,7 +1101,7 @@ router.post("/placeOrder", async (req, res) => {
       bglCash: usedBGL || 0,
       earnedBglCash: earnedCoins || 0,
       shiping,
-      totalAmount: totalAmount || 0,
+      totalAmount,
       orderID,
       status: "Processing"
     };
@@ -1076,13 +1114,7 @@ router.post("/placeOrder", async (req, res) => {
       });
       const order = await Order.create(orderData);
       await Cart.destroy({ where: { user: userid } });
-      if (earnedCoins > 0) {
-        await addTransaction(userid, order.id, "Bignlean Cash Earned", "in", earnedCoins);
-      }
-
-      // If usedBGLCash is true, create a transaction for BGL cash usage
       if (usedBGLCash) {
-        // Use the requested bglCash as the transaction value
         await Transaction.create({
           user: userid,
           orderId: order.id,
@@ -1090,6 +1122,9 @@ router.post("/placeOrder", async (req, res) => {
           type: "out",
           value: usedBGL
         });
+      }
+      if (earnedCoins > 0) {
+        await addTransaction(userid, order.id, "Bignlean Cash Earned", "in", earnedCoins);
       }
 
       const referral = await Refer.findOne({ where: { referTo: userid } });
@@ -1218,10 +1253,14 @@ async function calculateCartDetailsFallback(user, coupon, addressId) {
 
     let canUseBGLCash = false;
     let afterUseBGLCash = totalPrice;
+    const walletBalance = await Transaction.calculateFinalValueForUser(user);
 
-    if (totalPrice >= 3000) {
+    if (totalPrice >= 3000 && walletBalance >= 500) {
       canUseBGLCash = true;
-      afterUseBGLCash = totalPrice - userData.bglCash;
+      afterUseBGLCash = Math.max(
+        0,
+        totalPrice - Math.min(walletBalance, totalPrice)
+      );
     }
 
     return {
@@ -1232,6 +1271,7 @@ async function calculateCartDetailsFallback(user, coupon, addressId) {
       couponDiscount: totalCouponDiscount,
       canUseBGLCash,
       afterUseBGLCash,
+      walletBalance,
       isPremium,
     };
   } catch (error) {
@@ -1371,7 +1411,7 @@ router.get("/order/track/:id", async (req, res) => {
         .status(200)
         .json({ status: true, isAccepted: false, order: orders });
     }
-    const response = trackShipment(orders.trackingID, token);
+    const response = await trackShipment(orders.trackingID, token);
     response.orderDetails = orders;
     response.isAccepted = true;
     res.status(200).json(response);
@@ -1413,6 +1453,7 @@ router.put("/order/accept/:id", async (req, res) => {
         message: "Shipping address not found"
       });
     }
+    const customer = await User.findByPk(order.user);
 
     // Calculate weight with fallback
     let weight = 500; // Default weight in grams
@@ -1423,17 +1464,40 @@ router.put("/order/accept/:id", async (req, res) => {
     }
 
     // Prepare shipping details
-    const discount = order.amount - order.totalAmount;
-    const collectableAmount = order.paymentMethod === "COD" ? order.totalAmount : 0;
+    const shippingCharge = Number(order.shiping) || 0;
+    const payableAmount = Math.max(
+      0,
+      Number(order.totalAmount || 0) + shippingCharge
+    );
+    const discount = Math.max(
+      0,
+      Number(order.couponDiscount || 0) + Number(order.bglCash || 0)
+    );
+    const collectableAmount = order.paymentMethod === "COD" ? payableAmount : 0;
+    const consigneePhone = String(address.phone || customer?.phone || "")
+      .replace(/\D/g, "")
+      .slice(-10);
+    const consigneeName = address.name || customer?.name || "Customer";
+    const consigneeAddress = [address.flat, address.landmark]
+      .filter(Boolean)
+      .join(", ");
+
+    if (!consigneeAddress || !address.city || !address.pincode || !consigneePhone) {
+      return res.status(400).json({
+        status: false,
+        message:
+          "Cannot create shipment: customer address, pincode, or phone is missing",
+      });
+    }
     
     const consignee = {
-      name: address.name,
-      address: address.flat,
-      address_2: address.landmark,
+      name: consigneeName,
+      address: consigneeAddress,
+      address_2: address.landmark || "",
       city: address.city,
-      state: address.state,
+      state: address.state || address.city,
       pincode: address.pincode,
-      phone: address.phone,
+      phone: consigneePhone,
     };
 
     const pickup = {
@@ -1481,6 +1545,12 @@ router.put("/order/accept/:id", async (req, res) => {
         message: "Error preparing order items"
       });
     }
+    if (!orderItems.length) {
+      return res.status(400).json({
+        status: false,
+        message: "Cannot create shipment: order has no shippable items",
+      });
+    }
 
     // Try to create shipment
     try {
@@ -1490,10 +1560,10 @@ router.put("/order/accept/:id", async (req, res) => {
       
       console.log("Creating shipment with data:", {
         orderID: order.orderID,
-        shipping: order.shiping,
+        shipping: shippingCharge,
         discount: discount,
         paymentMethod: order.paymentMethod,
-        totalAmount: order.totalAmount,
+        totalAmount: payableAmount,
         weight: weight,
         orderItemsCount: orderItems.length,
         collectableAmount: collectableAmount
@@ -1501,11 +1571,11 @@ router.put("/order/accept/:id", async (req, res) => {
       
       const response = await createShipment(
         order.orderID,
-        order.shiping,
+        shippingCharge,
         discount,
         0,
         order.paymentMethod === "COD" ? "cod" : "prepaid",
-        order.totalAmount,
+        payableAmount,
         weight,
         10,
         10,
@@ -1514,42 +1584,42 @@ router.put("/order/accept/:id", async (req, res) => {
         consignee,
         pickup,
         orderItems,
-        "1",
+        req.body?.courierId || req.body?.courier_id || null,
         collectableAmount,
         token
       );
 
       console.log("Shipment API response:", JSON.stringify(response, null, 2));
 
-      if (response && response.status === true && response.data && response.data.awb_number) {
+      const awbNumber = response?.data?.awb_number || response?.data?.awb;
+
+      if (response && response.status === true && awbNumber) {
         // Success - update order with tracking info
         await order.update({
-          status: "PP",
-          trackingID: response.data.awb_number
+          status: "Accepted",
+          trackingID: awbNumber
         });
         
-        console.log("Order updated successfully with tracking ID:", response.data.awb_number);
+        console.log("Order updated successfully with tracking ID:", awbNumber);
         return res.status(200).json({ 
           status: true, 
           message: "Order accepted and shipment created successfully",
           order: {
             id: order.id,
-            status: "PP",
+            status: "Accepted",
             orderID: order.orderID,
-            trackingID: response.data.awb_number
+            trackingID: awbNumber
           }
         });
       } else {
-        // Shipment creation failed but still accept the order
         console.log("Shipment creation failed, response:", response);
-        await order.update({ status: "Accepted" });
         
-        return res.status(200).json({
-          status: true,
-          message: "Order accepted but shipment creation failed",
+        return res.status(400).json({
+          status: false,
+          message: "Shipment creation failed. Order was not accepted.",
           order: {
             id: order.id,
-            status: "Accepted",
+            status: order.status,
             orderID: order.orderID
           },
           shippingError: response?.message || "Could not create shipment with courier service",
@@ -1560,15 +1630,12 @@ router.put("/order/accept/:id", async (req, res) => {
       console.error("Shipping API error:", shippingError.message);
       console.error("Error stack:", shippingError.stack);
       
-      // Still accept the order even if shipping integration fails
-      await order.update({ status: "Accepted" });
-      
-      return res.status(200).json({
-        status: true,
-        message: "Order accepted but shipping setup failed",
+      return res.status(502).json({
+        status: false,
+        message: "Shipping setup failed. Order was not accepted.",
         order: {
           id: order.id,
-          status: "Accepted",
+          status: order.status,
           orderID: order.orderID
         },
         shippingError: shippingError.message
@@ -1640,10 +1707,10 @@ router.post("/order/create-shipment/:id", async (req, res) => {
       });
     }
 
-    if (order.status === "Processing") {
+    if (order.status === "Delivered" || order.status === "Cancelled") {
       return res.status(400).json({
         status: false,
-        message: "Order must be accepted first before creating shipment"
+        message: `Cannot create shipment for ${order.status} order`
       });
     }
 
@@ -1662,6 +1729,7 @@ router.post("/order/create-shipment/:id", async (req, res) => {
         message: "Shipping address not found"
       });
     }
+    const customer = await User.findByPk(order.user);
 
     // Calculate weight
     let weight = 500;
@@ -1672,17 +1740,40 @@ router.post("/order/create-shipment/:id", async (req, res) => {
     }
 
     // Prepare shipping details
-    const discount = order.amount - order.totalAmount;
-    const collectableAmount = order.paymentMethod === "COD" ? order.totalAmount : 0;
+    const shippingCharge = Number(order.shiping) || 0;
+    const payableAmount = Math.max(
+      0,
+      Number(order.totalAmount || 0) + shippingCharge
+    );
+    const discount = Math.max(
+      0,
+      Number(order.couponDiscount || 0) + Number(order.bglCash || 0)
+    );
+    const collectableAmount = order.paymentMethod === "COD" ? payableAmount : 0;
+    const consigneePhone = String(address.phone || customer?.phone || "")
+      .replace(/\D/g, "")
+      .slice(-10);
+    const consigneeName = address.name || customer?.name || "Customer";
+    const consigneeAddress = [address.flat, address.landmark]
+      .filter(Boolean)
+      .join(", ");
+
+    if (!consigneeAddress || !address.city || !address.pincode || !consigneePhone) {
+      return res.status(400).json({
+        status: false,
+        message:
+          "Cannot create shipment: customer address, pincode, or phone is missing",
+      });
+    }
     
     const consignee = {
-      name: address.name,
-      address: address.flat,
-      address_2: address.landmark,
+      name: consigneeName,
+      address: consigneeAddress,
+      address_2: address.landmark || "",
       city: address.city,
-      state: address.state,
+      state: address.state || address.city,
       pincode: address.pincode,
-      phone: address.phone,
+      phone: consigneePhone,
     };
 
     const pickup = {
@@ -1716,16 +1807,22 @@ router.post("/order/create-shipment/:id", async (req, res) => {
         orderItems.push(details);
       }
     }
+    if (!orderItems.length) {
+      return res.status(400).json({
+        status: false,
+        message: "Cannot create shipment: order has no shippable items",
+      });
+    }
 
     // Create shipment
     const token = await loginUserAndGetToken();
     const response = await createShipment(
       order.orderID,
-      order.shiping,
+      shippingCharge,
       discount,
       0,
       order.paymentMethod === "COD" ? "cod" : "prepaid",
-      order.totalAmount,
+      payableAmount,
       weight,
       10,
       10,
@@ -1734,15 +1831,17 @@ router.post("/order/create-shipment/:id", async (req, res) => {
       consignee,
       pickup,
       orderItems,
-      "1",
+      req.body?.courierId || req.body?.courier_id || null,
       collectableAmount,
       token
     );
 
-    if (response && response.status === true && response.data && response.data.awb_number) {
+    const awbNumber = response?.data?.awb_number || response?.data?.awb;
+
+    if (response && response.status === true && awbNumber) {
       await order.update({
-        status: "PP",
-        trackingID: response.data.awb_number
+        status: "Accepted",
+        trackingID: awbNumber
       });
       
       return res.status(200).json({ 
@@ -1750,9 +1849,9 @@ router.post("/order/create-shipment/:id", async (req, res) => {
         message: "Shipment created successfully",
         order: {
           id: order.id,
-          status: "PP",
+          status: "Accepted",
           orderID: order.orderID,
-          trackingID: response.data.awb_number
+          trackingID: awbNumber
         }
       });
     } else {
@@ -1791,13 +1890,24 @@ router.put("/order/Complete/:id", async (req, res) => {
 
     let transaction = null;
     if (earnedCoins > 0) {
-      transaction = await Transaction.create({
-        value: earnedCoins,
-        type: "in",
-        orderId: order.id,
-        user: order.user,
-        title: "Bignlean Cash Earned"
+      transaction = await Transaction.findOne({
+        where: {
+          user: order.user,
+          orderId: order.id,
+          type: "in",
+          title: "Bignlean Cash Earned",
+        },
       });
+
+      if (!transaction) {
+        transaction = await Transaction.create({
+          value: earnedCoins,
+          type: "in",
+          orderId: order.id,
+          user: order.user,
+          title: "Bignlean Cash Earned"
+        });
+      }
     }
 
     res.status(200).json({
@@ -1930,11 +2040,24 @@ router.get("/transactions", async (req, res) => {
     });
 
     if (!transactions || transactions.length === 0) {
+      const summary = userId
+        ? await Transaction.calculateWalletSummaryForUser(userId)
+        : {
+            baseBglCash: 0,
+            transactionTotalIn: 0,
+            totalIn: 0,
+            totalOut: 0,
+            balance: 0,
+          };
+
       return res.status(200).json({
         status: true,
-        total: 0,
-        totalIn: 0,
-        totalOut: 0,
+        total: summary.balance,
+        walletBalance: summary.balance,
+        baseBglCash: summary.baseBglCash,
+        transactionTotalIn: summary.transactionTotalIn,
+        totalIn: summary.totalIn,
+        totalOut: summary.totalOut,
         transactions: [],
       });
     }
@@ -1985,11 +2108,24 @@ router.get("/transactions", async (req, res) => {
       };
     });
 
+    const summary = userId
+      ? await Transaction.calculateWalletSummaryForUser(userId)
+      : {
+          baseBglCash: 0,
+          transactionTotalIn: totalIn,
+          totalIn,
+          totalOut,
+          balance: Math.max(totalIn - totalOut, 0),
+        };
+
     res.status(200).json({
       status: true,
-      total: totalIn - totalOut, // New field: total = totalIn - totalOut
-      totalIn,
-      totalOut,
+      total: summary.balance,
+      walletBalance: summary.balance,
+      baseBglCash: summary.baseBglCash,
+      transactionTotalIn: summary.transactionTotalIn,
+      totalIn: summary.totalIn,
+      totalOut: summary.totalOut,
       transactions: formattedTransactions,
     });
   } catch (e) {

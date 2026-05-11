@@ -77,6 +77,43 @@ function formatDate(inputDate) {
   return formattedDate;
 }
 
+const parseAmount = (value) => {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+const getVariantPrice = (product) => {
+  const variants = Array.isArray(product?.varients) ? product.varients : [];
+  const variant = variants[0] || {};
+  const sellingPrice = parseAmount(variant.sellingPrice || variant.price);
+  const premiumPrice = parseAmount(variant.premiumPrice);
+  const mrp = parseAmount(variant.mrp);
+
+  return {
+    mrp,
+    sellingPrice: sellingPrice || premiumPrice || mrp,
+    premiumPrice,
+  };
+};
+
+const buildOrderSummary = (order) => {
+  const subtotal = parseAmount(order.amount);
+  const couponDiscount = parseAmount(order.couponDiscount);
+  const walletDiscount = parseAmount(order.bglCash);
+  const shipping = parseAmount(order.shiping);
+  const payable = Math.max(0, parseAmount(order.totalAmount) + shipping);
+
+  return {
+    subtotal,
+    couponDiscount,
+    walletDiscount,
+    shipping,
+    payable,
+    totalAmount: parseAmount(order.totalAmount),
+    earnedBglCash: parseAmount(order.earnedBglCash),
+  };
+};
+
 // router.get("/orders", async (req, res) => {
 //   try {
 //     // Fetch orders sorted by createdAt in descending order
@@ -146,17 +183,41 @@ router.get("/orders", async (req, res) => {
       // Fetch products in parallel
       const productPromises = productIds.map(async (id, index) => {
         const product = await Product.findByPk(id);
-        return product ? { ...product.dataValues, qty: productQty[index] || 0 } : null;
+        if (!product) return null;
+
+        const productData = product.toJSON();
+        const qty = parseAmount(productQty[index] || 0);
+        const pricing = getVariantPrice(productData);
+        const lineAmount = pricing.sellingPrice * qty;
+
+        return {
+          ...productData,
+          qty,
+          amount: lineAmount,
+          lineTotal: lineAmount,
+          unitPrice: pricing.sellingPrice,
+          sellingPrice: pricing.sellingPrice,
+          mrp: pricing.mrp,
+          premiumPrice: pricing.premiumPrice,
+          createdAt: order.createdAt,
+        };
       });
 
       const products = (await Promise.all(productPromises)).filter((p) => p !== null);
 
-      // Remove unwanted fields
-      const { qty, usedCoupon, coupon, amount, updatedAt, ...orderData } = order.dataValues;
+      const orderJson = order.toJSON();
+      const orderSummary = buildOrderSummary(orderJson);
+      const { updatedAt, ...orderData } = orderJson;
 
       // Format order with necessary data
       orderData.product = products;
-      orderData.createdAt = formatDate(order.createdAt);
+      orderData.createdAt = order.createdAt;
+      orderData.formattedCreatedAt = formatDate(order.createdAt);
+      orderData.amount = orderSummary.subtotal;
+      orderData.orderSummary = orderSummary;
+      orderData.payableAmount = orderSummary.payable;
+      orderData.walletDiscount = orderSummary.walletDiscount;
+      orderData.shippingCharge = orderSummary.shipping;
       orderData.address = await Address.findByPk(order.address);
       orderData.user = await User.findByPk(order.user);
 

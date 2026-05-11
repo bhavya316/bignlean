@@ -311,7 +311,15 @@ const User = sequelize.define("users", {
   phone: { type: DataTypes.STRING, allowNull: false, unique: true },
   email: { type: DataTypes.STRING, allowNull: true },
   gender: { type: DataTypes.STRING, allowNull: true },
-  bglCash: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+  bglCash: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    validate: { min: 0 },
+    set(value) {
+      this.setDataValue("bglCash", Math.max(0, Math.floor(Number(value) || 0)));
+    },
+  },
   dob: { type: DataTypes.STRING, allowNull: true },
   height: { type: DataTypes.FLOAT, allowNull: true },
   weight: { type: DataTypes.FLOAT, allowNull: true },

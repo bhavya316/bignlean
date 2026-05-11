@@ -7,6 +7,7 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "seed:demo": "node seed-demo-data.js",
+    "seed:clean": "node seed-clean-test-data.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Deepak Kushwaha",

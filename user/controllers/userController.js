@@ -1029,13 +1029,16 @@
         ]
       });
 
-      const usersWithOrders = users.map(user => {
+      const usersWithOrders = await Promise.all(users.map(async (user) => {
         const userData = user.toJSON();
+        const walletBalance = await Transaction.calculateFinalValueForUser(user.id);
         return {
           ...userData,
+          bglCash: walletBalance,
+          walletBalance,
           orders: userData.orders || []
         };
-      });
+      }));
 
       res.status(200).json({
         status: true,
@@ -1065,7 +1068,13 @@
         isPremium = false;
       }
       user.isPremium = isPremium;
-      const newUser = { ...user.toJSON(), isPremium };
+      const walletBalance = await Transaction.calculateFinalValueForUser(id);
+      const newUser = {
+        ...user.toJSON(),
+        bglCash: walletBalance,
+        walletBalance,
+        isPremium,
+      };
       res.status(200).json({ status: true, message: "OK", user: newUser });
     } catch (e) {
       console.log(e);

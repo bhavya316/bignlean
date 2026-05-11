@@ -15,7 +15,8 @@ const {
   getAuthToken,
   createShipment,
   trackShipment,
-  getServiceability
+  getServiceability,
+  isXpressbeesTestMode
 } = xpressbees;
 
 // Cancel shipment
@@ -59,6 +60,7 @@ router.get("/providers/status", async (req, res) => {
     xpressbees: {
       configured: true,
       usesFallbackCredentials: !process.env.XPRESSBEES_EMAIL || !process.env.XPRESSBEES_PASSWORD,
+      testMode: isXpressbeesTestMode(),
       mounted: true,
       routes: ["/serviceability", "/create-shipment", "/track/:awb"],
     },
@@ -186,7 +188,7 @@ router.post("/create-shipment", async (req, res) => {
       const awbNumber = result.data.awb_number || result.data.awb;
       if (awbNumber) {
         await Order.update(
-          { trackingID: awbNumber },
+          { trackingID: awbNumber, status: "Accepted" },
           { where: { orderID: shipmentData.order_number } }
         );
       }
