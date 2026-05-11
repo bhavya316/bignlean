@@ -5,6 +5,7 @@ import { useGetRecentViews } from "@/queries/dataHandlers";
 import { useRouter } from "next/navigation";
 import { SwiperSlide } from "swiper/react";
 import { useMediaQuery } from "react-responsive";
+import { getVariantDiscountPercent } from "@/utils/variantPricing";
 
 export default function RecentlyViewed() {
   const { slidePerView, userData } = useAppContext();
@@ -25,10 +26,9 @@ export default function RecentlyViewed() {
     ?.map((view: any) => {
       const product = view.product;
 
-      // Calculate discount percentage
-      const premiumPrice = parseFloat(product.varients?.[0]?.premiumPrice || "0");
-      const sellingPrice = parseFloat(product.varients?.[0]?.sellingPrice || "0");
-      const discountPercentage = premiumPrice > 0 ? ((premiumPrice - sellingPrice) / premiumPrice) * 100 : 0;
+      const discountPercentage = getVariantDiscountPercent(
+        product.varients?.[0]
+      );
 
       return {
         id: product.id,

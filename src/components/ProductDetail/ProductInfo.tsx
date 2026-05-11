@@ -13,7 +13,12 @@ import {
 } from "@/queries/Product";
 import { Varient } from "@/utils/Types";
 import { ProductDetailType } from "@/utils/productType";
-import { resolveVariantSelection } from "@/utils/variantPricing";
+import {
+  getVariantDiscountPercent,
+  getVariantMarketPrice,
+  getVariantSellingPrice,
+  resolveVariantSelection,
+} from "@/utils/variantPricing";
 import { useQueryClient } from "@tanstack/react-query";
 import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -296,22 +301,26 @@ const PriceCard = ({
   className?: string;
   varient: Varient;
 }) => {
+  const marketPrice = getVariantMarketPrice(varient);
+  const sellingPrice = getVariantSellingPrice(varient);
+  const discountPercent = getVariantDiscountPercent(varient);
+
   return (
     <div className={className}>
       <div className="flex items-center gap-2">
-        <p className="text-black text-base not-italic font-normal line-through opacity-30">
-          ₹{varient?.premiumPrice}
-        </p>
-        <p className="text-green-500 text-xs not-italic font-semibold">
-          {percentOffCalc(
-            Number(varient?.premiumPrice),
-            Number(varient?.sellingPrice)
-          )}
-          % off
-        </p>
+        {discountPercent > 0 && (
+          <p className="text-black text-base not-italic font-normal line-through opacity-30">
+            ₹{marketPrice.toFixed(0)}
+          </p>
+        )}
+        {discountPercent > 0 && (
+          <p className="text-green-500 text-xs not-italic font-semibold">
+            {discountPercent.toFixed(0)}% off
+          </p>
+        )}
       </div>
       <p className="text-gradient text-2xl not-italic font-bold">
-        ₹{varient?.sellingPrice}
+        ₹{sellingPrice.toFixed(0)}
       </p>
       <p className="text-black text-xs not-italic font-normal">
         Inclusive of all taxes
@@ -319,10 +328,10 @@ const PriceCard = ({
     </div>
   );
 };
-export const percentOffCalc = (premiumPrice: number, sellingPrice: number) => {
-  if (!premiumPrice || premiumPrice <= 0 || !sellingPrice) return "0";
-  const priceDiff = premiumPrice - sellingPrice;
-  const percentOff = (priceDiff / premiumPrice) * 100;
+export const percentOffCalc = (marketPrice: number, sellingPrice: number) => {
+  if (!marketPrice || marketPrice <= 0 || !sellingPrice) return "0";
+  const priceDiff = marketPrice - sellingPrice;
+  const percentOff = (priceDiff / marketPrice) * 100;
   return percentOff.toFixed(0);
 };
 export const QuantityCard = ({

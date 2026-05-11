@@ -5,6 +5,10 @@ import { useGetComboProductDetail } from "@/queries/dataHandlers";
 import { ProductDetailType } from "@/utils/productType";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import {
+  getVariantMarketPrice,
+  getVariantSellingPrice,
+} from "@/utils/variantPricing";
 
 export default function Page() {
   const params = useParams();
@@ -153,7 +157,8 @@ function ComboSelectionCard({
   locked?: boolean;
   onClick?: () => void;
 }) {
-  const variant = product?.varients?.[0];
+  const sellingPrice = getVariantPrice(product, "sellingPrice");
+  const marketPrice = getVariantPrice(product, "mrp");
 
   return (
     <button
@@ -177,11 +182,13 @@ function ComboSelectionCard({
         </p>
         <div className="mt-1 flex items-center gap-2">
           <span className="text-sm font-bold text-black">
-            ₹{Number(variant?.sellingPrice || 0).toFixed(0)}
+            ₹{sellingPrice.toFixed(0)}
           </span>
-          <span className="text-xs text-gray-500 line-through">
-            ₹{getVariantPrice(product, "mrp").toFixed(0)}
-          </span>
+          {marketPrice > sellingPrice && (
+            <span className="text-xs text-gray-500 line-through">
+              ₹{marketPrice.toFixed(0)}
+            </span>
+          )}
         </div>
       </div>
       <span
@@ -198,8 +205,8 @@ function getVariantPrice(product: any, key: "mrp" | "sellingPrice") {
   if (!variant) return 0;
 
   if (key === "mrp") {
-    return Number(variant.mrp || variant.premiumPrice || 0);
+    return getVariantMarketPrice(variant);
   }
 
-  return Number(variant.sellingPrice || 0);
+  return getVariantSellingPrice(variant);
 }

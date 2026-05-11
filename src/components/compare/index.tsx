@@ -13,6 +13,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { useQueryClient } from "@tanstack/react-query";
+import { getFirstFlavorLabel, getOptionLabel, resolveVariantSelection } from "@/utils/variantPricing";
 
 export default function ComparePage() {
   const params = useSearchParams();
@@ -31,9 +32,12 @@ export default function ComparePage() {
       const defaultProduct = (data?.products as ProductDataType[])?.find(
         (product) => product.id === Number(productId)
       );
+      const firstVariant = defaultProduct?.varients?.[0];
+      const firstFlavor = getFirstFlavorLabel(firstVariant);
+      const firstVariantPricing = resolveVariantSelection(firstVariant, firstFlavor);
       const filterData = {
-        price: defaultProduct?.varients?.[0]?.sellingPrice,
-        weight: defaultProduct?.varients?.[0]?.units,
+        price: firstVariantPricing?.sellingPrice,
+        weight: getOptionLabel(firstVariant?.units),
         brand: defaultProduct?.brand?.heading,
         rating: defaultProduct?.averageRating,
       };
@@ -111,9 +115,12 @@ export const ProductsCompareInfo = ({
   useEffect(() => {
     if (data) {
       const product: ProductDetailType = data?.data?.result;
+      const firstVariant = product?.varients?.[0];
+      const firstFlavor = getFirstFlavorLabel(firstVariant);
+      const firstVariantPricing = resolveVariantSelection(firstVariant, firstFlavor);
       const filterData = {
-        price: product?.varients?.[0]?.sellingPrice,
-        weight: product?.varients?.[0]?.units,
+        price: firstVariantPricing?.sellingPrice,
+        weight: getOptionLabel(firstVariant?.units),
         brand: product?.brand?.heading,
         rating: product?.averageRating,
       };
@@ -169,8 +176,8 @@ export const ProductsCompareInfo = ({
                   <div className="text-xs">
                     <p className="line-clamp-2">{product?.name}</p>
                     <p className="font-light text-gray-500">
-                      {product?.varients?.[0]?.units}-
-                      {product?.varients?.[0]?.flavor?.[0]}
+                      {getOptionLabel(product?.varients?.[0]?.units)}-
+                      {getFirstFlavorLabel(product?.varients?.[0])}
                     </p>
                   </div>
                 </div>
@@ -192,6 +199,9 @@ export const ProductCard = ({
   setProductData: any;
   productsDetails: any;
 }) => {
+  const firstVariant = productsDetails?.varients?.[0];
+  const firstFlavor = getFirstFlavorLabel(firstVariant);
+  const unitLabel = getOptionLabel(firstVariant?.units);
   return (
     <div className="flex flex-col items-center h-full">
       <div className="relative shadow-md border rounded-lg bg-white p-3 w-[200px] max-[500px]:w-full mb-2">
@@ -215,8 +225,8 @@ export const ProductCard = ({
         {productsDetails?.name?.length > 30 ? "..." : ""}
       </h3>
       <p className="text-black text-base flex max-sm:text-xs items-center gap-2 font-normal">
-        <span>{productsDetails?.weight}</span>
-        <span>{productsDetails?.flavor}</span>
+        <span>{unitLabel}</span>
+        <span>{firstFlavor}</span>
       </p>
     </div>
   );
@@ -274,7 +284,7 @@ export const ComparisonTable = ({
 
     // Get the first variant and its first flavor
     const firstVariant = product.varients[0];
-    const firstFlavor = firstVariant?.flavor?.[0] || "";
+    const firstFlavor = getFirstFlavorLabel(firstVariant);
 
     // Debug log
     console.log("Adding to cart from comparison:", {

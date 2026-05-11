@@ -8,6 +8,7 @@ import CustomPageWrapper from "@/components/Wrappers/CustomPageWrapper";
 import { useAppContext } from "@/provider/ContextProvider/ContextProvider";
 import { useCancelOrder, useGetAllOrder } from "@/queries/Order";
 import { useTrackShipment, useGetTracking, TrackingData } from "@/queries/Shipping";
+import { getFlavorLabel, getOptionLabel } from "@/utils/variantPricing";
 
 export default function Page() {
   const { userData } = useAppContext();
@@ -121,7 +122,7 @@ const ProductDetailCard = ({
             {order?.product?.[0]?.name}
           </p>
           <p className="text-black text-sm not-italic font-normal opacity-40">
-            {order?.product?.[0]?.weight}- {order?.product?.[0]?.flavor}
+            {getOptionLabel(order?.product?.[0]?.weight)}- {getFlavorLabel(order?.product?.[0]?.flavor as any)}
           </p>
         </div>
         {order?.status !== "Cancelled" && (

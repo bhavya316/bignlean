@@ -15,8 +15,10 @@ import { useRouter } from "next/navigation";
 import { RazorPayIcon } from "@/Icons/RazorPayIcon";
 import { useAppContext } from "@/provider/ContextProvider/ContextProvider";
 import { toast } from "react-toastify";
-import axios from "axios";
-import { API_CONFIG } from "@/config/api";
+import {
+  useGetWalletTransactions,
+  type WalletApiResponse,
+} from "@/queries/Wallet";
 
 export default function Page() {
   const { userData } = useAppContext();
@@ -45,6 +47,12 @@ export default function Page() {
   } = useGetCartList(userData?.id as number);
   const { data: cartPrice, refetch: refetchCartPrice } =
     useGetCartPrice(cartParams);
+  const {
+    data: walletData,
+    isLoading: isWalletLoading,
+    isError: isWalletError,
+  } = useGetWalletTransactions(userData?.id);
+  const walletBalance = getWalletBalance(walletData);
 
   const [paymentMethod, setPaymentMethod] = useState("");
 
@@ -167,21 +175,32 @@ export default function Page() {
         discount += itemDiscount;
       });
 
+      const safeCash = getSafeWalletCash(bnlCash, walletBalance, {
+        status: true,
+        totalAmount,
+        shiping: 40,
+        discount,
+        couponDiscount: 0,
+        canUseBGLCash: totalAmount >= 3000 && walletBalance >= 500,
+        afterUseBGLCash: totalAmount,
+        isPremium: false,
+      });
+
       return {
         status: true,
         totalAmount: totalAmount,
         shiping: 40,
         discount: discount,
         couponDiscount: 0,
-        canUseBGLCash: true,
-        afterUseBGLCash: totalAmount - bnlCash,
+        canUseBGLCash: totalAmount >= 3000 && walletBalance >= 500,
+        afterUseBGLCash: Math.max(0, totalAmount - safeCash),
         isPremium: false,
       };
     } catch (error) {
       console.error("Error calculating cart price:", error);
       return null;
     }
-  }, [cartList?.data?.cartItems, bnlCash]);
+  }, [cartList?.data?.cartItems, bnlCash, walletBalance]);
 
   // Use API price data or fallback to calculated price
   const effectiveCartPrice = useMemo(() => {
@@ -252,17 +271,31 @@ export default function Page() {
       setAddressErr(false);
       setPayErr(false);
 
-      // Enforce redemption policy on client (server validates too)
-      const canRedeem = (effectiveCartPrice?.totalAmount || 0) >= 3000;
-      const safeBnlCash = (() => {
-        const requested = Math.floor(Number(bnlCash) || 0);
-        if (requested <= 0) return 0;
-        if (!canRedeem) return 0;
-        const cartAmount = Number(effectiveCartPrice?.totalAmount || 0);
-        const couponDiscount = Number(effectiveCartPrice?.couponDiscount || 0);
-        const maxRedeemable = Math.max(0, cartAmount - couponDiscount);
-        return Math.max(0, Math.min(requested, maxRedeemable));
-      })();
+      if (bnlCash > 0 && isWalletLoading) {
+        toast.error("Please wait while wallet balance is checked");
+        setIsPlacingOrder(false);
+        return;
+      }
+
+      if (bnlCash > 0 && isWalletError) {
+        toast.error("Unable to verify wallet balance. Please try again.");
+        setIsPlacingOrder(false);
+        return;
+      }
+
+      const safeBnlCash = getSafeWalletCash(
+        bnlCash,
+        walletBalance,
+        effectiveCartPrice
+      );
+      if (bnlCash > safeBnlCash) {
+        setBnlCash(safeBnlCash);
+        toast.info(
+          safeBnlCash > 0
+            ? `Wallet redemption adjusted to ₹${safeBnlCash}`
+            : "Wallet redemption removed because it is not eligible"
+        );
+      }
 
       const payload = {
         userid: Number(userData.id),
@@ -325,12 +358,18 @@ export default function Page() {
                   qty: item.qty,
                   price: item.sellingPrice,
                 })) || [];
+              const payableAmount = Math.max(
+                0,
+                Number(effectiveCartPrice?.totalAmount || 0) +
+                  Number(effectiveCartPrice?.shiping || 0) -
+                  safeBnlCash
+              );
 
               const shipmentPayload = {
                 order_number: String(orderId || Date.now()), // Fallback if orderId missing, but should be there
                 payment_type: "cod",
-                order_amount: effectiveCartPrice?.totalAmount || 0,
-                collectable_amount: effectiveCartPrice?.totalAmount || 0, // For COD, same as order amount
+                order_amount: payableAmount,
+                collectable_amount: payableAmount,
                 courier_id: bestCourierId,
                 consignee: {
                   name: userData?.name || "Customer",
@@ -416,7 +455,12 @@ export default function Page() {
 
   const totalAmount = effectiveCartPrice?.totalAmount || 0;
   const shipping = effectiveCartPrice?.shiping || 0;
-  const finalAmount = Math.max(0, totalAmount + shipping - bnlCash);
+  const safeBnlCash = getSafeWalletCash(
+    bnlCash,
+    walletBalance,
+    effectiveCartPrice
+  );
+  const finalAmount = Math.max(0, totalAmount + shipping - safeBnlCash);
 
   return (
     <CustomPageWrapper heading="Cart">
@@ -430,17 +474,19 @@ export default function Page() {
             </div>
             <div className="flex-[0.4] flex flex-col gap-4">
               <SpareCashCard
-                userId={userData?.id as number}
                 setBnlCash={setBnlCash}
-                bnlCash={bnlCash}
+                bnlCash={safeBnlCash}
                 cartPrice={effectiveCartPrice}
+                walletBalance={walletBalance}
+                isLoading={isWalletLoading}
+                error={isWalletError ? "Failed to load wallet balance" : null}
               />
               <ApplyCouponCard
                 setCouponId={setCouponId}
                 appliedCoupon={couponId}
               />
               <OrderCard
-                bnlCash={bnlCash}
+                bnlCash={safeBnlCash}
                 cartPrice={effectiveCartPrice}
                 onRetry={retryLoadCartPrice}
               />
@@ -533,6 +579,40 @@ export default function Page() {
   );
 }
 
+function getWalletBalance(walletData: WalletApiResponse | undefined) {
+  const transactions = Array.isArray(walletData?.transactions)
+    ? walletData.transactions
+    : [];
+
+  const calculatedBalance = transactions.reduce((total, transaction) => {
+    const value = Number(transaction.value) || 0;
+
+    if (transaction.type === "in") return total + value;
+    if (transaction.type === "out") return total - value;
+    return total;
+  }, 0);
+
+  const balance = Number(
+    walletData?.total ?? walletData?.walletBalance ?? calculatedBalance
+  );
+
+  return Math.max(0, Math.floor(Number.isFinite(balance) ? balance : 0));
+}
+
+function getSafeWalletCash(
+  requestedCash: number,
+  walletBalance: number,
+  cartPrice: CarttPrice | null | undefined
+) {
+  const requested = Math.max(0, Math.floor(Number(requestedCash) || 0));
+  const available = Math.max(0, Math.floor(Number(walletBalance) || 0));
+  const cartAmount = Math.max(0, Number(cartPrice?.totalAmount || 0));
+
+  if (requested <= 0 || cartAmount < 3000 || available < 500) return 0;
+
+  return Math.min(requested, available, cartAmount);
+}
+
 const SavingBanner = ({
   totalSavings,
 }: {
@@ -552,40 +632,23 @@ const SavingBanner = ({
 };
 
 const SpareCashCard = ({
-  userId,
   setBnlCash,
   bnlCash,
   cartPrice,
+  walletBalance,
+  isLoading,
+  error,
 }: {
-  userId: number;
   setBnlCash: React.Dispatch<React.SetStateAction<number>>;
   bnlCash: number;
   cartPrice: CarttPrice | null | undefined;
+  walletBalance: number;
+  isLoading: boolean;
+  error: string | null;
 }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [inputValue, setInputValue] = useState<string>("");
-  const [walletBalance, setWalletBalance] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const [eligibilityMsg, setEligibilityMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!userId) return;
-    setIsLoading(true);
-    axios
-      .get(`${API_CONFIG.BASE_URL}/transactions?userId=${userId}`)
-      .then((res) => {
-        setWalletBalance(res.data.total || 0);
-        setError(null);
-      })
-      .catch((err) => {
-        console.error("Error fetching wallet balance:", err);
-        setWalletBalance(0);
-        setError("Failed to load wallet balance");
-        toast.error("Failed to load wallet balance");
-      })
-      .finally(() => setIsLoading(false));
-  }, [userId]);
 
   // React to eligibility changes: reset applied cash if user becomes ineligible
   useEffect(() => {
@@ -606,8 +669,14 @@ const SpareCashCard = ({
       if (!isLoading) {
         toast.error("Loyalty cash removed: redemption not eligible currently");
       }
+    } else if (bnlCash > walletBalance) {
+      const safeCash = getSafeWalletCash(bnlCash, walletBalance, cartPrice);
+      setBnlCash(safeCash);
+      if (!isLoading) {
+        toast.error(`Wallet redemption cannot exceed ₹${walletBalance}`);
+      }
     }
-  }, [cartPrice?.totalAmount, walletBalance]);
+  }, [cartPrice?.totalAmount, walletBalance, isLoading, bnlCash, setBnlCash]);
 
   const handleDialogOpen = () => {
     const cartAmount = Number(cartPrice?.totalAmount || 0);
@@ -630,8 +699,7 @@ const SpareCashCard = ({
   const handleDialogConfirm = () => {
     const value = Number(inputValue);
     const cartAmount = Number(cartPrice?.totalAmount || 0);
-    const couponDiscount = Number(cartPrice?.couponDiscount || 0);
-    const maxRedeemable = Math.max(0, cartAmount - couponDiscount);
+    const maxRedeemable = Math.max(0, cartAmount);
     const isCartEligible = cartAmount >= 3000;
     const hasMinCoins = walletBalance >= 500;
 
@@ -703,8 +771,7 @@ const SpareCashCard = ({
 
     const value = Number(inputValue);
     const cartAmount = Number(cartPrice?.totalAmount || 0);
-    const couponDiscount = Number(cartPrice?.couponDiscount || 0);
-    const maxRedeemable = Math.max(0, cartAmount - couponDiscount);
+    const maxRedeemable = Math.max(0, cartAmount);
     const isCartEligible = cartAmount >= 3000;
     const hasMinCoins = walletBalance >= 500;
 
@@ -752,6 +819,7 @@ const SpareCashCard = ({
           type="checkbox"
           className="w-[18px] h-[18px] cursor-pointer"
           checked={bnlCash > 0}
+          onClick={(e) => e.stopPropagation()}
           onChange={(e) => {
             if (!e.target.checked) {
               setBnlCash(0);

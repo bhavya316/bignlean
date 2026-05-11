@@ -31,6 +31,13 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import PrimaryButton from "../Buttons/PrimaryButton";
+import {
+  getFirstFlavorLabel,
+  getVariantDiscountPercent,
+  getVariantMarketPrice,
+  getVariantSellingPrice,
+  resolveVariantSelection,
+} from "@/utils/variantPricing";
 
 type Props = {
   productData?: ProductDataType | ProductDetailType;
@@ -107,7 +114,7 @@ export function SimilarProductCard({
 
     // Get the first variant and its first flavor
     const firstVariant = product.varients[0];
-    const firstFlavor = firstVariant?.flavor?.[0] || "";
+    const firstFlavor = getFirstFlavorLabel(firstVariant);
 
     addToCart(
       {
@@ -148,6 +155,12 @@ export function SimilarProductCard({
   };
 
   if (product) {
+    const firstVariant = product?.varients?.[0];
+    const firstFlavor = getFirstFlavorLabel(firstVariant);
+    const firstVariantPricing = resolveVariantSelection(firstVariant, firstFlavor);
+    const marketPrice = getVariantMarketPrice(firstVariantPricing);
+    const sellingPrice = getVariantSellingPrice(firstVariantPricing);
+    const discountPercent = getVariantDiscountPercent(firstVariantPricing);
     const link = pathname === 'combo'
       ? `/combo/${product?.id}`
       : isOffer
@@ -188,7 +201,7 @@ export function SimilarProductCard({
             </div>
           </div>
           <p className="text-gray-600 text-xs">
-            {product?.varients?.[0]?.flavor?.[0]}
+            {firstFlavor}
           </p>
         </div>
         <div className="flex font-medium text-sm items-center gap-1">
@@ -197,11 +210,13 @@ export function SimilarProductCard({
         </div>
         <div className="flex items-center justify-between ">
           <div>
-            <p className="text-black text-xs not-italic font-medium line-through opacity-40">
-              ₹ {product?.varients?.[0]?.premiumPrice}
-            </p>
+            {discountPercent > 0 && (
+              <p className="text-black text-xs not-italic font-medium line-through opacity-40">
+                ₹ {marketPrice.toFixed(0)}
+              </p>
+            )}
             <p className="text-black text-base not-italic font-bold">
-              ₹ {product?.varients?.[0]?.sellingPrice}
+              ₹ {sellingPrice.toFixed(0)}
             </p>
           </div>
           {product?.isBestSeller && (
@@ -220,9 +235,11 @@ export function SimilarProductCard({
           onClick={addCartHandler}
           label="Add to cart"
         />
-        <p className="absolute top-0 left-0 text-green-500 text-xs not-italic font-bold bg-[#DFF3E2] p-2 rounded-br-[15px]">
-          {product?.discountPercentage?.toFixed(0)}% off
-        </p>
+        {discountPercent > 0 && (
+          <p className="absolute top-0 left-0 text-green-500 text-xs not-italic font-bold bg-[#DFF3E2] p-2 rounded-br-[15px]">
+            {discountPercent.toFixed(0)}% off
+          </p>
+        )}
         <button className="absolute top-3 right-3">
           {isWishListed ? (
             <div onClick={removeWish}>

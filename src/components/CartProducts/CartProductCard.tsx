@@ -5,7 +5,14 @@ import {
   useUpdateQuantityFromCart,
 } from "@/queries/Cart";
 import { cartData } from "./CartProducts";
-import { resolveVariantSelection } from "@/utils/variantPricing";
+import {
+  getFlavorLabel,
+  getOptionLabel,
+  getVariantMarketPrice,
+  getVariantSavings,
+  getVariantSellingPrice,
+  resolveVariantSelection,
+} from "@/utils/variantPricing";
 
 export default function CartProductCard({
   className,
@@ -20,11 +27,16 @@ export default function CartProductCard({
   const productData = productDetail?.product?.varients?.find(
     (varient) => varient.id === productDetail?.varientId
   );
+  const selectedFlavour = getFlavorLabel(productDetail?.flavour as any);
   const selectedVariantPricing = resolveVariantSelection(
     productData,
-    productDetail?.flavour
+    selectedFlavour
   );
+  const unitLabel = getOptionLabel(selectedVariantPricing?.units);
   const availableStock = Number(selectedVariantPricing?.stock || 0);
+  const marketPrice = getVariantMarketPrice(selectedVariantPricing);
+  const sellingPrice = getVariantSellingPrice(selectedVariantPricing);
+  const savings = getVariantSavings(selectedVariantPricing);
   const decreaseQuantity = () => {
     const nextQty = Number(productDetail?.qty || 0) - 1;
     if (nextQty <= 0) {
@@ -51,20 +63,22 @@ export default function CartProductCard({
           {data?.data?.result?.name}
         </p>
         <p className="text-black text-xs not-italic font-normal opacity-40">
-          {selectedVariantPricing?.units} - {productDetail?.flavour}
+          {unitLabel} - {selectedFlavour}
         </p>
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <p className="text-black text-xs not-italic font-normal line-through opacity-40">
-            ₹{selectedVariantPricing?.premiumPrice}
-          </p>
+          {savings > 0 && (
+            <p className="text-black text-xs not-italic font-normal line-through opacity-40">
+              ₹{marketPrice.toFixed(0)}
+            </p>
+          )}
           <p className="text-black text-sm not-italic font-bold">
-            ₹{selectedVariantPricing?.sellingPrice}
+            ₹{sellingPrice.toFixed(0)}
           </p>
-          <p className="text-green-500 text-sm not-italic font-medium">
-            Save ₹
-            {Number(selectedVariantPricing?.premiumPrice) -
-              Number(selectedVariantPricing?.sellingPrice)}
-          </p>
+          {savings > 0 && (
+            <p className="text-green-500 text-sm not-italic font-medium">
+              Save ₹{savings.toFixed(0)}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-[10px]">
           <button

@@ -4,7 +4,7 @@ import { Varient } from "@/utils/Types";
 import { ProductDetailType } from "@/utils/productType";
 import { Dispatch, SetStateAction, useState } from "react";
 import VarityButton from "../Buttons/VarityButton";
-import { getVariantFlavors, resolveVariantSelection } from "@/utils/variantPricing";
+import { getOptionLabel, getVariantFlavors, resolveVariantSelection } from "@/utils/variantPricing";
 
 export default function ProductVarient({
   product,
@@ -166,7 +166,7 @@ const WeightCard = ({
             onClick={() => setSelectedVarientId(varient.id)}
             key={varient.id}
             active={varient.id === selectedVarientId}
-            label={varient.units}
+            label={getOptionLabel(varient.units)}
           />
         ))}
       </div>
