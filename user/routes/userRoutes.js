@@ -70,6 +70,15 @@ router.post(
 );
 
 router.post(
+  "/resend-otp",
+  sendLoginOtpLimiter,
+  [body("phone").notEmpty().withMessage("Phone is required")],
+  handleValidation,
+  checkUserBlocked,
+  userController.resendOtp
+);
+
+router.post(
   "/login",
   loginLimiter,
   [

@@ -60,6 +60,57 @@ const resolveVariantPricing = (variant, selectedFlavour) => {
   };
 };
 
+const parseAmount = (value) => {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+const buildOrderItemSnapshot = (product, cartItem, isPremium) => {
+  const productData =
+    product && typeof product.toJSON === "function" ? product.toJSON() : product;
+  const variants = Array.isArray(productData?.varients) ? productData.varients : [];
+  const selectedVariant =
+    variants.find((item) => `${item.id}` === `${cartItem.varientId}`) ||
+    variants[0] ||
+    {};
+  const selectedPricing = resolveVariantPricing(selectedVariant, cartItem.flavour);
+  const mrp = parseAmount(selectedPricing.mrp ?? cartItem.mrp);
+  const sellingPrice = parseAmount(
+    selectedPricing.sellingPrice ?? selectedPricing.price ?? cartItem.sellingPrice
+  );
+  const premiumPrice = parseAmount(selectedPricing.premiumPrice ?? cartItem.premiumPrice);
+  const unitPrice = isPremium
+    ? premiumPrice || sellingPrice || mrp
+    : sellingPrice || premiumPrice || mrp;
+  const qty = parseAmount(cartItem.qty);
+  const flavour = cartItem.flavour || getFlavorLabel(selectedPricing);
+
+  return {
+    product: cartItem.product,
+    productId: cartItem.product,
+    varientId: cartItem.varientId,
+    variantId: cartItem.varientId,
+    flavour,
+    flavor: flavour,
+    qty,
+    units: selectedVariant.units || selectedPricing.units || "",
+    mrp,
+    sellingPrice,
+    premiumPrice,
+    unitPrice,
+    amount: unitPrice * qty,
+    lineTotal: unitPrice * qty,
+    variant: {
+      id: selectedVariant.id ?? cartItem.varientId,
+      units: selectedVariant.units || "",
+      stock: selectedPricing.stock ?? selectedVariant.stock,
+      mrp,
+      sellingPrice,
+      premiumPrice,
+    },
+  };
+};
+
 async function loginUserAndGetToken() {
   if (isXpressbeesTestMode()) {
     return "XPRESSBEES_TEST_TOKEN";
@@ -1098,10 +1149,19 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
     const eligibleSpend = amount; // already excludes discounts per calculateCartDetails
     const earnedCoins = Math.floor(eligibleSpend / 1000) * 10;
     const totalAmount = Math.max(0, amount - usedBGL);
+    const orderItems = [];
+
+    for (const item of cartItems) {
+      const product = await Product.findByPk(item.product);
+      if (product) {
+        orderItems.push(buildOrderItemSnapshot(product, item, cartDetails.isPremium));
+      }
+    }
 
     const orderData = {
       user: userid,
       product: itemsIDList,
+      items: orderItems,
       address: addressid,
       usedCoupon,
       coupon: couponId,

@@ -26,6 +26,14 @@ const Brand = sequelize.define("brands", {
     type: DataTypes.TEXT,
     allowNull: false,
   },
+  originCountry: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  originCountryCode: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 });
 
 module.exports = Brand;

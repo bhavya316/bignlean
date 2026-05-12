@@ -8,7 +8,7 @@ router.post(
   [ 
     body("catId").notEmpty().withMessage("Category ID is required"),
     body("subCatId").notEmpty().withMessage("Subcategory ID is required"),
-    body("countryOfOrigin").notEmpty().withMessage("Country of Origin is required"),
+    body("countryOfOrigin").optional(),
     body("isVeg").isBoolean().withMessage("isVeg must be a boolean"),
    
   ],

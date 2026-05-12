@@ -102,7 +102,7 @@ const uploadSingleFile = (req, res, next) => {
   });
 };
 
-router.post("/upload", authMiddleware, uploadSingleFile, (req, res) => {
+router.post("/upload", uploadSingleFile, (req, res) => {
   if (!req.file) {
     return res.status(400).json({ status: false, message: "No file uploaded" });
   }

@@ -7,6 +7,17 @@ const normalizeBanner = (banner) => {
   return [];
 };
 
+const normalizeBrandPayload = (body, existingBrand = {}) => ({
+  ...body,
+  banner:
+    body.banner === undefined
+      ? existingBrand.banner
+      : normalizeBanner(body.banner),
+  description: body.description || existingBrand.description || " ",
+  originCountry: body.originCountry || body.countryOfOrigin || existingBrand.originCountry || null,
+  originCountryCode: body.originCountryCode || existingBrand.originCountryCode || null,
+});
+
 const addBrand = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -18,11 +29,7 @@ const addBrand = async (req, res) => {
   }
 
   try {
-    const newBrand = await Brand.create({
-      ...req.body,
-      banner: normalizeBanner(req.body.banner),
-      description: req.body.description || " ",
-    });
+    const newBrand = await Brand.create(normalizeBrandPayload(req.body));
     res
       .status(201)
       .json({ status: true, message: "Brand added.", brand: newBrand });
@@ -67,14 +74,7 @@ const updateBrand = async (req, res) => {
         .json({ status: false, message: "Brand not found" });
     }
 
-    const updatedBrand = await brand.update({
-      ...req.body,
-      banner:
-        req.body.banner === undefined
-          ? brand.banner
-          : normalizeBanner(req.body.banner),
-      description: req.body.description || brand.description || " ",
-    });
+    const updatedBrand = await brand.update(normalizeBrandPayload(req.body, brand));
     res
       .status(200)
       .json({ status: true, message: "Brand updated.", brand: updatedBrand });

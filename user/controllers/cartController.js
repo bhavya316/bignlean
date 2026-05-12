@@ -8,14 +8,15 @@ const getFlavorLabel = (flavor) => {
   return flavor?.name || flavor?.flavor || flavor?.label || "";
 };
 
+const getVariantFlavorOptions = (variant) => {
+  if (Array.isArray(variant?.flavors)) return variant.flavors;
+  if (Array.isArray(variant?.flavour)) return variant.flavour;
+  if (Array.isArray(variant?.flavor)) return variant.flavor;
+  return [];
+};
+
 const resolveVariantPricing = (variant, selectedFlavour) => {
-  const flavors = Array.isArray(variant?.flavors)
-    ? variant.flavors
-    : Array.isArray(variant?.flavour)
-    ? variant.flavour
-    : Array.isArray(variant?.flavor)
-    ? variant.flavor
-    : [];
+  const flavors = getVariantFlavorOptions(variant);
   const selectedFlavorData = flavors.find(
     (flavor) => getFlavorLabel(flavor) === selectedFlavour
   );
@@ -76,7 +77,8 @@ const addToCart = async (req, res) => {
       }
 
       // Validate variant has flavors array
-      if (!Array.isArray(selectedVariant.flavor)) {
+      const flavorOptions = getVariantFlavorOptions(selectedVariant);
+      if (!Array.isArray(flavorOptions)) {
         return res.status(400).json({
           status: false,
           message: "No flavors available for this variant.",
@@ -85,13 +87,13 @@ const addToCart = async (req, res) => {
 
       // If no flavor is selected but variants have flavors, use the first one
       let selectedFlavour = flavour;
-      if (!flavour && selectedVariant.flavor.length > 0) {
-        selectedFlavour = getFlavorLabel(selectedVariant.flavor[0]);
+      if (!flavour && flavorOptions.length > 0) {
+        selectedFlavour = getFlavorLabel(flavorOptions[0]);
       }
 
       // Validate the selected flavor exists
-      const selectedFlavorExists = selectedVariant.flavor.length === 0 ||
-        selectedVariant.flavor.some(
+      const selectedFlavorExists = flavorOptions.length === 0 ||
+        flavorOptions.some(
           (flavor) => getFlavorLabel(flavor) === selectedFlavour
         );
       if (!selectedFlavorExists) {

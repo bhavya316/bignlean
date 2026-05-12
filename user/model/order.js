@@ -98,6 +98,10 @@ const Order = sequelize.define("orders", {
     type: DataTypes.JSON,
     allowNull: false,
   },
+  items: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
   address: {
     type: DataTypes.INTEGER,
     allowNull: false,

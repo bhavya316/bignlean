@@ -135,6 +135,34 @@ const sendLoginOtp = async (req, res, next) => {
   }
 };
 
+const resendOtp = async (req, res, next) => {
+  const { phone } = req.body;
+
+  try {
+    const user = await User.findOne({ where: { phone } });
+    if (!user) {
+      throw createHttpError(404, "User not found");
+    }
+
+    const otp = generateOtp();
+    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
+    await user.update({ otp, otpExpiry });
+
+    const sent = await sendSmsOtp(phone, otp);
+    if (!sent) {
+      throw createHttpError(502, "Unable to send OTP. Please try again.");
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: "OTP resent successfully.",
+      user: sanitizeUser(user),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const validateOtp = (user, otp) =>
   user.otp === otp && user.otpExpiry && user.otpExpiry >= new Date();
 
@@ -444,6 +472,7 @@ const blockUser = async (req, res, next) => {
 module.exports = {
   createUser,
   sendLoginOtp,
+  resendOtp,
   verifyOtp,
   loginUser,
   updateUser,

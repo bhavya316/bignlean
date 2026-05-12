@@ -22,30 +22,71 @@ const getFlavorLabel = (flavor) => {
   return flavor?.name || flavor?.flavor || flavor?.label || "";
 };
 
-const normalizeVariant = (variant, index) => {
-  const flavorOptions = Array.isArray(variant?.flavors)
-    ? variant.flavors
-    : Array.isArray(variant?.flavour)
-    ? variant.flavour
-    : Array.isArray(variant?.flavor)
-    ? variant.flavor
-    : [];
+const getVariantFlavorOptions = (variant) => {
+  if (Array.isArray(variant?.flavors)) return variant.flavors;
+  if (Array.isArray(variant?.flavour)) return variant.flavour;
+  if (Array.isArray(variant?.flavor)) return variant.flavor;
+  return [];
+};
 
-  const normalizedFlavors = flavorOptions.map((flavor) => {
-    if (typeof flavor === "string") return flavor;
-    return {
-      name: getFlavorLabel(flavor),
-      stock: flavor.stock ?? variant.stock ?? 0,
-      mrp: flavor.mrp ?? variant.mrp ?? 0,
-      sellingPrice: flavor.sellingPrice ?? flavor.price ?? variant.sellingPrice ?? 0,
-      premiumPrice: flavor.premiumPrice ?? variant.premiumPrice ?? variant.mrp ?? 0,
-    };
-  });
+const getBrandOriginCountry = (brand) =>
+  brand?.originCountry || brand?.countryOfOrigin || null;
+
+const getBrandOriginCode = (brand) => brand?.originCountryCode || null;
+
+const applyBrandOriginToProductData = (productData, brandInfo) => {
+  const originCountry = getBrandOriginCountry(brandInfo);
+  const originCountryCode = getBrandOriginCode(brandInfo);
+
+  return {
+    ...productData,
+    varients: normalizeVariants(productData?.varients) || productData?.varients,
+    countryOfOrigin: originCountry || productData?.countryOfOrigin,
+    brandOriginCountry: originCountry,
+    brandOriginCountryCode: originCountryCode,
+  };
+};
+
+const applyBrandOriginFallbackToRequest = async (body, currentBrandId = null) => {
+  const brandId = body.brandId || currentBrandId;
+  if (!brandId || body.countryOfOrigin) return;
+
+  const brandInfo = await Brand.findByPk(brandId);
+  const originCountry = getBrandOriginCountry(brandInfo);
+  if (originCountry) {
+    body.countryOfOrigin = originCountry;
+  }
+};
+
+const normalizeVariant = (variant, index) => {
+  const flavorOptions = getVariantFlavorOptions(variant);
+
+  const normalizedFlavors = flavorOptions
+    .map((flavor) => {
+      const label = getFlavorLabel(flavor);
+      const flavorData = flavor && typeof flavor === "object" ? flavor : null;
+      return {
+        name: label,
+        stock: flavorData ? flavorData.stock ?? variant.stock ?? 0 : variant.stock ?? 0,
+        mrp: flavorData ? flavorData.mrp ?? variant.mrp ?? 0 : variant.mrp ?? 0,
+        sellingPrice:
+          flavorData
+            ? flavorData.sellingPrice ?? flavorData.price ?? variant.sellingPrice ?? 0
+            : variant.sellingPrice ?? 0,
+        premiumPrice:
+          flavorData
+            ? flavorData.premiumPrice ?? variant.premiumPrice ?? variant.mrp ?? 0
+            : variant.premiumPrice ?? variant.mrp ?? 0,
+      };
+    })
+    .filter((flavor) => flavor.name);
+  const flavorLabels = normalizedFlavors.map((flavor) => flavor.name).filter(Boolean);
 
   return {
     ...variant,
     id: variant?.id ?? index + 1,
-    flavor: normalizedFlavors,
+    flavor: flavorLabels,
+    flavors: normalizedFlavors,
     stock: variant?.stock ?? normalizedFlavors?.[0]?.stock ?? 0,
     mrp: variant?.mrp ?? normalizedFlavors?.[0]?.mrp ?? 0,
     sellingPrice: variant?.sellingPrice ?? normalizedFlavors?.[0]?.sellingPrice ?? 0,
@@ -70,7 +111,7 @@ const hasSellableVariant = (variants) => {
       Number(variant.mrp || 0) > 0 &&
       Number(variant.sellingPrice || 0) > 0;
 
-    const flavorOptions = Array.isArray(variant.flavor) ? variant.flavor : [];
+    const flavorOptions = getVariantFlavorOptions(variant);
     const hasFlavorPrices = flavorOptions.some(
       (flavor) =>
         typeof flavor === "object" &&
@@ -109,6 +150,13 @@ const addProduct = async (req, res) => {
   }
 
   try {
+    await applyBrandOriginFallbackToRequest(req.body);
+    if (!req.body.countryOfOrigin) {
+      return res.status(400).json({
+        status: false,
+        message: "Country of Origin is required or must be configured on the selected brand",
+      });
+    }
     const product = await Product.create(req.body);
     res.status(201).json({ status: true, message: "Product added.", product });
   } catch (error) {
@@ -251,7 +299,7 @@ const getProductbyId = async (req, res) => {
 
     const productDetails = product.dataValues;
     const result = {
-      ...productDetails,
+      ...applyBrandOriginToProductData(productDetails, brandInfo),
       brandName: brandInfo ? brandInfo.name : null, // Added brandName
       isVeg: productDetails.isVeg,
       images: productDetails.images,
@@ -359,9 +407,8 @@ const getProductbyId = async (req, res) => {
       const itemBrand = await Brand.findByPk(item.brandId);
 
       const newItem = {
-        ...item.dataValues,
+        ...applyBrandOriginToProductData(item.dataValues, itemBrand),
         brandName: itemBrand ? itemBrand.name : null, // Added brandName here too
-        countryOfOrigin: item.dataValues.countryOfOrigin,
         isVeg: item.dataValues.isVeg,
         averageRating,
         discountPercentage
@@ -415,6 +462,8 @@ const updateProduct = async (req, res) => {
         });
       }
     }
+
+    await applyBrandOriginFallbackToRequest(req.body, product.brandId);
 
     const updatedProduct = await product.update(req.body);
     res.status(200).json({
@@ -575,8 +624,9 @@ const getAllProducts = async (req, res) => {
           isBestSellerMatch &&
           queryMatched
         ) {
+          const productBrandInfo = await Brand.findByPk(product.brandId);
           return {
-            ...product.dataValues,
+            ...applyBrandOriginToProductData(product.dataValues, productBrandInfo),
             averageRating,
             discountPercentage,
             totalRating,
@@ -739,7 +789,15 @@ const hasStock = (product) => {
     return variants.some((v) => {
       const s = v?.stock;
       const n = typeof s === "string" ? parseInt(s, 10) : Number(s);
-      return n > 0;
+      if (n > 0) return true;
+
+      return getVariantFlavorOptions(v).some((flavor) => {
+        if (!flavor || typeof flavor !== "object") return false;
+        const stock = flavor.stock;
+        const stockValue =
+          typeof stock === "string" ? parseInt(stock, 10) : Number(stock);
+        return stockValue > 0;
+      });
     });
   } catch {
     return false;
@@ -782,9 +840,10 @@ const getRelatedProducts = async (req, res) => {
       const mrp = parseAmount(product?.dataValues?.varients?.[0]?.mrp);
       const sp = parseAmount(product?.dataValues?.varients?.[0]?.sellingPrice);
       const discountPercentage = mrp > 0 ? ((mrp - sp) / mrp) * 100 : 0;
+      const brandInfo = await Brand.findByPk(product.brandId);
 
       return {
-        ...product.dataValues,
+        ...applyBrandOriginToProductData(product.dataValues, brandInfo),
         images: product.images,
         averageRating,
         discountPercentage,
@@ -976,9 +1035,10 @@ const getBestSellerProducts = async (req, res) => {
         const myRating = parsedRatings.filter(
           (rating) => rating.user && rating.user.id == userId
         );
+        const brandInfo = await Brand.findByPk(product.brandId);
 
         return {
-          ...product,
+          ...applyBrandOriginToProductData(product, brandInfo),
           isVeg: product.isVeg,
           images: product.images,
           overView: product.overView,
@@ -1120,8 +1180,9 @@ const getBestSellingProductsToday = async (req, res) => {
 
         // Get product details like in getProductbyId
         const productDetails = product.dataValues || product;
+        const brandInfo = await Brand.findByPk(productDetails.brandId);
         const result = {
-          ...productDetails,
+          ...applyBrandOriginToProductData(productDetails, brandInfo),
           images: productDetails.images,
           overView: productDetails.overView,
           details: productDetails.details,
@@ -1303,8 +1364,9 @@ const getBestSellingProductTodayById = async (req, res) => {
         .json({ status: false, message: "Product not found" });
     }
     const productDetails = product.dataValues;
+    const brandInfo = await Brand.findByPk(product.brandId);
     const result = {
-      ...productDetails,
+      ...applyBrandOriginToProductData(productDetails, brandInfo),
       images: productDetails.images,
       overView: productDetails.overView,
       details: productDetails.details,
@@ -1479,9 +1541,10 @@ const getAllProductsPaginated = async (req, res) => {
               parseInt(product.varients[0].mrp || 1)) *
             100
             : 0;
+        const brandInfo = await Brand.findByPk(product.brandId);
 
         return {
-          ...product.dataValues,
+          ...applyBrandOriginToProductData(product.dataValues, brandInfo),
           averageRating,
           discountPercentage,
           totalRatings: ratings.length,

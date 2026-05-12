@@ -82,18 +82,93 @@ const parseAmount = (value) => {
   return Number.isFinite(amount) ? amount : 0;
 };
 
-const getVariantPrice = (product) => {
+const getFlavorLabel = (flavor) => {
+  if (flavor == null) return "";
+  if (typeof flavor === "string" || typeof flavor === "number") return String(flavor);
+  return String(flavor.name || flavor.flavor || flavor.label || "");
+};
+
+const getVariantFlavorOptions = (variant) => {
+  if (Array.isArray(variant?.flavors)) return variant.flavors;
+  if (Array.isArray(variant?.flavour)) return variant.flavour;
+  if (Array.isArray(variant?.flavor)) return variant.flavor;
+  return [];
+};
+
+const resolveVariantPricing = (variant, selectedFlavour) => {
+  const flavors = getVariantFlavorOptions(variant);
+  const selectedFlavorData = flavors.find(
+    (flavor) => getFlavorLabel(flavor) === selectedFlavour
+  );
+
+  if (!selectedFlavorData || typeof selectedFlavorData === "string") {
+    return variant;
+  }
+
+  return {
+    ...variant,
+    stock: selectedFlavorData.stock ?? variant.stock,
+    mrp: selectedFlavorData.mrp ?? variant.mrp,
+    sellingPrice:
+      selectedFlavorData.sellingPrice ??
+      selectedFlavorData.price ??
+      variant.sellingPrice,
+    premiumPrice: selectedFlavorData.premiumPrice ?? variant.premiumPrice,
+  };
+};
+
+const getOrderItemProductId = (orderItem, fallbackId) =>
+  orderItem?.productId || orderItem?.product || orderItem?.id || fallbackId;
+
+const getVariantPrice = (product, orderItem = {}) => {
   const variants = Array.isArray(product?.varients) ? product.varients : [];
-  const variant = variants[0] || {};
-  const sellingPrice = parseAmount(variant.sellingPrice || variant.price);
-  const premiumPrice = parseAmount(variant.premiumPrice);
-  const mrp = parseAmount(variant.mrp);
+  const requestedVariantId =
+    orderItem.varientId || orderItem.variantId || orderItem.variant?.id;
+  const variant =
+    variants.find((item) => `${item.id}` === `${requestedVariantId}`) ||
+    variants[0] ||
+    {};
+  const selectedFlavour = orderItem.flavour || orderItem.flavor;
+  const variantPricing = resolveVariantPricing(variant, selectedFlavour);
+  const mrp = parseAmount(orderItem.mrp ?? variantPricing.mrp);
+  const sellingPrice = parseAmount(
+    orderItem.sellingPrice ?? variantPricing.sellingPrice ?? variantPricing.price
+  );
+  const premiumPrice = parseAmount(orderItem.premiumPrice ?? variantPricing.premiumPrice);
+  const unitPrice = parseAmount(orderItem.unitPrice) || sellingPrice || premiumPrice || mrp;
 
   return {
     mrp,
     sellingPrice: sellingPrice || premiumPrice || mrp,
     premiumPrice,
+    unitPrice,
+    variant,
+    flavour: selectedFlavour || getFlavorLabel(getVariantFlavorOptions(variant)[0]),
+    units: orderItem.units || variant.units || "",
   };
+};
+
+const buildVariantSummary = (pricing) => {
+  const parts = [];
+  if (pricing.units) parts.push(`Variant: ${pricing.units}`);
+  if (pricing.flavour) parts.push(`Flavor: ${pricing.flavour}`);
+  if (pricing.unitPrice) parts.push(`Unit price: ₹${pricing.unitPrice}`);
+  if (pricing.mrp) parts.push(`MRP: ₹${pricing.mrp}`);
+  return parts.join(" | ");
+};
+
+const withVariantDetails = (details, summary) => {
+  const existingDetails = Array.isArray(details) ? details : [];
+  if (!summary) return existingDetails;
+  const firstDetail = existingDetails[0] || {};
+  return [
+    {
+      ...firstDetail,
+      heading: firstDetail.heading || "Variant",
+      body: [summary, firstDetail.body].filter(Boolean).join(" | "),
+    },
+    ...existingDetails.slice(1),
+  ];
 };
 
 const buildOrderSummary = (order) => {
@@ -179,26 +254,41 @@ router.get("/orders", async (req, res) => {
     const orderPromises = orders.map(async (order) => {
       const productIds = order.product || []; // Ensure product is an array
       const productQty = order.qty || []; // Ensure qty is an array
+      const orderItems = Array.isArray(order.items) ? order.items : [];
+      const itemSource = orderItems.length
+        ? orderItems
+        : productIds.map((productId, index) => ({
+            productId,
+            qty: productQty[index],
+          }));
 
       // Fetch products in parallel
-      const productPromises = productIds.map(async (id, index) => {
+      const productPromises = itemSource.map(async (orderItem, index) => {
+        const id = getOrderItemProductId(orderItem, productIds[index]);
         const product = await Product.findByPk(id);
         if (!product) return null;
 
         const productData = product.toJSON();
-        const qty = parseAmount(productQty[index] || 0);
-        const pricing = getVariantPrice(productData);
-        const lineAmount = pricing.sellingPrice * qty;
+        const qty = parseAmount(orderItem.qty || productQty[index] || 0);
+        const pricing = getVariantPrice(productData, orderItem);
+        const lineAmount = parseAmount(orderItem.lineTotal || orderItem.amount) || pricing.unitPrice * qty;
+        const variantSummary = buildVariantSummary(pricing);
 
         return {
           ...productData,
+          details: withVariantDetails(productData.details, variantSummary),
           qty,
           amount: lineAmount,
           lineTotal: lineAmount,
-          unitPrice: pricing.sellingPrice,
+          unitPrice: pricing.unitPrice,
           sellingPrice: pricing.sellingPrice,
           mrp: pricing.mrp,
           premiumPrice: pricing.premiumPrice,
+          selectedVariant: pricing.variant,
+          selectedVariantId: orderItem.varientId || orderItem.variantId || pricing.variant?.id,
+          selectedFlavour: pricing.flavour,
+          selectedFlavor: pricing.flavour,
+          selectedUnits: pricing.units,
           createdAt: order.createdAt,
         };
       });
@@ -213,7 +303,9 @@ router.get("/orders", async (req, res) => {
       orderData.product = products;
       orderData.createdAt = order.createdAt;
       orderData.formattedCreatedAt = formatDate(order.createdAt);
-      orderData.amount = orderSummary.subtotal;
+      orderData.subtotalAmount = orderSummary.subtotal;
+      orderData.amount = orderSummary.payable;
+      orderData.finalAmount = orderSummary.payable;
       orderData.orderSummary = orderSummary;
       orderData.payableAmount = orderSummary.payable;
       orderData.walletDiscount = orderSummary.walletDiscount;
