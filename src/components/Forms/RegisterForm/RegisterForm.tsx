@@ -6,9 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { signInWithGoogle, signInWithFacebook } from "@/utils/firebaseConfig";
-import Cookies from "js-cookie"; // Add this import
 import { useDispatchContext } from "@/provider/ContextProvider/ContextProvider"; // Add this import
 import { API_CONFIG } from "@/config/api";
+import { persistAuthSession } from "@/utils/authSession";
 
 export default function RegisterForm() {
   const [phone, setPhone] = useState("");
@@ -88,23 +88,41 @@ export default function RegisterForm() {
       setDisable(false);
     }
   };
+  const completeSocialSignIn = (data: any, provider: "google" | "facebook", firebaseUser: any) => {
+    if (!data?.user || !data?.token) {
+      toast.dismiss();
+      toast.error("Authentication failed");
+      return;
+    }
+
+    const userProfile = {
+      ...data.user,
+      provider,
+      firebaseUid: firebaseUser?.uid || data.user.firebaseUid,
+    };
+
+    persistAuthSession(userProfile, data.token);
+    dispatch({ type: "SET_USER_DATA", payload: userProfile });
+
+    toast.dismiss();
+    toast.success(`${provider === "google" ? "Google" : "Facebook"} sign-in successful!`);
+    window.location.href = "/";
+  };
+
 const handleGoogleSignIn = async () => {
   try {
     setDisable(true);
     setErrorMessage("");
-    
-    console.log("Starting Google sign-in...");
+
     const { success, idToken, user, errorMessage } = await signInWithGoogle();
     
     if (!success || !idToken) {
-      console.error("Google sign-in failed");
       toast.dismiss();
       toast.error(errorMessage || "Google sign-in failed");
       setDisable(false);
       return;
     }
-    
-    console.log("Google sign-in successful, sending token to backend...");
+
     const response = await fetch(`${API_CONFIG.BASE_URL}/auth/social`, {
       method: "POST",
       headers: {
@@ -119,145 +137,9 @@ const handleGoogleSignIn = async () => {
     });
     
     const data = await response.json();
-    console.log("Backend response:", data);
-    
-    // Check if response is successful
+
     if (data.status) {
-      try {
-        // Now fetch the user profile using Firebase UID
-        const userResponse = await fetch(`${API_CONFIG.BASE_URL}/user?firebaseUid=${user.uid}`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-        
-        const userData = await userResponse.json();
-        console.log("User data response:", userData);
-        
-        if (userData.status && userData.user) {
-          // We have the correct user data with the right ID!
-         const userProfile = {
-  id: userData.user.id,
-  name: userData.user.name || user?.displayName || "",
-  email: userData.user.email || user?.email || "",
-  image: null, // Changed from string to null to match UserType
-  phone: userData.user.phone || "",
-  gender: userData.user.gender || "",
-  bglCash: userData.user.bglCash || 0,
-  dob: userData.user.dob || "",
-  height: userData.user.height || 0,
-  weight: userData.user.weight || 0,
-  referCode: userData.user.referCode || "",
-  provider: "google",
-  firebaseUid: user.uid
-};
-          console.log("Using correct user profile with ID:", userProfile.id);
-          
-          // Save user details in localStorage
-          localStorage.setItem("AUTH", JSON.stringify(userProfile));
-          
-          // Update context with user data
-          dispatch({ type: "SET_USER_DATA", payload: userProfile });
-          
-          toast.dismiss();
-          toast.success("Google sign-in successful!");
-          
-          // Force a redirect to home page using window.location
-          window.location.href = "/";
-          return;
-        }
-      } catch (profileError) {
-        console.error("Error fetching user profile:", profileError);
-        // Continue with fallback method if profile fetch fails
-      }
-      
-      // Try direct lookup with user email
-      try {
-        // Find user by email
-        const emailLookupResponse = await fetch(`${API_CONFIG.BASE_URL}/user/lookup?email=${encodeURIComponent(user?.email || '')}`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-        
-        const emailLookupData = await emailLookupResponse.json();
-        console.log("Email lookup response:", emailLookupData);
-        
-        if (emailLookupData.status && emailLookupData.user && emailLookupData.user.id) {
-          // We found the user by email!
-          const userProfile = {
-            id: emailLookupData.user.id, // This will be the real ID (64) from the database
-            name: emailLookupData.user.name || user?.displayName || "",
-            email: emailLookupData.user.email || user?.email || "",
-            image: emailLookupData.user.image || user?.photoURL || "",
-            phone: emailLookupData.user.phone || "",
-            gender: emailLookupData.user.gender || "",
-            bglCash: emailLookupData.user.bglCash || 0,
-            dob: emailLookupData.user.dob || "",
-            height: emailLookupData.user.height || 0,
-            weight: emailLookupData.user.weight || 0,
-            referCode: emailLookupData.user.referCode || "",
-            provider: "google",
-            firebaseUid: user.uid
-          };
-          
-          console.log("Using user profile from email lookup with ID:", userProfile.id);
-          
-          // Save user details in localStorage
-          localStorage.setItem("AUTH", JSON.stringify(userProfile));
-          
-          // Update context with user data
-          dispatch({ type: "SET_USER_DATA", payload: userProfile });
-          
-          toast.dismiss();
-          toast.success("Google sign-in successful!");
-          
-          // Force a redirect to home page using window.location
-          window.location.href = "/";
-          return;
-        }
-      } catch (emailLookupError) {
-        console.error("Error looking up user by email:", emailLookupError);
-        // Continue with fallback method if email lookup fails
-      }
-      
-      // If we couldn't get the user profile, use the fallback approach with a warning
-      console.warn("Could not retrieve correct user ID from backend. Using fallback method.");
-      
-      const tempUserId = 64; // Use the known correct ID instead of generated hash
-      
-      // Create user data object with the correct ID from the database
-      const userProfile = {
-        id: tempUserId, // Using the known correct ID
-        name: user?.displayName || "Google User",
-        email: user?.email || "",
-        image: user?.photoURL || "",
-        phone: "",
-        gender: "",
-        bglCash: data.walletBalance || 0,
-        dob: "",
-        height: 0,
-        weight: 0,
-        referCode: "",
-        provider: "google",
-        firebaseUid: user.uid
-      };
-      
-      console.log("Using fallback user profile with ID:", userProfile.id);
-      
-      // Save user details in localStorage
-      localStorage.setItem("AUTH", JSON.stringify(userProfile));
-      
-      // Update context with user data
-      dispatch({ type: "SET_USER_DATA", payload: userProfile });
-      
-      toast.dismiss();
-      toast.success("Google sign-in successful!");
-      
-      // Force a redirect to home page using window.location
-      window.location.href = "/";
+      completeSocialSignIn(data, "google", user);
     } else {
       toast.dismiss();
       toast.error(data.message || "Authentication failed");
@@ -274,19 +156,16 @@ const handleFacebookSignIn = async () => {
   try {
     setDisable(true);
     setErrorMessage("");
-    
-    console.log("Starting Facebook sign-in...");
+
     const { success, idToken, user, errorMessage } = await signInWithFacebook();
     
     if (!success || !idToken) {
-      console.error("Facebook sign-in failed");
       toast.dismiss();
       toast.error(errorMessage || "Facebook sign-in failed");
       setDisable(false);
       return;
     }
-    
-    console.log("Facebook sign-in successful, sending token to backend...");
+
     const response = await fetch(`${API_CONFIG.BASE_URL}/auth/social`, {
       method: "POST",
       headers: {
@@ -301,40 +180,9 @@ const handleFacebookSignIn = async () => {
     });
     
     const data = await response.json();
-    console.log("Backend response:", data);
     
     if (data.status) {
-      // We know Facebook users have their own ID in the database
-      // Use a known ID structure that works for your backend
-      const userProfile = {
-        id: 65, // Using a fixed ID for Facebook users in your database
-        name: user?.displayName || "Facebook User",
-        email: user?.email || "",
-        image: null, // Set to null to match UserType
-        phone: "",
-        gender: "",
-        bglCash: data.walletBalance || 0,
-        dob: "",
-        height: 0,
-        weight: 0,
-        referCode: "",
-        provider: "facebook",
-        firebaseUid: user.uid
-      };
-      
-      console.log("Using Facebook user profile with ID:", userProfile.id);
-      
-      // Save user details in localStorage
-      localStorage.setItem("AUTH", JSON.stringify(userProfile));
-      
-      // Update context with user data
-      dispatch({ type: "SET_USER_DATA", payload: userProfile });
-      
-      toast.dismiss();
-      toast.success("Facebook sign-in successful!");
-      
-      // Force a redirect to home page using window.location
-      window.location.href = "/";
+      completeSocialSignIn(data, "facebook", user);
     } else {
       toast.dismiss();
       toast.error(data.message || "Authentication failed");

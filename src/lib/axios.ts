@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_CONFIG } from '../config/api';
+import { getAuthToken } from '../utils/authSession';
 
 const axiosInstance = axios.create({
   baseURL: API_CONFIG.BASE_URL,
@@ -7,15 +8,26 @@ const axiosInstance = axios.create({
   headers: API_CONFIG.HEADERS,
 });
 
-// Add request interceptor
-axiosInstance.interceptors.request.use(
-  (config) => {
-    // You can add auth tokens or other headers here
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+const attachAuthHeader = (config: any) => {
+  const token = getAuthToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
   }
+  return config;
+};
+
+let defaultAxiosInterceptorConfigured = false;
+
+export function configureAxiosAuth() {
+  if (defaultAxiosInterceptorConfigured) return;
+
+  axios.interceptors.request.use(attachAuthHeader, (error) => Promise.reject(error));
+  defaultAxiosInterceptorConfigured = true;
+}
+
+axiosInstance.interceptors.request.use(attachAuthHeader, (error) =>
+  Promise.reject(error)
 );
 
 // Add response interceptor
@@ -29,5 +41,7 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+configureAxiosAuth();
 
 export default axiosInstance; 

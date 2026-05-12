@@ -19,6 +19,7 @@ import { ReactNode, useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import { UserType } from "@/utils/Types";
 import { API_CONFIG } from "@/config/api";
+import { getAuthHeaders, getAuthToken, persistAuthSession } from "@/utils/authSession";
 
 type ProfileOption = {
   link: string;
@@ -51,7 +52,9 @@ export default function Profile() {
     if (userId && profileToggle && (!userData?.email || !userData?.image)) {
       setIsLoading(true);
       try {
-        const response = await fetch(`${API_CONFIG.BASE_URL}/user/${userId}`);
+        const response = await fetch(`${API_CONFIG.BASE_URL}/user/${userId}`, {
+          headers: getAuthHeaders(),
+        });
 
         if (!response.ok) {
           console.error("User data fetch failed with status:", response.status);
@@ -64,9 +67,7 @@ export default function Profile() {
           // Update context with complete user data
           dispatch({ type: "SET_USER_DATA", payload: data.user });
 
-          // Also update localStorage
-          localStorage.setItem("AUTH", JSON.stringify(data.user));
-          console.log("User data refreshed from profile component");
+          persistAuthSession(data.user, getAuthToken() || undefined);
         } else {
           // If API doesn't return user, use Google data from cookies if available
           const userName = Cookies.get("userName");
@@ -89,7 +90,7 @@ export default function Profile() {
             };
 
             dispatch({ type: "SET_USER_DATA", payload: googleUserData });
-            localStorage.setItem("AUTH", JSON.stringify(googleUserData));
+            persistAuthSession(googleUserData, getAuthToken() || undefined);
           }
         }
       } catch (error) {

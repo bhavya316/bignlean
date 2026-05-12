@@ -8,6 +8,7 @@ import { useDispatchContext } from "@/provider/ContextProvider/ContextProvider";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { API_CONFIG } from "@/config/api";
+import { persistAuthSession } from "@/utils/authSession";
 
 export default function VerifyOtp() {
   const [otp, setOtp] = useState("");
@@ -79,8 +80,8 @@ const handleVerifyOtp = async (e: React.FormEvent<HTMLFormElement>) => {
       // 1. Store user data in context
       dispatch({ type: "SET_USER_DATA", payload: data.user });
       
-      // 2. Store complete user data in localStorage
-      localStorage.setItem("AUTH", JSON.stringify(data.user));
+      // 2. Store complete user data and JWT in localStorage
+      persistAuthSession(data.user, data.token);
       
       // 3. Store user ID in sessionStorage
       sessionStorage.setItem("userId", data.user.id.toString());

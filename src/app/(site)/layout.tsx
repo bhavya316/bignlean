@@ -6,16 +6,22 @@ import { useDispatchContext } from "@/provider/ContextProvider/ContextProvider";
 import { ReactNode, useEffect, Suspense } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { AUTH_STORAGE_KEY, clearAuthSession } from "@/utils/authSession";
 
 export default function Layout({ children }: { children: ReactNode }) {
   const dispatch = useDispatchContext();
 
   useEffect(() => {
-    if (localStorage?.AUTH) {
+    const auth = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (auth && auth !== "null") {
+      try {
       dispatch({
         type: "SET_USER_DATA",
-        payload: JSON?.parse(localStorage?.AUTH),
+        payload: JSON.parse(auth),
       });
+      } catch {
+        clearAuthSession();
+      }
     }
   }, []);
 
