@@ -25,6 +25,7 @@ import {
   getVariantSellingPrice,
   resolveVariantSelection,
 } from "@/utils/variantPricing";
+import { getFirstMediaUrl } from "@/utils/media";
 
 
 type Props = {
@@ -160,11 +161,11 @@ export default function ProductCard({
       >
         <div className="flex items-center justify-center relative">
           <Image
-            src={Array.isArray(product?.images) && product.images.length > 0 ? product.images[0] : "/placeholder-product.png"}
+            src={getFirstMediaUrl(product?.images)}
             alt={product?.name || "Product"}
             width={200}
             height={140}
-            className="object-cover object-top w-auto h-[140px] cursor-pointer"
+            className="h-[140px] w-full max-w-[200px] cursor-pointer object-contain object-center"
             onClick={() => {
               recordProductView(product?.id as number);
               router.push(link);

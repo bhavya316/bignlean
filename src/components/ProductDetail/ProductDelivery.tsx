@@ -39,7 +39,69 @@ const MembershipCard = () => {
   );
 };
 
+const COUNTRY_CODES: Record<string, string> = {
+  india: "IN",
+  bharat: "IN",
+  "united states": "US",
+  usa: "US",
+  us: "US",
+  "united kingdom": "GB",
+  uk: "GB",
+  england: "GB",
+  canada: "CA",
+  australia: "AU",
+  "new zealand": "NZ",
+  germany: "DE",
+  france: "FR",
+  italy: "IT",
+  spain: "ES",
+  netherlands: "NL",
+  belgium: "BE",
+  switzerland: "CH",
+  sweden: "SE",
+  norway: "NO",
+  denmark: "DK",
+  ireland: "IE",
+  poland: "PL",
+  austria: "AT",
+  portugal: "PT",
+  "united arab emirates": "AE",
+  uae: "AE",
+  "saudi arabia": "SA",
+  qatar: "QA",
+  kuwait: "KW",
+  singapore: "SG",
+  malaysia: "MY",
+  thailand: "TH",
+  indonesia: "ID",
+  vietnam: "VN",
+  philippines: "PH",
+  china: "CN",
+  japan: "JP",
+  "south korea": "KR",
+  korea: "KR",
+  taiwan: "TW",
+  "hong kong": "HK",
+  brazil: "BR",
+  mexico: "MX",
+  "south africa": "ZA",
+  turkey: "TR",
+};
+
+const getFlagEmoji = (country: string) => {
+  const code = COUNTRY_CODES[country.trim().toLowerCase()];
+  if (!code) return "";
+
+  return code
+    .toUpperCase()
+    .split("")
+    .map((char) => String.fromCodePoint(0x1f1e6 + char.charCodeAt(0) - 65))
+    .join("");
+};
+
 const OriginCard = ({ country }: { country: string }) => {
+  const flag = getFlagEmoji(country);
+
   return (
     <div className="flex items-center justify-around sm-3 rounded-lg p-4 mt-5">
       <div className="flex flex-col gap-2 items-center">
@@ -50,7 +112,16 @@ const OriginCard = ({ country }: { country: string }) => {
       </div>
       <div className="w-[1px] h-[60px] bg-gray-200"></div>
       <div className="flex flex-col gap-2 items-center">
-        <img src="/assets/product/india.png" alt="india" className="w-[38px]" />
+        {flag ? (
+          <span
+            aria-label={`${country} flag`}
+            className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white text-[28px] shadow-sm"
+          >
+            {flag}
+          </span>
+        ) : (
+          <img src="/assets/product/india.png" alt="country flag" className="w-[38px]" />
+        )}
         <p className="text-black text-xs not-italic font-normal">
           Origin: {country}
         </p>

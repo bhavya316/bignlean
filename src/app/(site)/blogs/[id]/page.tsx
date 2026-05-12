@@ -35,6 +35,53 @@ async function getBlogById(id: string) {
   }
 }
 
+function renderInlineFormatting(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_|`[^`]+`)/g);
+
+  return parts.map((part, index) => {
+    if ((part.startsWith("**") && part.endsWith("**")) || (part.startsWith("__") && part.endsWith("__"))) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    if ((part.startsWith("*") && part.endsWith("*")) || (part.startsWith("_") && part.endsWith("_"))) {
+      return <em key={index}>{part.slice(1, -1)}</em>;
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return <code key={index} className="rounded bg-gray-100 px-1 py-0.5 text-base">{part.slice(1, -1)}</code>;
+    }
+    return part;
+  });
+}
+
+function renderBlogBody(bodyText = "") {
+  return bodyText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      if (line.startsWith("### ")) {
+        return <h4 key={index} className="mt-6 mb-3 text-xl font-bold text-black">{renderInlineFormatting(line.slice(4))}</h4>;
+      }
+      if (line.startsWith("## ")) {
+        return <h3 key={index} className="mt-8 mb-3 text-2xl font-bold text-black">{renderInlineFormatting(line.slice(3))}</h3>;
+      }
+      if (line.startsWith("# ")) {
+        return <h2 key={index} className="mt-8 mb-4 text-3xl font-bold text-black">{renderInlineFormatting(line.slice(2))}</h2>;
+      }
+      if (/^[-*]\s+/.test(line)) {
+        return (
+          <div key={index} className="mb-3 flex items-start">
+            <span className="mr-3 mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+            <p className="flex-1 leading-8">{renderInlineFormatting(line.replace(/^[-*]\s+/, ""))}</p>
+          </div>
+        );
+      }
+      if (/^\d+\.\s+/.test(line)) {
+        return <p key={index} className="mb-3 leading-8">{renderInlineFormatting(line)}</p>;
+      }
+      return <p key={index} className="mb-4 leading-8">{renderInlineFormatting(line)}</p>;
+    });
+}
+
 // Add this function to generate all possible blog paths at build time
 export async function generateStaticParams() {
   const blogs = await getAllBlogs();
@@ -88,16 +135,7 @@ export default async function Page({ params }: { params: { id: string } }) {
         </div>
       </div>
       <div className="text-gray-700 w-[95%] max-lg:w-full mx-auto text-lg not-italic font-normal mb-6">
-        {blog?.bodyText?.split('\n')
-          .filter((paragraph: string) => paragraph.trim() !== '')
-          .map((paragraph: string, index: number) => (
-            <div key={index} className="flex items-start mb-4">
-              <span className="text-gray-700 mr-2 text-xl font-bold" >•</span>
-              <p className="flex-1">
-                {paragraph.trim()}
-              </p>
-            </div>
-          ))}
+        {renderBlogBody(blog?.bodyText)}
       </div>
     </CustomPageWrapper>
   );

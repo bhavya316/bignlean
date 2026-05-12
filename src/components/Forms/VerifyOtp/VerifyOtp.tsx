@@ -14,6 +14,7 @@ export default function VerifyOtp() {
   const [otp, setOtp] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const dispatch = useDispatchContext();
@@ -121,7 +122,7 @@ const handleVerifyOtp = async (e: React.FormEvent<HTMLFormElement>) => {
   
   // Handle resend OTP
   const handleResendOtp = async () => {
-    if (!canResend) return;
+    if (!canResend || resending) return;
     
     if (!phone) {
       toast.dismiss();
@@ -131,39 +132,32 @@ const handleVerifyOtp = async (e: React.FormEvent<HTMLFormElement>) => {
     }
 
     try {
-      // Reset the timer
-      setCountdown(60);
-      setCanResend(false);
-      
-      // Call the appropriate API to resend OTP
-      const apiEndpoint = isFromRegistration
-        ? `${API_CONFIG.BASE_URL}/register`
-        : `${API_CONFIG.BASE_URL}/send-login-otp`;
-      
-      const requestBody = isFromRegistration
-        ? { phone, referCode: sessionStorage.getItem("tempReferCode") || undefined }
-        : { phone };
-      
-      const response = await fetch(apiEndpoint, {
+      setResending(true);
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/resend-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({ phone }),
       });
-      
-      const data = await response.json();
-      
-      if (data.status) {
+
+      const data = await response.json().catch(() => null);
+
+      if (response.ok && data?.status) {
         toast.dismiss();
         toast.success("OTP resent successfully to your mobile number!");
-        setOtp(""); // Clear the OTP input field
+        setOtp("");
+        setCountdown(60);
+        setCanResend(false);
       } else {
         toast.dismiss();
-        toast.error(data.message || "Failed to resend OTP. Please try again.");
+        toast.error(data?.message || "Failed to resend OTP. Please try again.");
       }
     } catch (error) {
       console.error("Resend OTP error:", error);
       toast.dismiss();
       toast.error("Failed to resend OTP. Please try again.");
+    } finally {
+      setResending(false);
     }
   };
 
@@ -184,7 +178,7 @@ const handleVerifyOtp = async (e: React.FormEvent<HTMLFormElement>) => {
         <OTPInput
           containerStyle={{
             justifyContent: "center",
-            gap: "clamp(10px, 4vw, 25px)",
+            gap: "clamp(10px, 4vw, 18px)",
             width: "100%",
           }}
           value={otp}
@@ -197,7 +191,7 @@ const handleVerifyOtp = async (e: React.FormEvent<HTMLFormElement>) => {
               inputMode="numeric"
               pattern="[0-9]*"
               autoComplete="one-time-code"
-              className="h-12 w-12 rounded-lg text-center text-black outline-none sm-3 sm:h-[60px] sm:w-[60px]"
+              className="!h-14 !w-14 max-[380px]:!h-12 max-[380px]:!w-12 rounded-xl border border-gray-200 bg-white text-center text-xl font-semibold text-black outline-none shadow-sm transition focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           )}
         />
@@ -210,11 +204,11 @@ const handleVerifyOtp = async (e: React.FormEvent<HTMLFormElement>) => {
       </form>
       <p className="text-gray-500 text-center text-sm not-italic font-normal mt-5">
         Resend OTP:
-        <span 
-          className={`ml-1 ${canResend ? 'text-red-700 cursor-pointer' : 'text-gray-400'}`} 
+        <span
+          className={`ml-1 ${canResend && !resending ? 'text-red-700 cursor-pointer' : 'text-gray-400 cursor-not-allowed'}`}
           onClick={handleResendOtp}
         >
-          {canResend ? 'Resend Now' : `${countdown}s`}
+          {resending ? 'Sending...' : canResend ? 'Resend Now' : `${countdown}s`}
         </span>
       </p>
     </FormWrapper>

@@ -2,8 +2,6 @@
 import {
   DownloadBanner,
   HomeCarosoul,
-  Banner1Section,
-  Banner2Section,
   Banner3Section,
   ProductSection,
   Quotes,
@@ -43,8 +41,6 @@ export default function Home() {
 
   // Filter banners by type
   const heroSliderBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Hero Slider") || [];
-  const banner1SectionBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Banner 1 Section") || [];
-  const banner2SectionBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Banner 2 Section") || [];
   const banner3SectionBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Banner 3 Section") || [];
   useGEtWishList(userData?.id as number);
   return (
@@ -56,7 +52,6 @@ export default function Home() {
       <HomepageHeroDeck
         isLoading={bannersLoading}
         heroBanners={heroSliderBanners}
-        sideBanners={[...banner1SectionBanners, ...banner2SectionBanners]}
       />
       <MarketplaceTrustStrip />
 
@@ -116,11 +111,6 @@ export default function Home() {
 
             return productSection;
           })} */}
-        <Banner1SectionWrapper
-          isLoading={bannersLoading}
-          banners={banner1SectionBanners}
-        />
-
                     {comboCategoriesLoading ? (
                       <ComboCategoriesSkeleton />
                     ) : (
@@ -135,13 +125,6 @@ export default function Home() {
           authorName="Arnold Schwarzenegger"
           quote="“There are no shortcuts. Everything is reps, reps, reps. --”"
         />
-
-
-        <Banner2SectionWrapper
-          isLoading={bannersLoading}
-          banners={banner2SectionBanners}
-        />
-
         {homeProductsLoading ? (
           <DynamicComboSectionsSkeleton />
         ) : (
@@ -203,53 +186,17 @@ export default function Home() {
 
 // Loading Skeleton Components
 
-function getBannerLink(banner: any) {
-  if (Array.isArray(banner?.link) && banner.link.length > 0) return banner.link[0];
-  if (typeof banner?.link === "string") return banner.link;
-  return "/shop-by-brands";
-}
-
 function HomepageHeroDeck({
   isLoading,
   heroBanners,
-  sideBanners,
 }: {
   isLoading: boolean;
   heroBanners: any[];
-  sideBanners: any[];
 }) {
   return (
     <div className="w-[1200px] max-[1200px]:w-full mx-auto px-4 pt-5">
-      <div className="grid grid-cols-[minmax(0,2fr)_360px] gap-4 max-[980px]:grid-cols-1">
-        <div className="min-w-0 bg-white rounded-lg p-2 shadow-sm">
-          {isLoading ? <HomeCarosoulSkeleton /> : <HomeCarosoul bannersData={heroBanners} className="!px-0 !w-full" />}
-        </div>
-        <div className="grid gap-4 max-[980px]:grid-cols-2 max-[620px]:grid-cols-1">
-          {[0, 1].map((index) => {
-            const banner = sideBanners[index];
-            return (
-              <Link
-                href={getBannerLink(banner)}
-                key={index}
-                className="relative overflow-hidden rounded-lg bg-white min-h-[143px] shadow-sm group"
-              >
-                {banner?.web ? (
-                  <img
-                    src={banner.web}
-                    alt="promotion"
-                    className="w-full h-full min-h-[143px] object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                  />
-                ) : (
-                  <div className="h-full min-h-[143px] bg-[#111827] text-white p-5 flex flex-col justify-center">
-                    <p className="text-xs uppercase tracking-wide text-gray-300">Offer zone</p>
-                    <p className="text-2xl font-bold mt-2">Up to 45% off</p>
-                    <p className="text-sm text-gray-300 mt-1">Protein, creatine and wellness picks</p>
-                  </div>
-                )}
-              </Link>
-            );
-          })}
-        </div>
+      <div className="min-w-0 bg-white rounded-lg p-2 shadow-sm">
+        {isLoading ? <HomeCarosoulSkeleton /> : <HomeCarosoul bannersData={heroBanners} className="!px-0 !w-full" />}
       </div>
     </div>
   );
@@ -438,28 +385,6 @@ type BannerSectionWrapperProps = {
   isLoading: boolean;
   banners: any[];
 };
-
-function Banner1SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
-  if (isLoading) {
-    return (
-      <div className="my-8 flex justify-center">
-        <div className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] bg-gray-200 rounded-lg shadow-lg animate-pulse" />
-      </div>
-    );
-  }
-  return <Banner1Section banners={banners} />;
-}
-
-function Banner2SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
-  if (isLoading) {
-    return (
-      <div className="my-8 flex justify-center">
-        <div className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] bg-gray-200 rounded-lg shadow-lg animate-pulse" />
-      </div>
-    );
-  }
-  return <Banner2Section banners={banners} />;
-}
 
 function Banner3SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
   if (isLoading) {
