@@ -14,6 +14,13 @@ const { validateCouponForCart } = require("../admin/controllers/couponController
 const { generateRandomId } = require("./functions");
 const { addTransaction } = require("../user/controllers/transactionController");
 const {
+  authMiddleware,
+  requireOwnedResource,
+  requireSameUserBody,
+  requireSameUserParam,
+  requireSameUserQuery,
+} = require("../middleware/authMiddleware");
+const {
   isXpressbeesTestMode,
   createTestShipmentResponse,
   createTestTrackingResponse,
@@ -61,9 +68,13 @@ async function loginUserAndGetToken() {
   const apiUrl = "https://shipment.xpressbees.com/api/users/login";
 
   const requestData = {
-    email: process.env.XPRESSBEES_EMAIL || "orders@bignlean.com",
-    password: process.env.XPRESSBEES_PASSWORD || "Carry@2525",
+    email: process.env.XPRESSBEES_EMAIL,
+    password: process.env.XPRESSBEES_PASSWORD,
   };
+
+  if (!requestData.email || !requestData.password) {
+    throw new Error("XPRESSBEES_EMAIL and XPRESSBEES_PASSWORD are required outside test mode");
+  }
 
   if (isXpressbeesTestMode()) {
     return createTestServiceabilityResponse(requestData);
@@ -931,7 +942,7 @@ router.post("/ndr/action", async (req, res) => {
 
 
 
-router.post("/placeOrder", async (req, res) => {
+router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async (req, res) => {
   try {
     const {
       userid,
@@ -970,6 +981,9 @@ router.post("/placeOrder", async (req, res) => {
     }
     if (!address) {
       return res.status(404).json({ status: false, message: "Address not found." });
+    }
+    if (Number(address.user) !== Number(userid)) {
+      return res.status(403).json({ status: false, message: "Address does not belong to this user." });
     }
 
     let amount = 0;
@@ -1281,7 +1295,7 @@ async function calculateCartDetailsFallback(user, coupon, addressId) {
 }
 
 // Replace your cart/details endpoint with this one
-router.get("/cart/details", async (req, res) => {
+router.get("/cart/details", authMiddleware, requireSameUserQuery("user"), async (req, res) => {
   const user = req.query.user;
   const coupon = req.query.coupon;
   const addressId = req.query.addressId;
@@ -1318,7 +1332,7 @@ router.get("/cart/details", async (req, res) => {
   }
 });
 
-router.delete("/order/cancel/:id", async (req, res) => {
+router.delete("/order/cancel/:id", authMiddleware, requireOwnedResource(Order, "id", "user"), async (req, res) => {
   const id = req.params.id;
   try {
     const order = await Order.findByPk(id);
@@ -1344,7 +1358,7 @@ router.delete("/order/cancel/:id", async (req, res) => {
   }
 });
 
-router.get("/order/user/:user", async (req, res) => {
+router.get("/order/user/:user", authMiddleware, requireSameUserParam("user"), async (req, res) => {
   try {
     const user = req.params.user;
     const orders = await Order.findAll({ where: { user } });
@@ -1379,7 +1393,7 @@ router.get("/order/user/:user", async (req, res) => {
   }
 });
 
-router.get("/order/track/:id", async (req, res) => {
+router.get("/order/track/:id", authMiddleware, requireOwnedResource(Order, "id", "user"), async (req, res) => {
   try {
     const id = req.params.id;
     const ordersDetails = await Order.findByPk(id);
@@ -2028,7 +2042,11 @@ router.get("/order", async (req, res) => {
 });
 
 
-router.get("/transactions", async (req, res) => {
+router.get(
+  "/transactions",
+  authMiddleware,
+  requireSameUserQuery("userId", { defaultToAuthenticatedUser: true }),
+  async (req, res) => {
   try {
     const userId = req.query.userId;
 
@@ -2132,7 +2150,8 @@ router.get("/transactions", async (req, res) => {
     console.error(e);
     res.status(500).json({ status: false, message: "Server Error" });
   }
-});
+  }
+);
 
 // Export individual functions for use in other modules
 module.exports = {

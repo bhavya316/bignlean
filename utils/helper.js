@@ -2,6 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const router = express.Router();
 const path = require("path");
+const fs = require("fs");
 const { param, query, validationResult } = require("express-validator");
 const bannerController = require("../admin/controllers/bannerController");
 const brandController = require("../admin/controllers/brandController");
@@ -15,13 +16,14 @@ const dealController = require("../admin/controllers/dealController");
 const dashboard = require("./dashboard");
 const recentSearchesController = require("../user/controllers/recentSerches");
 const admin = require("../config/firebaseAdmin"); // This already initializes Firebase
-const serviceAccount = require("../bignlean-c415a-firebase-adminsdk-kdr6p-00b58d83c6.json");
 const Notification = require("../user/model/notification");
 const NotificationSchedule = require("../user/model/notification2");
 const Brand = require("../admin/model/brand");
 const { Sequelize, Op } = require("sequelize");
 const Product = require("../admin/model/product");
 const Category = require("../admin/model/category");
+const { authMiddleware, requireSameUserParam } = require("../middleware/authMiddleware");
+const createHttpError = require("./httpError");
 
 // REMOVE THIS ENTIRE BLOCK - Firebase is already initialized in firebaseAdmin.js
 // admin.initializeApp({
@@ -29,18 +31,78 @@ const Category = require("../admin/model/category");
 //   databaseURL: "https://drive1-aa20a-default-rtdb.firebaseio.com/",
 // });
 
+const uploadDir = path.join(__dirname, "..", "uploads");
+const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".pdf"]);
+const blockedExtensions = new Set([
+  ".bat",
+  ".cmd",
+  ".com",
+  ".exe",
+  ".html",
+  ".js",
+  ".jsp",
+  ".msi",
+  ".php",
+  ".ps1",
+  ".py",
+  ".sh",
+  ".vbs",
+]);
+const allowedMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+]);
+
 const storage = multer.diskStorage({
-  destination: "./uploads/",
+  destination: function (req, file, cb) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
   filename: function (req, file, cb) {
     const currentDateTime = Date.now();
-    const extension = path.extname(file.originalname);
-    const newFilename = `${currentDateTime}${extension}`;
+    const extension = path.extname(file.originalname).toLowerCase();
+    const newFilename = `${currentDateTime}-${Math.round(Math.random() * 1e9)}${extension}`;
     cb(null, newFilename);
   },
 });
-const upload = multer({ storage: storage });
 
-router.post("/upload", upload.single("file"), (req, res) => {
+const fileFilter = (req, file, cb) => {
+  const extension = path.extname(file.originalname).toLowerCase();
+
+  if (blockedExtensions.has(extension)) {
+    return cb(createHttpError(400, "Executable file types are not allowed"));
+  }
+
+  if (!allowedExtensions.has(extension) || !allowedMimeTypes.has(file.mimetype)) {
+    return cb(createHttpError(400, "Only JPEG, PNG, WEBP, and PDF uploads are allowed"));
+  }
+
+  cb(null, true);
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+});
+
+const uploadSingleFile = (req, res, next) => {
+  upload.single("file")(req, res, (error) => {
+    if (!error) return next();
+
+    if (error.code === "LIMIT_FILE_SIZE") {
+      return next(createHttpError(400, "File size must be 5MB or less"));
+    }
+
+    next(error);
+  });
+};
+
+router.post("/upload", authMiddleware, uploadSingleFile, (req, res) => {
   if (!req.file) {
     return res.status(400).json({ status: false, message: "No file uploaded" });
   }
@@ -99,10 +161,12 @@ router.get("/admin/dashboard", dashboard.getSalesAnalysis);
 router.get("/products/trending", productController.getTrendingProducts);
 router.get(
   "/recentSearches/user/:id",
+  authMiddleware,
+  requireSameUserParam("id"),
   recentSearchesController.getUserRecentSearches
 );
 
-router.post("/admin/notification", async (req, res) => {
+router.post("/admin/notification", async (req, res, next) => {
   try {
     const { title, body, image, type, link } = req.body;
     if (!title || !body || !type) {
@@ -131,9 +195,8 @@ router.post("/admin/notification", async (req, res) => {
     }
 
     res.status(200).json({ status: true, message: "Success" });
-  } catch (e) {
-    console.log(e);
-    res.status(400).json({ status: false, message: "Server Error" });
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -217,7 +280,7 @@ router.get("/topBrands", async (req, res) => {
   }
 });
 
-router.get("/search", async (req, res) => {
+router.get("/search", async (req, res, next) => {
   try {
     const query = req.query.q;
 
@@ -270,9 +333,8 @@ router.get("/search", async (req, res) => {
     });
 
     res.status(200).json({ status: true, products: inStockProducts, brands, categories });
-  } catch (e) {
-    console.log(e);
-    res.status(500).json({ status: false, message: "Server Error" });
+  } catch (error) {
+    next(error);
   }
 });
 

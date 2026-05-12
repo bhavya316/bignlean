@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
 const fs = require("fs");
 const path = require("path");
+const logger = require("../utils/logger");
 
 const databaseURL =
   process.env.FIREBASE_DATABASE_URL ||
@@ -32,7 +33,7 @@ const loadServiceAccount = () => {
 let firebaseAdmin;
 try {
   firebaseAdmin = admin.app(); // Try to get the default app
-  console.log("Firebase Admin SDK already initialized");
+  logger.info("Firebase Admin SDK already initialized");
 } catch (error) {
   // Firebase not initialized yet, initialize it
   try {
@@ -52,15 +53,15 @@ try {
       firebaseAdmin = admin.initializeApp({ projectId });
     }
 
-    console.log("Firebase Admin SDK initialized successfully");
+    logger.info("Firebase Admin SDK initialized successfully");
   } catch (error) {
-    console.error("Error initializing Firebase Admin SDK:", error);
+    logger.error({ err: error }, "Error initializing Firebase Admin SDK");
     // Fallback initialization for development
     if (process.env.NODE_ENV === "development") {
       firebaseAdmin = admin.initializeApp({
         projectId,
       });
-      console.log("Firebase Admin SDK initialized in development mode");
+      logger.info("Firebase Admin SDK initialized in development mode");
     }
   }
 }

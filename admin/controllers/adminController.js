@@ -2,7 +2,7 @@ const { Op } = require("sequelize");
 const bcrypt = require("bcrypt");
 const Admin = require("../model/admin");
 
-const createAdmin = async (req, res) => {
+const createAdmin = async (req, res, next) => {
   try {
     const { name, phone, email, password } = req.body;
 
@@ -33,12 +33,11 @@ const createAdmin = async (req, res) => {
       admin: newAdmin,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: false, message: "Internal Server Error" });
+    next(error);
   }
 };
 
-const loginAdmin = async (req, res) => {
+const loginAdmin = async (req, res, next) => {
   try {
     const { identifier, password } = req.body;
 
@@ -64,12 +63,11 @@ const loginAdmin = async (req, res) => {
 
     res.status(200).json({ status: true, message: "Login successful." });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: false, message: "Internal Server Error" });
+    next(error);
   }
 };
 
-const resetPassword = async (req, res) => {
+const resetPassword = async (req, res, next) => {
   try {
     const { identifier, newPassword } = req.body;
 
@@ -93,8 +91,7 @@ const resetPassword = async (req, res) => {
       .status(200)
       .json({ status: true, message: "Password reset successful." });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ status: false, message: "Internal Server Error" });
+    next(error);
   }
 };
 

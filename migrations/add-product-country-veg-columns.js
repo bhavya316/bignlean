@@ -1,48 +1,32 @@
-const sequelize = require('../config/database');
+module.exports = {
+  up: async (queryInterface, Sequelize) => {
+    const productsTable = await queryInterface.describeTable("products");
 
-async function addProductCountryVegColumns() {
-  try {
-    console.log('Starting migration: add countryOfOrigin and isVeg to products...');
-
-    const [countryCol] = await sequelize.query(
-      "SHOW COLUMNS FROM `products` LIKE 'countryOfOrigin'"
-    );
-    if (countryCol.length === 0) {
-      console.log('Adding countryOfOrigin column...');
-      await sequelize.query(
-        "ALTER TABLE `products` ADD COLUMN `countryOfOrigin` VARCHAR(255) NULL"
-      );
-      console.log('countryOfOrigin column added successfully');
-    } else {
-      console.log('countryOfOrigin column already exists');
+    if (!productsTable.countryOfOrigin) {
+      await queryInterface.addColumn("products", "countryOfOrigin", {
+        type: Sequelize.STRING,
+        allowNull: true,
+      });
     }
 
-    const [isVegCol] = await sequelize.query(
-      "SHOW COLUMNS FROM `products` LIKE 'isVeg'"
-    );
-    if (isVegCol.length === 0) {
-      console.log('Adding isVeg column...');
-      await sequelize.query(
-        "ALTER TABLE `products` ADD COLUMN `isVeg` TINYINT(1) NOT NULL DEFAULT 0"
-      );
-      console.log('isVeg column added successfully');
-    } else {
-      console.log('isVeg column already exists');
+    if (!productsTable.isVeg) {
+      await queryInterface.addColumn("products", "isVeg", {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      });
+    }
+  },
+
+  down: async (queryInterface) => {
+    const productsTable = await queryInterface.describeTable("products");
+
+    if (productsTable.isVeg) {
+      await queryInterface.removeColumn("products", "isVeg");
     }
 
-    console.log('Migration completed successfully');
-  } catch (error) {
-    console.error('Migration failed:', error);
-    process.exit(1);
-  }
-}
-
-addProductCountryVegColumns()
-  .then(() => {
-    console.log('Done');
-    process.exit(0);
-  })
-  .catch(err => {
-    console.error('Error:', err);
-    process.exit(1);
-  });
+    if (productsTable.countryOfOrigin) {
+      await queryInterface.removeColumn("products", "countryOfOrigin");
+    }
+  },
+};

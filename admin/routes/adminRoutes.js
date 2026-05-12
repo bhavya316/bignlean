@@ -24,7 +24,7 @@ const resetPasswordValidation = [
   body("newPassword").notEmpty().withMessage("New password is required"),
 ];
 
-router.post("/admin", createAdminValidation, (req, res) => {
+router.post("/admin", createAdminValidation, (req, res, next) => {
   const errors = validationResult(req);
 
   if (!errors.isEmpty()) {
@@ -33,10 +33,10 @@ router.post("/admin", createAdminValidation, (req, res) => {
       .json({ status: false, message: "ERROR", errors: errors.array() });
   }
 
-  adminController.createAdmin(req, res);
+  adminController.createAdmin(req, res, next);
 });
 
-router.post("/admin/login", loginAdminValidation, (req, res) => {
+router.post("/admin/login", loginAdminValidation, (req, res, next) => {
   const errors = validationResult(req);
 
   if (!errors.isEmpty()) {
@@ -45,10 +45,10 @@ router.post("/admin/login", loginAdminValidation, (req, res) => {
       .json({ status: false, message: "ERROR", errors: errors.array() });
   }
 
-  adminController.loginAdmin(req, res);
+  adminController.loginAdmin(req, res, next);
 });
 
-router.post("/admin/reset-password", resetPasswordValidation, (req, res) => {
+router.post("/admin/reset-password", resetPasswordValidation, (req, res, next) => {
   const errors = validationResult(req);
 
   if (!errors.isEmpty()) {
@@ -57,7 +57,7 @@ router.post("/admin/reset-password", resetPasswordValidation, (req, res) => {
       .json({ status: false, message: "ERROR", errors: errors.array() });
   }
 
-  adminController.resetPassword(req, res);
+  adminController.resetPassword(req, res, next);
 });
 
 module.exports = router;

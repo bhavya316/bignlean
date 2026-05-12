@@ -2,9 +2,16 @@ const express = require("express");
 const router = express.Router();
 const { body, param } = require("express-validator");
 const ratingController = require("../controllers/ratingController");
+const Rating = require("../model/rating");
+const {
+  authMiddleware,
+  requireOwnedResource,
+  requireSameUserBody,
+} = require("../../middleware/authMiddleware");
 
 router.post(
   "/ratings",
+  authMiddleware,
   [
     body("user").notEmpty().withMessage("User ID is required"),
     body("product").notEmpty().withMessage("Product ID is required"),
@@ -36,6 +43,7 @@ router.post(
       .withMessage("valueForMoneyRate must be between 1 and 5"),
     body("review").optional(),
   ],
+  requireSameUserBody("user"),
   ratingController.addRating
 );
 
@@ -43,6 +51,8 @@ router.get("/ratings/:id", ratingController.getAllRating);
 
 router.put(
   "/ratings/:id",
+  authMiddleware,
+  requireOwnedResource(Rating, "id", "user"),
   [
     param("id").notEmpty().withMessage("Rating ID is required"),
     body("user").optional(),
@@ -74,12 +84,15 @@ router.put(
       .withMessage("valueForMoneyRate must be between 1 and 5"),
     body("review").optional(),
   ],
+  requireSameUserBody("user", { optional: true }),
   ratingController.updateRating
 );
 
 router.delete(
   "/ratings/:id",
+  authMiddleware,
   param("id").notEmpty().withMessage("Rating ID is required"),
+  requireOwnedResource(Rating, "id", "user"),
   ratingController.deleteRating
 );
 
