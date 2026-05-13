@@ -31,6 +31,8 @@ export interface ProductDetailType {
   expiry_date?: string;
   similerProduct?: any[];
   countryOfOrigin?: string;
+  brandOriginCountry?: string | null;
+  brandOriginCountryCode?: string | null;
   isVeg?: boolean | null;
 }
 

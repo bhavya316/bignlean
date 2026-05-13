@@ -4,7 +4,15 @@ import Link from "next/link";
 import { ChangeEvent, useEffect, useState } from "react";
 import OutlinedButton from "../Buttons/OutlinedButton";
 
-export default function ProductDelivery({ price, countryOfOrigin }: { price: number, countryOfOrigin?: string }) {
+export default function ProductDelivery({
+  price,
+  countryOfOrigin,
+  countryCode,
+}: {
+  price: number;
+  countryOfOrigin?: string;
+  countryCode?: string;
+}) {
   return (
     <div className="w-[85%] max-lg:w-full max-[450px]:w-full">
       <h2 className="text-black text-lg not-italic font-semibold mb-4">
@@ -12,7 +20,7 @@ export default function ProductDelivery({ price, countryOfOrigin }: { price: num
       </h2>
       <PinCodeCard price={price} />
       {/* <BigLeanCashCard /> */}
-      <OriginCard country={countryOfOrigin || "India"} />
+      <OriginCard country={countryOfOrigin || "India"} countryCode={countryCode} />
       {/* <MembershipCard /> */}
     </div>
   );
@@ -88,19 +96,22 @@ const COUNTRY_CODES: Record<string, string> = {
   turkey: "TR",
 };
 
-const getFlagEmoji = (country: string) => {
-  const code = COUNTRY_CODES[country.trim().toLowerCase()];
-  if (!code) return "";
-
-  return code
-    .toUpperCase()
-    .split("")
-    .map((char) => String.fromCodePoint(0x1f1e6 + char.charCodeAt(0) - 65))
-    .join("");
+const getCountryCode = (country: string, countryCode?: string) => {
+  const code = countryCode || COUNTRY_CODES[country.trim().toLowerCase()];
+  return /^[A-Za-z]{2}$/.test(code || "") ? code.toLowerCase() : "in";
 };
 
-const OriginCard = ({ country }: { country: string }) => {
-  const flag = getFlagEmoji(country);
+const OriginCard = ({
+  country,
+  countryCode,
+}: {
+  country: string;
+  countryCode?: string;
+}) => {
+  const code = getCountryCode(country, countryCode);
+  const flagSrc = code === "in"
+    ? "/assets/product/india.png"
+    : `https://flagcdn.com/w80/${code}.png`;
 
   return (
     <div className="flex items-center justify-around sm-3 rounded-lg p-4 mt-5">
@@ -112,16 +123,14 @@ const OriginCard = ({ country }: { country: string }) => {
       </div>
       <div className="w-[1px] h-[60px] bg-gray-200"></div>
       <div className="flex flex-col gap-2 items-center">
-        {flag ? (
-          <span
-            aria-label={`${country} flag`}
-            className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white text-[28px] shadow-sm"
-          >
-            {flag}
-          </span>
-        ) : (
-          <img src="/assets/product/india.png" alt="country flag" className="w-[38px]" />
-        )}
+        <img
+          src={flagSrc}
+          alt={`${country} flag`}
+          className="h-[28px] w-[42px] rounded-sm object-contain shadow-sm"
+          onError={(event) => {
+            event.currentTarget.src = "/assets/product/india.png";
+          }}
+        />
         <p className="text-black text-xs not-italic font-normal">
           Origin: {country}
         </p>

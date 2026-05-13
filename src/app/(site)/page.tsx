@@ -2,8 +2,9 @@
 import {
   DownloadBanner,
   HomeCarosoul,
+  Banner1Section,
+  Banner2Section,
   Banner3Section,
-  ProductSection,
   Quotes,
   RecentlyViewed,
   BestSeller,
@@ -26,8 +27,6 @@ import {
   useGetAllHomeProducts,
   useGetComboCategories,
 } from "@/queries/dataHandlers";
-// Add to imports at the top
-import React from "react";
 import FirstOfferModal from "@/components/Home/FirstOfferModal";
 import Link from "next/link";
 
@@ -41,6 +40,8 @@ export default function Home() {
 
   // Filter banners by type
   const heroSliderBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Hero Slider") || [];
+  const banner1SectionBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Banner 1 Section") || [];
+  const banner2SectionBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Banner 2 Section") || [];
   const banner3SectionBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Banner 3 Section") || [];
   useGEtWishList(userData?.id as number);
   return (
@@ -49,11 +50,11 @@ export default function Home() {
       <div className="hidden  justify-center max-[750px]:flex mb-4 max-[500px]:px-5">
         <SearchForProducts />
       </div>
-      <HomepageHeroDeck
-        isLoading={bannersLoading}
-        heroBanners={heroSliderBanners}
-      />
-      <MarketplaceTrustStrip />
+        <HomepageHeroDeck
+          isLoading={bannersLoading}
+          heroBanners={heroSliderBanners}
+        />
+        <MarketplaceTrustStrip />
 
       <div className="max-xl:w-[95%] mx-auto">
         <div className="max-[800px]:hidden">
@@ -63,6 +64,11 @@ export default function Home() {
         <div className="max-[800px]:hidden">
           <ShopByCategory categoriesData={categoriesData?.categories} isLoading={categoriesLoading} />
         </div>
+
+        <Banner1SectionWrapper
+          isLoading={bannersLoading}
+          banners={banner1SectionBanners}
+        />
 
         <PopularProducts isLoading={homeProductsLoading} />
         
@@ -119,18 +125,30 @@ export default function Home() {
                       ))
                     )}
 
+        <Banner2SectionWrapper
+          isLoading={bannersLoading}
+          banners={banner2SectionBanners}
+        />
+
         {homeProductsLoading ? <PickOfTheDaySkeleton /> : <PickOfTheDay />}
 
         <Quotes
           authorName="Arnold Schwarzenegger"
+          quote="There are no shortcuts. Everything is reps, reps, reps."
+        />
+
+        {/*
+        <Quotes
+          authorName="Arnold Schwarzenegger"
           quote="“There are no shortcuts. Everything is reps, reps, reps. --”"
         />
+        */}
         {homeProductsLoading ? (
           <DynamicComboSectionsSkeleton />
         ) : (
           homeProducts?.data
             ?.filter((item: any) => item.type === "Combo")
-            .map((item: ComboType, index: number) => (
+            .map((item: ComboType) => (
               <div
                 key={item.id}
                 className="flex flex-col gap-2 py-10 w-[1200px] mx-auto mt-[60px] max-[1200px]:w-full max-xl:px-5"
@@ -160,15 +178,30 @@ export default function Home() {
         {homeProductsLoading ? <BestSellerSkeleton /> : <BestSeller />}
 
         <ExtraOffFreebies />
-        
 
+        {/*
         <Quotes
           authorName="Arnold Schwarzenegger"
           quote="“There are no shortcuts. Everything is
            reps, reps, reps.”"
         />
-        
+        */}
+
+        {/*
+        <Quotes
+          authorName="Arnold Schwarzenegger"
+          quote="“The last three or four reps is what makes the muscle grow.”"
+        />
+        */}
+
         <FitFoodRange />
+
+        {/*
+        <Quotes
+          authorName="Michael John Bobak"
+          quote="“All progress takes place outside the comfort zone.”"
+        />
+        */}
 
         <Banner3SectionWrapper
           isLoading={bannersLoading}
@@ -385,6 +418,28 @@ type BannerSectionWrapperProps = {
   isLoading: boolean;
   banners: any[];
 };
+
+function Banner1SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
+  if (isLoading) {
+    return (
+      <div className="my-8 flex justify-center">
+        <div className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] bg-gray-200 rounded-lg shadow-lg animate-pulse" />
+      </div>
+    );
+  }
+  return <Banner1Section banners={banners} />;
+}
+
+function Banner2SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
+  if (isLoading) {
+    return (
+      <div className="my-8 flex justify-center">
+        <div className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] bg-gray-200 rounded-lg shadow-lg animate-pulse" />
+      </div>
+    );
+  }
+  return <Banner2Section banners={banners} />;
+}
 
 function Banner3SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
   if (isLoading) {
