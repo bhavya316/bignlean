@@ -4,12 +4,44 @@ const { body, param, query, validationResult } = require("express-validator");
 const comboProductController = require("../controllers/comboProductController");
 
 router.post(
+  "/combo-products/preview",
+  [
+    body("products")
+      .isArray({ min: 2, max: 3 })
+      .withMessage("Combo must include 2 or 3 products"),
+    body("mrp").optional().isNumeric().withMessage("MRP must be a number"),
+    body("sellingPrice").optional().isNumeric().withMessage("Price must be a number"),
+    body("price").optional().isNumeric().withMessage("Price must be a number"),
+  ],
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res
+        .status(400)
+        .json({ status: false, message: "ERROR", errors: errors.array() });
+    }
+    comboProductController.previewComboFromProducts(req, res);
+  }
+);
+
+const stripVariants = (req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    delete req.body.varients;
+    delete req.body.variants;
+  }
+  next();
+};
+
+router.post(
   "/combo-products",
   [
     body("name").optional().isString().withMessage("Name must be a string"),
     body("products").optional().isArray({ min: 2, max: 3 }).withMessage("Products must contain 2 or 3 product IDs"),
-    body("varients").optional().isArray().withMessage("Variants must be an array"),
+    body("mrp").optional().isNumeric().withMessage("MRP must be a number"),
+    body("sellingPrice").optional().isNumeric().withMessage("Price must be a number"),
+    body("price").optional().isNumeric().withMessage("Price must be a number"),
   ],
+  stripVariants,
   comboProductController.addComboProduct
 );
 
@@ -88,6 +120,7 @@ router.put(
   [
     param("id").notEmpty().withMessage("Combo Product ID is required"),
   ],
+  stripVariants,
   comboProductController.updateComboProduct
 );
 

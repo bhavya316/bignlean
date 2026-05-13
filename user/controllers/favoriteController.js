@@ -1,6 +1,7 @@
 const Favorite = require("../model/favorite");
 const Rating = require("../model/rating");
 const Product = require("../../admin/model/product");
+const ComboProduct = require("../../admin/model/comboProduct");
 const { validationResult } = require("express-validator");
 const User = require("../model/user");
 
@@ -15,7 +16,7 @@ const addFavorite = async (req, res) => {
   }
 
   try {
-    const { user, product } = req.body;
+    const { user, product, isCombo } = req.body;
     const existingFavorite = await Favorite.findOne({
       where: { user, product },
     });
@@ -26,7 +27,7 @@ const addFavorite = async (req, res) => {
         .json({ status: false, message: "Favorite already exists" });
     }
 
-    const newFavorite = await Favorite.create({ user, product });
+    const newFavorite = await Favorite.create({ user, product, isCombo: isCombo || false });
     res.status(201).json({
       status: true,
       message: "Favorite added.",
@@ -49,8 +50,24 @@ const getFavoritesByUser = async (req, res) => {
 
     const filteredList = [];
     for (const fav of favorites) {
-      const product = await Product.findByPk(fav.product);
-      if (product) {
+      let product;
+      if (fav.isCombo) {
+        product = await ComboProduct.findByPk(fav.product);
+      } else {
+        product = await Product.findByPk(fav.product);
+      }
+      if (!product) continue;
+
+      const newItem = { ...product.dataValues };
+
+      if (fav.isCombo) {
+        newItem.averageRating = 0;
+        newItem.totalRating = 0;
+        newItem.ratings = [];
+        newItem.myRating = [];
+        newItem.discountPercentage = product.mrp > 0 && product.sellingPrice > 0
+          ? ((product.mrp - product.sellingPrice) / product.mrp) * 100 : 0;
+      } else {
         const ratings = await Rating.findAll({
           where: { product: product.id },
           order: [["createdAt", "DESC"]],
@@ -59,14 +76,16 @@ const getFavoritesByUser = async (req, res) => {
           (sum, rating) => sum + rating.rate,
           0
         );
-        const averageRating =
+        newItem.averageRating =
           ratings.length > 0 ? totalRating / ratings.length : 0;
+        newItem.totalRating = totalRating;
 
-        const discountPercentage =
-          ((parseInt(product.varients[0].mrp) -
-            parseInt(product.varients[0].sellingPrice)) /
-            parseInt(product.varients[0].mrp)) *
-          100;
+        const firstVariant = Array.isArray(product.varients) && product.varients[0] || {};
+        newItem.discountPercentage =
+          ((parseInt(firstVariant.mrp) -
+            parseInt(firstVariant.sellingPrice)) /
+            parseInt(firstVariant.mrp)) *
+          100 || 0;
 
         const parsedRatings = await Promise.all(
           ratings.map(async (rating) => {
@@ -79,24 +98,11 @@ const getFavoritesByUser = async (req, res) => {
           })
         );
 
-        const myRating = [];
-        for (const rating of parsedRatings) {
-          if (rating.user.id == user) {
-            myRating.push(rating);
-          }
-        }
-
-        const newItem = {
-          ...product.dataValues,
-          averageRating,
-          discountPercentage,
-          totalRating,
-          ratings: parsedRatings,
-          myRating,
-        };
-
-        filteredList.push(newItem);
+        newItem.ratings = parsedRatings;
+        newItem.myRating = parsedRatings.filter((r) => r.user?.id == user);
       }
+
+      filteredList.push(newItem);
     }
 
     res.status(200).json({ status: true, message: "OK", filteredList });

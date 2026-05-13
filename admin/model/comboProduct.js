@@ -37,6 +37,20 @@ const ComboProduct = sequelize.define("comboProducts", {
     allowNull: false,
     defaultValue: false,
   },
+  mrp: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0,
+  },
+  sellingPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0,
+  },
+  price: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+  },
   images: {
     type: DataTypes.JSON,
     allowNull: true,
@@ -85,6 +99,7 @@ const ComboProduct = sequelize.define("comboProducts", {
   varients: {
     type: DataTypes.JSON,
     allowNull: false,
+    defaultValue: [],
   },
   expiry_date: {
     type: DataTypes.STRING,

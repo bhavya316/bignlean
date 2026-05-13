@@ -9,6 +9,7 @@ const Order = require("../user/model/order");
 const Transaction = require("../user/model/transaction")
 const Refer = require("../user/model/refer");
 const Product = require("../admin/model/product");
+const ComboProduct = require("../admin/model/comboProduct");
 const Coupon = require("../admin/model/coupon");
 const { validateCouponForCart } = require("../admin/controllers/couponController");
 const { generateRandomId } = require("./functions");
@@ -68,22 +69,34 @@ const parseAmount = (value) => {
 const buildOrderItemSnapshot = (product, cartItem, isPremium) => {
   const productData =
     product && typeof product.toJSON === "function" ? product.toJSON() : product;
-  const variants = Array.isArray(productData?.varients) ? productData.varients : [];
-  const selectedVariant =
-    variants.find((item) => `${item.id}` === `${cartItem.varientId}`) ||
-    variants[0] ||
-    {};
-  const selectedPricing = resolveVariantPricing(selectedVariant, cartItem.flavour);
-  const mrp = parseAmount(selectedPricing.mrp ?? cartItem.mrp);
-  const sellingPrice = parseAmount(
-    selectedPricing.sellingPrice ?? selectedPricing.price ?? cartItem.sellingPrice
-  );
-  const premiumPrice = parseAmount(selectedPricing.premiumPrice ?? cartItem.premiumPrice);
-  const unitPrice = isPremium
-    ? premiumPrice || sellingPrice || mrp
-    : sellingPrice || premiumPrice || mrp;
-  const qty = parseAmount(cartItem.qty);
-  const flavour = cartItem.flavour || getFlavorLabel(selectedPricing);
+  const isCombo = cartItem.varientId === 0 && cartItem.flavour === "Combo";
+
+  let mrp, sellingPrice, premiumPrice, unitPrice, qty, flavour;
+  qty = parseAmount(cartItem.qty);
+
+  if (isCombo) {
+    mrp = parseAmount(cartItem.mrp);
+    sellingPrice = parseAmount(cartItem.sellingPrice);
+    premiumPrice = parseAmount(cartItem.premiumPrice || cartItem.mrp);
+    unitPrice = sellingPrice || premiumPrice || mrp;
+    flavour = "Combo";
+  } else {
+    const variants = Array.isArray(productData?.varients) ? productData.varients : [];
+    const selectedVariant =
+      variants.find((item) => `${item.id}` === `${cartItem.varientId}`) ||
+      variants[0] ||
+      {};
+    const selectedPricing = resolveVariantPricing(selectedVariant, cartItem.flavour);
+    mrp = parseAmount(selectedPricing.mrp ?? cartItem.mrp);
+    sellingPrice = parseAmount(
+      selectedPricing.sellingPrice ?? selectedPricing.price ?? cartItem.sellingPrice
+    );
+    premiumPrice = parseAmount(selectedPricing.premiumPrice ?? cartItem.premiumPrice);
+    unitPrice = isPremium
+      ? premiumPrice || sellingPrice || mrp
+      : sellingPrice || premiumPrice || mrp;
+    flavour = cartItem.flavour || getFlavorLabel(selectedPricing);
+  }
 
   return {
     product: cartItem.product,
@@ -93,7 +106,7 @@ const buildOrderItemSnapshot = (product, cartItem, isPremium) => {
     flavour,
     flavor: flavour,
     qty,
-    units: selectedVariant.units || selectedPricing.units || "",
+    units: "",
     mrp,
     sellingPrice,
     premiumPrice,
@@ -101,9 +114,9 @@ const buildOrderItemSnapshot = (product, cartItem, isPremium) => {
     amount: unitPrice * qty,
     lineTotal: unitPrice * qty,
     variant: {
-      id: selectedVariant.id ?? cartItem.varientId,
-      units: selectedVariant.units || "",
-      stock: selectedPricing.stock ?? selectedVariant.stock,
+      id: cartItem.varientId,
+      units: "",
+      stock: 999,
       mrp,
       sellingPrice,
       premiumPrice,
@@ -364,9 +377,22 @@ async function calculateCartDetails(user, coupon, addressId) {
     var totalCouponDiscount = 0;
 
     for (const cartItem of cartItems) {
-      const product = await Product.findByPk(cartItem.product);
+      let product = await Product.findByPk(cartItem.product);
+      let isCombo = false;
+      if (!product) {
+        product = await ComboProduct.findByPk(cartItem.product);
+        isCombo = true;
+      }
+      if (!product) continue;
 
-      if (product) {
+      if (isCombo) {
+        const mrp = parseAmount(product.mrp);
+        const sellingPrice = parseAmount(product.sellingPrice ?? product.price);
+        const productPrice = sellingPrice || mrp;
+        totalPrice += productPrice * cartItem.qty;
+        totalWeight += 500 * cartItem.qty;
+        totalDiscount += (mrp - sellingPrice) * cartItem.qty;
+      } else {
         const varients = product.varients;
         const selectedVariant = varients.find(
           (item) => `${item.id}` === `${cartItem.varientId}`
@@ -1042,7 +1068,8 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
     const itemsIDList = [];
     const qtyList = [];
     for (const item of cartItems) {
-      const product = await Product.findByPk(item.product);
+      let product = await Product.findByPk(item.product);
+      if (!product) product = await ComboProduct.findByPk(item.product);
       if (product) {
         itemsIDList.push(item.product);
         qtyList.push(item.qty);
@@ -1152,7 +1179,13 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
     const orderItems = [];
 
     for (const item of cartItems) {
-      const product = await Product.findByPk(item.product);
+      const isComboItem = item.varientId === 0 && item.flavour === "Combo";
+      let product;
+      if (isComboItem) {
+        product = await ComboProduct.findByPk(item.product);
+      } else {
+        product = await Product.findByPk(item.product);
+      }
       if (product) {
         orderItems.push(buildOrderItemSnapshot(product, item, cartDetails.isPremium));
       }
@@ -1428,8 +1461,16 @@ router.get("/order/user/:user", authMiddleware, requireSameUserParam("user"), as
       const productQty = order.qty;
       let finalProductList = [];
 
+      const items = order.items || [];
       for (var i = 0; i < productIds.length; i++) {
-        const product = await Product.findByPk(productIds[i]);
+        const itemDetail = items[i] || {};
+        const isComboProduct = itemDetail.varientId === 0 && itemDetail.flavour === "Combo";
+        let product;
+        if (isComboProduct) {
+          product = await ComboProduct.findByPk(productIds[i]);
+        } else {
+          product = await Product.findByPk(productIds[i]);
+        }
         if (product) {
           const newProduct = { ...product.dataValues, qty: productQty[i] };
           finalProductList.push(newProduct);
@@ -1463,8 +1504,16 @@ router.get("/order/track/:id", authMiddleware, requireOwnedResource(Order, "id",
     const productQty = orders.qty;
     let finalProductList = [];
 
+    const items = orders.items || [];
     for (var i = 0; i < productIds.length; i++) {
-      const product = await Product.findByPk(productIds[i]);
+      const itemDetail = items[i] || {};
+      const isComboProduct = itemDetail.varientId === 0 && itemDetail.flavour === "Combo";
+      let product;
+      if (isComboProduct) {
+        product = await ComboProduct.findByPk(productIds[i]);
+      } else {
+        product = await Product.findByPk(productIds[i]);
+      }
       if (product) {
         const newProduct = { ...product.dataValues, qty: productQty[i] };
         finalProductList.push(newProduct);
@@ -1588,19 +1637,27 @@ router.put("/order/accept/:id", async (req, res) => {
     // Prepare order items
     let orderItems = [];
     try {
+      const orderItemsDetails = order.items || [];
       for (let i = 0; i < order.product.length; i++) {
-        const product = await Product.findByPk(order.product[i]);
+        const itemDetail = orderItemsDetails[i] || {};
+        const isComboProduct = itemDetail.varientId === 0 && itemDetail.flavour === "Combo";
+        let product;
+        if (isComboProduct) {
+          product = await ComboProduct.findByPk(order.product[i]);
+        } else {
+          product = await Product.findByPk(order.product[i]);
+        }
         if (product) {
-          // Get price from variants - use the first variant's selling price
           let price = 0;
-          if (product.varients && Array.isArray(product.varients) && product.varients.length > 0) {
+          if (isComboProduct) {
+            price = parseFloat(product.sellingPrice || product.price || 0);
+          } else if (product.varients && Array.isArray(product.varients) && product.varients.length > 0) {
             const firstVariant = product.varients[0];
             price = firstVariant.sellingPrice ? parseFloat(firstVariant.sellingPrice) || 0 : 0;
           }
           
-          // If no price found in variants, use a default price
           if (price === 0) {
-            price = 100; // Default price if no variant price available
+            price = 100;
             console.log(`No price found for product ${product.id}, using default: ${price}`);
           }
           
@@ -1863,11 +1920,21 @@ router.post("/order/create-shipment/:id", async (req, res) => {
 
     // Prepare order items
     let orderItems = [];
+    const createItemsDetails = order.items || [];
     for (let i = 0; i < order.product.length; i++) {
-      const product = await Product.findByPk(order.product[i]);
+      const itemDetail = createItemsDetails[i] || {};
+      const isComboProduct = itemDetail.varientId === 0 && itemDetail.flavour === "Combo";
+      let product;
+      if (isComboProduct) {
+        product = await ComboProduct.findByPk(order.product[i]);
+      } else {
+        product = await Product.findByPk(order.product[i]);
+      }
       if (product) {
         let price = 0;
-        if (product.varients && Array.isArray(product.varients) && product.varients.length > 0) {
+        if (isComboProduct) {
+          price = parseFloat(product.sellingPrice || product.price || 0);
+        } else if (product.varients && Array.isArray(product.varients) && product.varients.length > 0) {
           const firstVariant = product.varients[0];
           price = firstVariant.sellingPrice ? parseFloat(firstVariant.sellingPrice) || 0 : 0;
         }
@@ -2074,8 +2141,16 @@ router.get("/order", async (req, res) => {
       const productQty = order.qty;
       let finalProductList = [];
 
+      const items = order.items || [];
       for (let i = 0; i < productIds.length; i++) {
-        const product = await Product.findByPk(productIds[i]);
+        const itemDetail = items[i] || {};
+        const isComboProduct = itemDetail.varientId === 0 && itemDetail.flavour === "Combo";
+        let product;
+        if (isComboProduct) {
+          product = await ComboProduct.findByPk(productIds[i]);
+        } else {
+          product = await Product.findByPk(productIds[i]);
+        }
         if (product) {
           const newProduct = { ...product.dataValues, qty: productQty[i] };
           finalProductList.push(newProduct);

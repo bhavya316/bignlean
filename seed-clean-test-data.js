@@ -1132,6 +1132,7 @@ async function seedMerchandising(products) {
 
   for (const name of comboProductNames) {
     const source = products[name].toJSON();
+    const firstVariant = source.varients?.[0] || {};
     await ComboProduct.create({
       catId: source.catId,
       comboCatId: comboCategory.id,
@@ -1141,6 +1142,9 @@ async function seedMerchandising(products) {
       name: `${source.name} Combo Pick`,
       isBestSeller: source.isBestSeller,
       isOnFlashSale: source.isOnFlashSale,
+      mrp: firstVariant.mrp || 0,
+      sellingPrice: firstVariant.sellingPrice || firstVariant.price || 0,
+      price: firstVariant.sellingPrice || firstVariant.price || 0,
       images: source.images,
       overView: source.overView,
       details: source.details,
@@ -1150,7 +1154,7 @@ async function seedMerchandising(products) {
       supplements: source.supplements,
       brand: source.brand,
       hit: source.hit,
-      varients: source.varients,
+      varients: [],
       expiry_date: source.expiry_date,
     });
   }

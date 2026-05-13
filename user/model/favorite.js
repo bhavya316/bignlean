@@ -10,6 +10,10 @@ const Favorite = sequelize.define("favorites", {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  isCombo: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
 });
 
 module.exports = Favorite;

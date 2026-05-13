@@ -670,6 +670,7 @@ async function seed() {
 
   for (const product of comboItems) {
     const baseProduct = product.toJSON();
+    const firstVariant = baseProduct.varients?.[0] || {};
     await upsertBy(ComboProduct, { name: `${baseProduct.name} Combo Pick` }, {
       catId: baseProduct.catId,
       comboCatId: comboCategory.id,
@@ -678,6 +679,9 @@ async function seed() {
       brandId: baseProduct.brandId,
       isBestSeller: baseProduct.isBestSeller,
       isOnFlashSale: baseProduct.isOnFlashSale,
+      mrp: firstVariant.mrp || 0,
+      sellingPrice: firstVariant.sellingPrice || firstVariant.price || 0,
+      price: firstVariant.sellingPrice || firstVariant.price || 0,
       images: baseProduct.images,
       overView: baseProduct.overView,
       details: baseProduct.details,
@@ -687,7 +691,7 @@ async function seed() {
       supplements: baseProduct.supplements,
       brand: baseProduct.brand,
       hit: baseProduct.hit,
-      varients: baseProduct.varients,
+      varients: [],
       expiry_date: baseProduct.expiry_date,
     });
   }

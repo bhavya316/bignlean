@@ -12,6 +12,31 @@ const firstVariant = (product) =>
     ? product.varients[0]
     : {};
 
+const numberOr = (value, fallback = 0) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+const normalizeComboPricingPayload = (payload) => {
+  const firstPayloadVariant =
+    Array.isArray(payload?.varients) && payload.varients.length > 0
+      ? payload.varients[0]
+      : {};
+  const mrp = numberOr(payload?.mrp, numberOr(firstPayloadVariant.mrp, 0));
+  const sellingPrice = numberOr(
+    payload?.sellingPrice ?? payload?.price,
+    numberOr(firstPayloadVariant.sellingPrice ?? firstPayloadVariant.price, 0)
+  );
+
+  return {
+    ...payload,
+    mrp,
+    sellingPrice,
+    price: payload?.price == null || payload.price === "" ? sellingPrice : payload.price,
+    varients: [],
+  };
+};
+
 const buildComboFromProducts = async (body) => {
   const productIds = Array.isArray(body.products)
     ? body.products.map((id) => Number(id)).filter(Boolean)
@@ -49,11 +74,8 @@ const buildComboFromProducts = async (body) => {
     (sum, variant) => sum + Number(variant.sellingPrice || 0),
     0
   );
-  const premiumPrice = variants.reduce(
-    (sum, variant) => sum + Number(variant.premiumPrice || variant.mrp || 0),
-    0
-  );
-  const stock = Math.min(...variants.map((variant) => Number(variant.stock || 0)));
+  const comboMrp = numberOr(body.mrp, mrp);
+  const comboSellingPrice = numberOr(body.sellingPrice ?? body.price, sellingPrice);
   const firstProduct = products[0];
   const description =
     body.description ||
@@ -68,6 +90,9 @@ const buildComboFromProducts = async (body) => {
       subCatId2: body.subCatId2 || firstProduct.subCatId2 || null,
       brandId: firstProduct.brandId,
       name: body.name || products.map((product) => product.name).join(" + "),
+      mrp: comboMrp,
+      sellingPrice: comboSellingPrice,
+      price: comboSellingPrice,
       images: body.images || products.flatMap((product) => product.images || []).slice(0, 6),
       overView: body.overView || [],
       details: body.details || [{ heading: "Description", body: description }],
@@ -76,18 +101,8 @@ const buildComboFromProducts = async (body) => {
       certificates: body.certificates || [],
       supplements: body.supplements || [],
       brand: body.brand || {},
-      varients: [
-        {
-          id: 1,
-          units: `${products.length} products`,
-          flavor: ["Combo"],
-          stock,
-          mrp,
-          sellingPrice,
-          premiumPrice,
-          productIds,
-        },
-      ],
+      selectedProductIds: productIds,
+      varients: [],
       expiry_date: body.expiry_date || null,
     },
   };
@@ -106,6 +121,10 @@ const addComboProduct = async (req, res) => {
     // Ensure table exists
     await ComboProduct.sync({ alter: true });
 
+    if (req.body.comboCategoryId && !req.body.comboCatId) {
+      req.body.comboCatId = req.body.comboCategoryId;
+    }
+
     let payload = req.body;
     if (Array.isArray(req.body.products)) {
       const comboBuild = await buildComboFromProducts(req.body);
@@ -116,9 +135,16 @@ const addComboProduct = async (req, res) => {
       }
       payload = comboBuild.data;
     }
+    payload = normalizeComboPricingPayload(payload);
 
-    const requiredFields = ["catId", "comboCatId", "subCatId", "brandId", "name", "varients"];
-    const missingField = requiredFields.find((field) => !payload[field]);
+    const requiredFields = ["catId", "comboCatId", "subCatId", "brandId", "name", "mrp", "sellingPrice"];
+    const missingField = requiredFields.find(
+      (field) =>
+        payload[field] === undefined ||
+        payload[field] === null ||
+        payload[field] === "" ||
+        (["mrp", "sellingPrice"].includes(field) && Number(payload[field]) <= 0)
+    );
     if (missingField) {
       return res.status(400).json({
         status: false,
@@ -192,7 +218,9 @@ const updateComboProduct = async (req, res) => {
       });
     }
 
-    const updatedComboProduct = await comboProduct.update(req.body);
+    const updatedComboProduct = await comboProduct.update(
+      normalizeComboPricingPayload(req.body)
+    );
     res.status(200).json({
       status: true,
       message: "Combo product updated.",
@@ -227,6 +255,14 @@ const deleteComboProduct = async (req, res) => {
       message: "Unable to delete combo product.",
     });
   }
+};
+
+const previewComboFromProducts = async (req, res) => {
+  const comboBuild = await buildComboFromProducts(req.body);
+  if (!comboBuild.status) {
+    return res.status(comboBuild.code).json(comboBuild);
+  }
+  res.status(200).json({ status: true, data: comboBuild.data });
 };
 
 const getAllComboProductsPaginated = async (req, res) => {
@@ -266,12 +302,11 @@ const getAllComboProductsPaginated = async (req, res) => {
     const enrichedComboProducts = comboProducts.map((comboProduct) => {
       const data = comboProduct.dataValues;
 
+      const comboMrp = Number(data.mrp || 0);
+      const comboSellingPrice = Number(data.sellingPrice || data.price || 0);
       const discountPercentage =
-        data.varients && data.varients[0]
-          ? ((parseInt(data.varients[0].mrp || 0) -
-              parseInt(data.varients[0].sellingPrice || 0)) /
-              parseInt(data.varients[0].mrp || 1)) *
-            100
+        comboMrp > 0 && comboSellingPrice > 0
+          ? ((comboMrp - comboSellingPrice) / comboMrp) * 100
           : 0;
 
       return {
@@ -366,6 +401,9 @@ const getAllComboCategoriesWithProducts = async (req, res) => {
           name: productData.name,
           isBestSeller: productData.isBestSeller,
           isOnFlashSale: productData.isOnFlashSale,
+          mrp: productData.mrp || 0,
+          sellingPrice: productData.sellingPrice || productData.price || 0,
+          price: productData.price || productData.sellingPrice || 0,
           images: productData.images || [],
           overView: productData.overView || [],
           details: productData.details || [],
@@ -460,6 +498,9 @@ const getComboProductByIdWithDetails = async (req, res) => {
       name: productData.name,
       isBestSeller: productData.isBestSeller,
       isOnFlashSale: productData.isOnFlashSale,
+      mrp: productData.mrp || 0,
+      sellingPrice: productData.sellingPrice || productData.price || 0,
+      price: productData.price || productData.sellingPrice || 0,
       images: productData.images || [],
       overView: productData.overView || [],
       details: productData.details || [],
@@ -529,6 +570,9 @@ const getComboProductByIdWithDetails = async (req, res) => {
         name: comboData.name,
         isBestSeller: comboData.isBestSeller,
         isOnFlashSale: comboData.isOnFlashSale,
+        mrp: comboData.mrp || 0,
+        sellingPrice: comboData.sellingPrice || comboData.price || 0,
+        price: comboData.price || comboData.sellingPrice || 0,
         images: comboData.images || [],
         overView: comboData.overView || [],
         details: comboData.details || [],
@@ -582,6 +626,7 @@ module.exports = {
   getComboProductsByCategory,
   updateComboProduct,
   deleteComboProduct,
+  previewComboFromProducts,
   getAllComboProductsPaginated,
   getAllComboCategoriesWithProducts,
 

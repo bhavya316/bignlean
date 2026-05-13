@@ -1,4 +1,5 @@
 const Product = require("../../admin/model/product");
+const ComboProduct = require("../../admin/model/comboProduct");
 const Cart = require("../model/cart");
 const { validationResult } = require("express-validator");
 const Rating = require("../model/rating");
@@ -49,14 +50,27 @@ const addToCart = async (req, res) => {
 
   try {
     const { user, product, qty, varientId, flavour } = req.body;
-    const productDetails = await Product.findByPk(product);
+
+    // Use frontend signal to determine product type
+    const isCombo = varientId === 0 && flavour === "Combo";
+    let productDetails;
+    if (isCombo) {
+      productDetails = await ComboProduct.findByPk(product);
+    } else {
+      productDetails = await Product.findByPk(product);
+    }
     if (!productDetails) {
-      return res
-        .status(404)
-        .json({ status: false, message: "Product not found" });
+      return res.status(404).json({ status: false, message: "Product not found" });
     }
 
-      // Validate product has variants
+    let mrp, sellingPrice, premiumPrice, selectedFlavour;
+
+    if (isCombo) {
+      mrp = parseFloat(productDetails.mrp || 0);
+      sellingPrice = parseFloat(productDetails.sellingPrice || productDetails.price || 0);
+      premiumPrice = mrp;
+      selectedFlavour = flavour || "Combo";
+    } else {
       if (!productDetails.varients || !Array.isArray(productDetails.varients) || productDetails.varients.length === 0) {
         return res.status(400).json({
           status: false,
@@ -64,7 +78,6 @@ const addToCart = async (req, res) => {
         });
       }
 
-      // Find the selected variant
       const selectedVariant = productDetails.varients.find(
         (item) => `${item.id}` === `${varientId}`
       );
@@ -76,7 +89,6 @@ const addToCart = async (req, res) => {
         });
       }
 
-      // Validate variant has flavors array
       const flavorOptions = getVariantFlavorOptions(selectedVariant);
       if (!Array.isArray(flavorOptions)) {
         return res.status(400).json({
@@ -85,13 +97,11 @@ const addToCart = async (req, res) => {
         });
       }
 
-      // If no flavor is selected but variants have flavors, use the first one
-      let selectedFlavour = flavour;
+      selectedFlavour = flavour;
       if (!flavour && flavorOptions.length > 0) {
         selectedFlavour = getFlavorLabel(flavorOptions[0]);
       }
 
-      // Validate the selected flavor exists
       const selectedFlavorExists = flavorOptions.length === 0 ||
         flavorOptions.some(
           (flavor) => getFlavorLabel(flavor) === selectedFlavour
@@ -116,62 +126,47 @@ const addToCart = async (req, res) => {
         });
       }
 
-      const existingCartItem = await Cart.findOne({
-        where: { user, product, varientId, flavour: selectedFlavour },
-      });
+      mrp = selectedVariantPricing.mrp ? parseFloat(selectedVariantPricing.mrp) : null;
+      sellingPrice = selectedVariantPricing.sellingPrice ? parseFloat(selectedVariantPricing.sellingPrice) : null;
+      premiumPrice = selectedVariantPricing.premiumPrice ? parseFloat(selectedVariantPricing.premiumPrice) : mrp;
 
-      if (existingCartItem) {
-        const nextQty = existingCartItem.qty + qty;
-        if (nextQty > availableStock) {
-          return res.status(400).json({
-            status: false,
-            message: "Requested quantity exceeds available stock.",
-          });
-        }
-
-        existingCartItem.qty = nextQty;
-        existingCartItem.mrp = parseFloat(selectedVariantPricing.mrp || 0);
-        existingCartItem.sellingPrice = parseFloat(selectedVariantPricing.sellingPrice || 0);
-        existingCartItem.premiumPrice = parseFloat(selectedVariantPricing.premiumPrice || selectedVariantPricing.mrp || 0);
-        await existingCartItem.save();
-        return res.status(200).json({
-          status: true,
-          message: "Cart updated successfully.",
-          cartItem: existingCartItem,
-        });
-      }
-
-      // Validate and parse price values
-      const mrp = selectedVariantPricing.mrp ? parseFloat(selectedVariantPricing.mrp) : null;
-      const sellingPrice = selectedVariantPricing.sellingPrice ? parseFloat(selectedVariantPricing.sellingPrice) : null;
-      const premiumPrice = selectedVariantPricing.premiumPrice ? parseFloat(selectedVariantPricing.premiumPrice) : mrp;
-
-      // Validate that at least one price is available
       if (!mrp && !sellingPrice && !premiumPrice) {
         return res.status(400).json({
           status: false,
           message: "Product pricing information is not available. Please try again later.",
         });
       }
+    }
 
-      // Create new cart item
-      const newCartItem = await Cart.create({
-        user,
-        product,
-        qty,
-        varientId,
-        flavour: selectedFlavour,
-        mrp: mrp,
-        sellingPrice: sellingPrice,
-        premiumPrice: premiumPrice,
-      });
+    const existingCartItem = await Cart.findOne({
+      where: { user, product, varientId, flavour: selectedFlavour },
+    });
 
-      res.status(201).json({
+    if (existingCartItem) {
+      existingCartItem.qty = existingCartItem.qty + qty;
+      existingCartItem.mrp = mrp;
+      existingCartItem.sellingPrice = sellingPrice;
+      existingCartItem.premiumPrice = premiumPrice;
+      await existingCartItem.save();
+      return res.status(200).json({
         status: true,
-        message: "Product added to cart successfully.",
-        cartItem: newCartItem,
+        message: "Cart updated successfully.",
+        cartItem: existingCartItem,
       });
-    
+    }
+
+    const newCartItem = await Cart.create({
+      user, product, qty, varientId,
+      flavour: selectedFlavour,
+      mrp, sellingPrice, premiumPrice,
+    });
+
+    res.status(201).json({
+      status: true,
+      message: "Product added to cart successfully.",
+      cartItem: newCartItem,
+    });
+
   } catch (error) {
     console.error("Add to cart error:", error);
     res.status(400).json({
@@ -280,25 +275,32 @@ const getCartByUser = async (req, res) => {
 
     const filteredList = [];
     for (const item of cartItems) {
-      const product = await Product.findByPk(item.product);
+      const isComboItem = item.varientId === 0 && item.flavour === "Combo";
+      let product;
+      if (isComboItem) {
+        product = await ComboProduct.findByPk(item.product);
+      } else {
+        product = await Product.findByPk(item.product);
+      }
+      if (!product) continue;
 
-      const ratings = await Rating.findAll({
-        where: { product: product.id },
-      });
-      const totalRating = ratings.reduce((sum, rating) => sum + rating.rate, 0);
-      const averageRating =
-        ratings.length > 0 ? totalRating / ratings.length : 0;
-      const discountPercentage =
-        ((product.dataValues.price - product.dataValues.sellingPrice) /
-          product.dataValues.price) *
-        100;
-      const newItem = {
-        ...product.dataValues,
-        averageRating,
-        discountPercentage,
-      };
+      const newItem = { ...product.dataValues };
+
+      if (isComboItem) {
+        newItem.averageRating = 0;
+        newItem.discountPercentage = product.mrp > 0 && product.sellingPrice > 0
+          ? ((product.mrp - product.sellingPrice) / product.mrp) * 100 : 0;
+        newItem.varients = [];
+      } else {
+        const ratings = await Rating.findAll({ where: { product: product.id } });
+        const totalRating = ratings.reduce((sum, rating) => sum + rating.rate, 0);
+        newItem.averageRating = ratings.length > 0 ? totalRating / ratings.length : 0;
+        const firstVariant = Array.isArray(product.varients) && product.varients[0] || {};
+        newItem.discountPercentage =
+          ((parseInt(firstVariant.mrp) - parseInt(firstVariant.sellingPrice)) /
+            parseInt(firstVariant.mrp)) * 100 || 0;
+      }
       item.product = newItem;
-
       filteredList.push(item);
     }
 
