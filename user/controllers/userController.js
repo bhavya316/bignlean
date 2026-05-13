@@ -10,6 +10,57 @@ const { generateToken, sanitizeUser } = require("../../utils/auth");
 
 const generateOtp = () => Math.floor(1000 + Math.random() * 9000).toString();
 
+const SOCIAL_PROVIDERS = {
+  google: {
+    label: "Google",
+    firebaseIds: ["google.com"],
+    userColumn: "googleId",
+  },
+  facebook: {
+    label: "Facebook",
+    firebaseIds: ["facebook.com"],
+    userColumn: "facebookId",
+  },
+};
+
+const normalizeSocialProvider = (provider) =>
+  String(provider || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\.com$/, "");
+
+const normalizeEmail = (email) => {
+  const normalized = String(email || "").trim().toLowerCase();
+  return normalized || null;
+};
+
+const getSocialProviderFromToken = (decodedToken) => {
+  const firebaseInfo = decodedToken.firebase || {};
+  const identities = firebaseInfo.identities || {};
+
+  return {
+    signInProvider: firebaseInfo.sign_in_provider || null,
+    identityProviders: Object.keys(identities),
+  };
+};
+
+const assertSocialTokenProvider = (decodedToken, providerKey) => {
+  const providerConfig = SOCIAL_PROVIDERS[providerKey];
+  const { signInProvider, identityProviders } = getSocialProviderFromToken(decodedToken);
+  const hasExpectedProvider =
+    providerConfig.firebaseIds.includes(signInProvider) ||
+    identityProviders.some((identityProvider) =>
+      providerConfig.firebaseIds.includes(identityProvider)
+    );
+
+  if (!hasExpectedProvider) {
+    throw createHttpError(400, `Token is not from ${providerConfig.label}`);
+  }
+};
+
+const getSocialPhoneFallback = (providerKey, firebaseUid) =>
+  `SOCIAL-${providerKey.toUpperCase()}-${String(firebaseUid).slice(0, 64)}`;
+
 const calculateWalletBalance = async (userId) => {
   if (typeof Transaction.calculateFinalValueForUser !== "function") {
     return 0;
@@ -388,55 +439,105 @@ const verifyFirebaseToken = async (req, res, next) => {
 };
 
 const socialAuth = async (req, res, next) => {
-  const { idToken, provider } = req.body;
+  const { idToken } = req.body;
+  const providerKey = normalizeSocialProvider(req.body.provider);
+  const providerConfig = SOCIAL_PROVIDERS[providerKey];
 
   try {
-    if (!idToken || !provider) {
+    if (!idToken || !providerConfig) {
       throw createHttpError(400, "ID token and provider are required");
     }
 
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const firebaseUid = decodedToken.uid;
-    const email = decodedToken.email || req.body.email || null;
+    const email = normalizeEmail(decodedToken.email || req.body.email);
     const name = decodedToken.name || req.body.name || null;
-    const picture = decodedToken.picture || null;
-    const providerId = decodedToken.firebase?.sign_in_provider;
+    const picture = decodedToken.picture || req.body.image || req.body.photoURL || null;
+    const providerColumn = providerConfig.userColumn;
 
-    if (providerId && providerId !== `${provider}.com`) {
-      throw createHttpError(400, `Token is not from ${provider}`);
+    assertSocialTokenProvider(decodedToken, providerKey);
+
+    const userLookups = [{ firebaseUid }];
+    if (email) userLookups.push({ email });
+    if (User.rawAttributes[providerColumn]) {
+      userLookups.push({ [providerColumn]: firebaseUid });
     }
 
-    let user = await User.findOne({ where: { firebaseUid } });
-    if (!user && email) {
-      user = await User.findOne({ where: { email } });
-    }
+    let user = await User.findOne({
+      where: {
+        [Op.or]: userLookups,
+      },
+    });
 
     if (user) {
-      await user.update({
+      if (user.isBlocked) {
+        throw createHttpError(403, "User account is blocked");
+      }
+
+      const updateData = {
         firebaseUid,
-        name: user.name || name,
-        image: user.image || picture,
-      });
+        ...(email && !user.email ? { email } : {}),
+        ...(name && !user.name ? { name } : {}),
+        ...(picture && !user.image ? { image: picture } : {}),
+        ...(User.rawAttributes[providerColumn] ? { [providerColumn]: firebaseUid } : {}),
+      };
+
+      await user.update(updateData);
     } else {
-      const tempPhone = req.body.phone || `SOCIAL-${provider.toUpperCase()}-${Date.now()}`;
-      user = await User.create({
+      const tempPhone = req.body.phone || getSocialPhoneFallback(providerKey, firebaseUid);
+      const createData = {
         name,
         email,
         firebaseUid,
         image: picture,
         phone: tempPhone,
         referCode: await createUniqueReferCode(),
+      };
+
+      if (User.rawAttributes[providerColumn]) {
+        createData[providerColumn] = firebaseUid;
+      }
+
+      user = await User.create({
+        ...createData,
       });
     }
 
     return sendAuthResponse(
       res,
       200,
-      `${provider.charAt(0).toUpperCase() + provider.slice(1)} authentication successful`,
+      `${providerConfig.label} authentication successful`,
       user
     );
   } catch (error) {
-    next(error.statusCode ? error : createHttpError(401, "Authentication failed"));
+    logger.error(
+      {
+        err: error,
+        provider: providerKey || req.body.provider,
+        firebaseCode: error.code,
+      },
+      "Social authentication failed"
+    );
+
+    if (error.statusCode) {
+      return next(error);
+    }
+
+    if (error.code === "auth/id-token-expired") {
+      return next(createHttpError(401, "Social login expired. Please try again."));
+    }
+
+    if (error.code && String(error.code).startsWith("auth/")) {
+      return next(createHttpError(401, "Invalid social login token. Please sign in again."));
+    }
+
+    if (error.name === "SequelizeUniqueConstraintError") {
+      return next(
+        createHttpError(409, "This social account is already linked. Please sign in again.")
+      );
+    }
+
+    next(error);
   }
 };
 
