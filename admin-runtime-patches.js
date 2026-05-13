@@ -46,6 +46,9 @@
   });
   var brandOriginValue = "";
   var brandOriginsByName = {};
+  var offerBannerImageValue = "";
+  var offerDraftProductIds = [];
+  var offerDraftProducts = [];
   var comboDraftPayload = null;
   var comboEditPricesLoaded = false;
   var webpackRequire = null;
@@ -105,7 +108,40 @@
       ".bnl-combo-modal__status{font-size:13px;color:#6b7280;}",
       ".bnl-combo-modal__error{font-size:13px;color:#b91c1c;}",
       ".bnl-combo-modal__secondary,.bnl-combo-modal__close{background:#f3f4f6;color:#111827;border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;}",
+      ".bnl-offer-image-tools{display:grid!important;grid-template-columns:repeat(2,minmax(180px,1fr));gap:14px;align-items:stretch;}",
+      ".bnl-offer-image-tools>input[type='file']{display:none!important;}",
+      ".bnl-offer-logo-upload,.bnl-offer-banner-upload{min-height:150px!important;height:auto!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;}",
+      ".bnl-offer-banner-upload{border:2px dashed #d1d5db!important;border-radius:10px!important;background:#f9fafb!important;cursor:pointer!important;overflow:hidden!important;padding:10px!important;}",
+      ".bnl-offer-banner-upload:hover{border-color:#e70f0f!important;background:#fff7f7!important;}",
+      ".bnl-offer-banner-upload__preview{display:flex;min-height:128px;width:100%;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#111827;font-size:14px;font-weight:700;}",
+      ".bnl-offer-banner-upload__preview img{max-height:128px!important;width:100%!important;object-fit:contain!important;border-radius:8px;background:#fff;}",
+      ".bnl-offer-banner-upload__preview small{display:block;color:#6b7280;font-size:12px;font-weight:500;line-height:1.35;}",
+      ".bnl-offer-image-hint{display:block;width:100%;margin-top:8px;color:#6b7280;font-size:12px;font-weight:500;line-height:1.35;}",
+      ".bnl-offer-builder{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:0 0 18px;box-shadow:0 10px 24px rgba(15,23,42,.06);}",
+      ".bnl-offer-builder h4{margin:0 0 4px;font-size:18px;color:#111827;}",
+      ".bnl-offer-builder p{margin:0;color:#6b7280;font-size:13px;line-height:1.45;}",
+      ".bnl-offer-builder__filters{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:10px;margin-top:14px;align-items:end;}",
+      ".bnl-offer-builder__field{display:flex;flex-direction:column;gap:6px;min-width:0;}",
+      ".bnl-offer-builder__field label{font-size:13px;font-weight:700;color:#111827;}",
+      ".bnl-offer-builder input,.bnl-offer-builder select{height:40px;border:1px solid #d1d5db;border-radius:8px;background:#fff;padding:0 10px;font-size:14px;outline:none;}",
+      ".bnl-offer-builder button{height:40px;border:0;border-radius:8px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}",
+      ".bnl-offer-builder__primary{background:#e70f0f;color:#fff;}",
+      ".bnl-offer-builder__secondary{background:#f3f4f6;color:#111827;}",
+      ".bnl-offer-builder__selected{display:flex;flex-wrap:wrap;gap:8px;min-height:28px;margin-top:14px;}",
+      ".bnl-offer-builder__chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:#fff7f7;border:1px solid #fecaca;color:#991b1b;padding:6px 10px;font-size:12px;font-weight:700;}",
+      ".bnl-offer-builder__chip button{height:auto;background:transparent;color:#991b1b;padding:0;font-size:14px;line-height:1;}",
+      ".bnl-offer-builder__products{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:14px;max-height:430px;overflow:auto;padding-right:4px;}",
+      ".bnl-offer-builder__product{display:grid;grid-template-columns:58px minmax(0,1fr);gap:10px;align-items:center;border:1px solid #e5e7eb;border-radius:8px;padding:10px;background:#fff;}",
+      ".bnl-offer-builder__product img{width:58px!important;height:58px!important;max-height:58px!important;object-fit:contain;border-radius:7px;background:#f3f4f6;}",
+      ".bnl-offer-builder__product strong{display:block;color:#111827;font-size:13px;line-height:1.3;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+      ".bnl-offer-builder__product span{display:block;color:#6b7280;font-size:12px;margin-bottom:8px;}",
+      ".bnl-offer-builder__product button{height:34px;background:#111827;color:#fff;padding:0 10px;}",
+      ".bnl-offer-builder__product button.is-selected{background:#16a34a;}",
+      ".bnl-offer-builder__status{margin-top:10px;font-size:13px;color:#6b7280;}",
+      ".bnl-offer-builder__status.is-error{color:#b91c1c;}",
       "@media(max-width:680px){.bnl-combo-picker__header,.bnl-combo-price-row,.bnl-combo-preview,.bnl-combo-modal__head,.bnl-combo-modal__foot{grid-template-columns:1fr;display:grid;}.bnl-combo-modal{padding:10px;}.bnl-combo-products{grid-template-columns:1fr;}}",
+      "@media(max-width:900px){.bnl-offer-builder__filters{grid-template-columns:1fr 1fr;}.bnl-offer-builder__filters button{width:100%;}}",
+      "@media(max-width:680px){.bnl-offer-image-tools,.bnl-offer-builder__filters{grid-template-columns:1fr;}.bnl-offer-logo-upload,.bnl-offer-banner-upload{min-height:140px!important;}.bnl-offer-builder__products{grid-template-columns:1fr;}}",
       ".add_product_varients__content__items{grid-template-columns:repeat(4,minmax(150px,1fr))!important;align-items:end!important;overflow:visible!important;}",
       ".add_product_varients__content__items__item_desc{min-width:0;align-self:end;}",
       ".add_product_varients__content__items__item_desc:nth-of-type(-n+4) label{min-height:42px;display:flex;flex-direction:column;justify-content:flex-end;}",
@@ -358,6 +394,11 @@
       comboDraftPayload = null;
       comboEditPricesLoaded = false;
     }
+    if (isOfferAddPath(lastObservedPath) && !isOfferAddPath(currentPath)) {
+      offerBannerImageValue = "";
+      offerDraftProductIds = [];
+      offerDraftProducts = [];
+    }
     lastObservedPath = currentPath;
   }
 
@@ -492,6 +533,340 @@
     return headers;
   }
 
+  function isOfferAddPath(pathname) {
+    return /\/add_new_offer\/?$/.test(pathname || location.pathname);
+  }
+
+  function isOfferFormPage() {
+    return !!document.querySelector(".add_new_deal input#offer_name") &&
+      !!document.querySelector(".add_new_deal .categories__content__new_brand__upload_logo");
+  }
+
+  function uploadOfferImageFile(file) {
+    var formData = new FormData();
+    formData.append("file", file);
+    return fetch("http://localhost:3002/upload", {
+      method: "POST",
+      headers: getAdminAuthHeaders(false),
+      body: formData
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        if (!response.ok || data.status === false) {
+          throw new Error(data.message || "Unable to upload image.");
+        }
+        var url = data.fileUrl || data.filePath || data.url;
+        if (!url) throw new Error("Upload response did not include an image URL.");
+        return url;
+      });
+    });
+  }
+
+  function updateOfferBannerPreview(wrapper, statusText, isError) {
+    var preview = wrapper && wrapper.querySelector("[data-bnl-offer-banner-preview]");
+    if (!preview) return;
+    if (offerBannerImageValue) {
+      preview.innerHTML = [
+        '<img src="' + escapeHtml(offerBannerImageValue) + '" alt="Offer banner preview" />',
+        "<span>Change offer banner</span>",
+        statusText ? '<small style="color:' + (isError ? "#b91c1c" : "#16a34a") + '">' + escapeHtml(statusText) + "</small>" : "<small>Banner image: 1500 x 400 px. Used on the offer detail page.</small>"
+      ].join("");
+      return;
+    }
+    preview.innerHTML = [
+      "<span>Upload offer banner</span>",
+      "<small>Banner image: 1500 x 400 px. Used on the offer detail page.</small>",
+      statusText ? '<small style="color:' + (isError ? "#b91c1c" : "#6b7280") + '">' + escapeHtml(statusText) + "</small>" : ""
+    ].join("");
+  }
+
+  function installOfferBannerUpload() {
+    if (!isOfferFormPage()) return;
+    var imageTools = document.querySelector(".add_new_deal .categories__content__new_brand");
+    if (!imageTools || imageTools.querySelector("[data-bnl-offer-banner-upload]")) return;
+
+    imageTools.classList.add("bnl-offer-image-tools");
+    var logoUpload = imageTools.querySelector(".categories__content__new_brand__upload_logo");
+    if (logoUpload) {
+      logoUpload.classList.add("bnl-offer-logo-upload");
+      var logoLabel = logoUpload.querySelector("span");
+      if (logoLabel && /offer image/i.test(logoLabel.textContent || "")) {
+        logoLabel.textContent = "Upload offer logo";
+      }
+      if (!logoUpload.querySelector("[data-bnl-offer-logo-hint]")) {
+        var logoHint = document.createElement("small");
+        logoHint.className = "bnl-offer-image-hint";
+        logoHint.setAttribute("data-bnl-offer-logo-hint", "true");
+        logoHint.textContent = "Logo image: 600 x 400 px. Used on offer cards, navbar, and other listing areas.";
+        logoUpload.appendChild(logoHint);
+      }
+    }
+
+    var bannerUpload = document.createElement("div");
+    bannerUpload.className = "bnl-offer-banner-upload";
+    bannerUpload.setAttribute("data-bnl-offer-banner-upload", "true");
+    bannerUpload.innerHTML = [
+      '<input type="file" accept="image/*" data-bnl-offer-banner-input hidden />',
+      '<div class="bnl-offer-banner-upload__preview" data-bnl-offer-banner-preview></div>'
+    ].join("");
+
+    imageTools.appendChild(bannerUpload);
+    updateOfferBannerPreview(bannerUpload);
+
+    var input = bannerUpload.querySelector("[data-bnl-offer-banner-input]");
+    bannerUpload.addEventListener("click", function (event) {
+      if (event.target === input) return;
+      if (input) input.click();
+    });
+    input.addEventListener("change", function (event) {
+      var file = event.target && event.target.files && event.target.files[0];
+      if (!file) return;
+      updateOfferBannerPreview(bannerUpload, "Uploading banner...", false);
+      uploadOfferImageFile(file)
+        .then(function (url) {
+          offerBannerImageValue = url;
+          updateOfferBannerPreview(bannerUpload, "Banner uploaded.", false);
+        })
+        .catch(function (error) {
+          updateOfferBannerPreview(bannerUpload, error.message || "Unable to upload banner.", true);
+        });
+    });
+  }
+
+  function getOfferProductId(product) {
+    return Number(product && (product.id || product.productId));
+  }
+
+  function normalizeOfferProductIdsForAdmin(products) {
+    if (!products) return [];
+    var items = products;
+    if (typeof products === "string") {
+      try {
+        items = JSON.parse(products);
+      } catch (error) {
+        items = products.split(",");
+      }
+    }
+    if (!Array.isArray(items)) return [];
+    return items.map(function (item) {
+      if (item && typeof item === "object") return Number(item.id || item.productId);
+      return Number(item);
+    }).filter(Boolean);
+  }
+
+  function setOfferBuilderStatus(builder, message, isError) {
+    var status = builder && builder.querySelector("[data-bnl-offer-status]");
+    if (!status) return;
+    status.textContent = message || "";
+    status.className = "bnl-offer-builder__status" + (isError ? " is-error" : "");
+  }
+
+  function renderOfferSelectedProducts(builder) {
+    var selectedNode = builder && builder.querySelector("[data-bnl-offer-selected]");
+    if (!selectedNode) return;
+    if (!offerDraftProducts.length) {
+      selectedNode.innerHTML = '<span class="bnl-offer-builder__status">No products selected for this offer.</span>';
+      return;
+    }
+    selectedNode.innerHTML = "";
+    offerDraftProducts.forEach(function (product) {
+      var id = getOfferProductId(product);
+      var chip = document.createElement("span");
+      chip.className = "bnl-offer-builder__chip";
+      chip.innerHTML = '<span>' + escapeHtml(product.name || ("Product #" + id)) + '</span><button type="button" aria-label="Remove product">x</button>';
+      chip.querySelector("button").addEventListener("click", function () {
+        offerDraftProductIds = offerDraftProductIds.filter(function (item) { return item !== id; });
+        offerDraftProducts = offerDraftProducts.filter(function (item) { return getOfferProductId(item) !== id; });
+        renderOfferSelectedProducts(builder);
+        renderOfferProductRows(builder, builder.__bnlOfferProducts || []);
+      });
+      selectedNode.appendChild(chip);
+    });
+  }
+
+  function renderOfferProductRows(builder, products) {
+    var productsNode = builder && builder.querySelector("[data-bnl-offer-products]");
+    if (!productsNode) return;
+    builder.__bnlOfferProducts = products || [];
+    productsNode.innerHTML = "";
+
+    if (!products || !products.length) {
+      productsNode.innerHTML = '<div class="bnl-offer-builder__status">No products found.</div>';
+      return;
+    }
+
+    products.forEach(function (product) {
+      var id = getOfferProductId(product);
+      if (!id) return;
+      var isSelected = offerDraftProductIds.indexOf(id) !== -1;
+      var row = document.createElement("div");
+      row.className = "bnl-offer-builder__product";
+
+      var image = document.createElement("img");
+      image.src = getProductImage(product) || "/assets/product.png";
+      image.alt = product.name || "Product";
+
+      var info = document.createElement("div");
+      var name = document.createElement("strong");
+      name.textContent = product.name || "Product";
+      name.title = product.name || "Product";
+      var meta = document.createElement("span");
+      meta.textContent = getProductPriceSummary(product);
+      var button = document.createElement("button");
+      button.type = "button";
+      button.textContent = isSelected ? "Selected" : "Add to offer";
+      if (isSelected) button.className = "is-selected";
+      button.addEventListener("click", function () {
+        if (offerDraftProductIds.indexOf(id) === -1) {
+          offerDraftProductIds.push(id);
+          offerDraftProducts.push(product);
+        }
+        renderOfferSelectedProducts(builder);
+        renderOfferProductRows(builder, builder.__bnlOfferProducts || []);
+        setOfferBuilderStatus(builder, "Selected " + offerDraftProductIds.length + " product" + (offerDraftProductIds.length === 1 ? "" : "s") + ".", false);
+      });
+
+      info.appendChild(name);
+      info.appendChild(meta);
+      info.appendChild(button);
+      row.appendChild(image);
+      row.appendChild(info);
+      productsNode.appendChild(row);
+    });
+  }
+
+  function fetchOfferProducts(builder) {
+    var searchInput = builder.querySelector("[data-bnl-offer-search]");
+    var categorySelect = builder.querySelector("[data-bnl-offer-category]");
+    var subcategorySelect = builder.querySelector("[data-bnl-offer-subcategory]");
+    var params = new URLSearchParams();
+    params.set("page", "1");
+    params.set("limit", "100");
+    if (searchInput && searchInput.value.trim()) params.set("search", searchInput.value.trim());
+    if (categorySelect && categorySelect.value) params.set("catId", categorySelect.value);
+    if (subcategorySelect && subcategorySelect.value) params.set("subCatId", subcategorySelect.value);
+
+    setOfferBuilderStatus(builder, "Loading products...", false);
+    fetch("http://localhost:3002/admin/all-products?" + params.toString(), {
+      headers: getAdminAuthHeaders(false)
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        var products = normalizeProductsResponse(data);
+        renderOfferProductRows(builder, products);
+        setOfferBuilderStatus(builder, products.length + " product" + (products.length === 1 ? "" : "s") + " loaded.", false);
+      })
+      .catch(function () {
+        renderOfferProductRows(builder, []);
+        setOfferBuilderStatus(builder, "Unable to load products.", true);
+      });
+  }
+
+  function fetchOfferCategories(builder) {
+    var categorySelect = builder.querySelector("[data-bnl-offer-category]");
+    if (!categorySelect) return;
+    categorySelect.innerHTML = '<option value="">All categories</option>';
+    fetch("http://localhost:3002/categories", {
+      headers: getAdminAuthHeaders(false)
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        var categories = Array.isArray(data.categories) ? data.categories : Array.isArray(data.data) ? data.data : [];
+        categories.forEach(function (category) {
+          var option = document.createElement("option");
+          option.value = category.id;
+          option.textContent = category.name || ("Category #" + category.id);
+          categorySelect.appendChild(option);
+        });
+      })
+      .catch(function () {
+        setOfferBuilderStatus(builder, "Unable to load categories.", true);
+      });
+  }
+
+  function fetchOfferSubcategories(builder, categoryId) {
+    var subcategorySelect = builder.querySelector("[data-bnl-offer-subcategory]");
+    if (!subcategorySelect) return;
+    subcategorySelect.innerHTML = '<option value="">All subcategories</option>';
+    subcategorySelect.disabled = !categoryId;
+    if (!categoryId) return;
+
+    fetch("http://localhost:3002/subcategories/" + encodeURIComponent(categoryId), {
+      headers: getAdminAuthHeaders(false)
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        var subcategories = Array.isArray(data.subcategories) ? data.subcategories : Array.isArray(data.data) ? data.data : [];
+        subcategories.forEach(function (subcategory) {
+          var option = document.createElement("option");
+          option.value = subcategory.id;
+          option.textContent = subcategory.name || ("Subcategory #" + subcategory.id);
+          subcategorySelect.appendChild(option);
+        });
+        subcategorySelect.disabled = false;
+      })
+      .catch(function () {
+        setOfferBuilderStatus(builder, "Unable to load subcategories.", true);
+      });
+  }
+
+  function installOfferProductPicker() {
+    if (!isOfferFormPage()) return;
+    var container = document.querySelector(".add_new_deal__content__all_product");
+    if (!container || container.querySelector("[data-bnl-offer-builder]")) return;
+
+    var nativeFilters = container.querySelector(".add_new_deal__content__all_product__search_container");
+    if (nativeFilters) nativeFilters.style.display = "none";
+
+    var builder = document.createElement("div");
+    builder.className = "bnl-offer-builder";
+    builder.setAttribute("data-bnl-offer-builder", "true");
+    builder.innerHTML = [
+      "<h4>Offer product picker</h4>",
+      "<p>Select products here if the default category or subcategory controls do not load. These selections are used when creating the offer.</p>",
+      '<div class="bnl-offer-builder__filters">',
+      '<div class="bnl-offer-builder__field"><label>Search product</label><input data-bnl-offer-search type="search" placeholder="Search by product name" /></div>',
+      '<div class="bnl-offer-builder__field"><label>Category</label><select data-bnl-offer-category><option value="">All categories</option></select></div>',
+      '<div class="bnl-offer-builder__field"><label>Subcategory</label><select data-bnl-offer-subcategory disabled><option value="">All subcategories</option></select></div>',
+      '<button type="button" class="bnl-offer-builder__primary" data-bnl-offer-load>Load Products</button>',
+      "</div>",
+      '<div class="bnl-offer-builder__selected" data-bnl-offer-selected></div>',
+      '<div class="bnl-offer-builder__status" data-bnl-offer-status></div>',
+      '<div class="bnl-offer-builder__products" data-bnl-offer-products></div>'
+    ].join("");
+
+    var heading = container.querySelector(".add_new_deal__content__all_product__heading");
+    if (heading && heading.nextSibling) {
+      container.insertBefore(builder, heading.nextSibling);
+    } else {
+      container.insertBefore(builder, container.firstChild);
+    }
+
+    var searchTimer = null;
+    var searchInput = builder.querySelector("[data-bnl-offer-search]");
+    var categorySelect = builder.querySelector("[data-bnl-offer-category]");
+    var subcategorySelect = builder.querySelector("[data-bnl-offer-subcategory]");
+    var loadButton = builder.querySelector("[data-bnl-offer-load]");
+
+    searchInput.addEventListener("input", function () {
+      if (searchTimer) window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(function () { fetchOfferProducts(builder); }, 300);
+    });
+    categorySelect.addEventListener("change", function () {
+      fetchOfferSubcategories(builder, categorySelect.value);
+      fetchOfferProducts(builder);
+    });
+    subcategorySelect.addEventListener("change", function () {
+      fetchOfferProducts(builder);
+    });
+    loadButton.addEventListener("click", function () {
+      fetchOfferProducts(builder);
+    });
+
+    renderOfferSelectedProducts(builder);
+    fetchOfferCategories(builder);
+    fetchOfferProducts(builder);
+  }
+
   function getComboSelectValue(labelId) {
     var label = document.getElementById(labelId);
     var root = label && label.closest ? label.closest(".MuiFormControl-root") : null;
@@ -597,7 +972,7 @@
     }
     var mrp = data.mrp || 0;
     var sellingPrice = data.sellingPrice || data.price || 0;
-    var selectedIds = data.selectedProductIds || data.productIds || [];
+    var selectedIds = data.selectedProductIds || data.products || data.productIds || [];
     preview.hidden = false;
     preview.innerHTML = [
       "<div>",
@@ -708,7 +1083,14 @@
       }
     });
     if (isBlankRecord(merged.brand) && comboDraftPayload.brand) merged.brand = comboDraftPayload.brand;
-    delete merged.products;
+    var selectedIds = comboDraftPayload.selectedProductIds || comboDraftPayload.products || comboDraftPayload.productIds || [];
+    if (Array.isArray(selectedIds) && selectedIds.length > 0) {
+      merged.products = selectedIds.map(function (id) { return Number(id); }).filter(Boolean);
+      merged.selectedProductIds = merged.products;
+    } else {
+      delete merged.products;
+      delete merged.selectedProductIds;
+    }
     return merged;
   }
 
@@ -991,6 +1373,11 @@
           if (this.__bnlShouldClearFlavorDrafts && this.status >= 200 && this.status < 300) {
             clearFlavorDrafts();
           }
+          if (this.__bnlShouldClearOfferBanner && this.status >= 200 && this.status < 300) {
+            offerBannerImageValue = "";
+            offerDraftProductIds = [];
+            offerDraftProducts = [];
+          }
           if (String(this.__bnlUrl || "").indexOf("/brands") === -1) return;
           var data = JSON.parse(this.responseText || "{}");
           var list = Array.isArray(data.brands) ? data.brands : data.brand ? [data.brand] : [];
@@ -1015,6 +1402,22 @@
           }
           if (isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/combo-products") && String(this.__bnlUrl || "").indexOf("/combo-products/preview") === -1) {
             body = JSON.stringify(mergeComboDraftIntoPayload(payload));
+          }
+          if (isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/offers")) {
+            if (payload.image && !payload.logo) payload.logo = payload.image;
+            var payloadProductIds = normalizeOfferProductIdsForAdmin(payload.products);
+            var selectedOfferProductIds = payloadProductIds.concat(offerDraftProductIds).filter(function (id, index, list) {
+              return id && list.indexOf(id) === index;
+            });
+            if (selectedOfferProductIds.length > 0) payload.products = selectedOfferProductIds;
+            if (offerBannerImageValue) {
+              payload.banner = offerBannerImageValue;
+              payload.bannerImage = offerBannerImageValue;
+            } else if (!payload.banner && payload.image) {
+              payload.banner = payload.image;
+            }
+            body = JSON.stringify(payload);
+            this.__bnlShouldClearOfferBanner = true;
           }
           if (isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/products") && Array.isArray(payload.varients)) {
             body = JSON.stringify(normalizeProductVariants(payload));
@@ -1059,6 +1462,8 @@
         subCatId: product.subCatId,
         comboCatId: product.comboCatId,
         comboCategoryId: product.comboCatId,
+        products: product.products || product.selectedProductIds || [],
+        selectedProductIds: product.selectedProductIds || product.products || [],
         varients: []
       };
       writeComboPriceInputs(section, comboDraftPayload);
@@ -1124,6 +1529,8 @@
       installProductDraftGuard();
       cleanupProductDraftOnRouteChange();
       installComboProductPicker();
+      installOfferBannerUpload();
+      installOfferProductPicker();
       hideComboVariantControls();
       fixComboConfig();
       fixComboNavButton();
