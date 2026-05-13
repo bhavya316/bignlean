@@ -14,16 +14,24 @@ export default function ProductBottomSheet({
   product,
   selectedFlavour,
   selectedVarientId,
+  isCombo = false,
 }: {
   product: ProductDetailType;
   selectedVarientId: number;
   selectedFlavour: string;
+  isCombo?: boolean;
 }) {
   const [quantity, setQuantity] = useState(1);
-  const varient = product.varients.find(
+  const varient = (product.varients || []).find(
     (varient) => varient.id === selectedVarientId
   );
-  const selectedVariantPricing = resolveVariantSelection(varient, selectedFlavour);
+  const selectedVariantPricing = isCombo
+    ? {
+        mrp: product?.mrp || 0,
+        sellingPrice: product?.sellingPrice ?? product?.price ?? 0,
+        stock: product?.stock ?? 999,
+      }
+    : resolveVariantSelection(varient, selectedFlavour);
   const maxQuantity = Number(selectedVariantPricing?.stock || 0);
   const isOutOfStock = maxQuantity <= 0;
   const { userData } = useAppContext();
@@ -62,8 +70,8 @@ export default function ProductBottomSheet({
         user: userData.id,
         product: product?.id,
         qty: quantity,
-        flavour: selectedFlavour,
-        varientId: selectedVarientId,
+        flavour: isCombo ? "Combo" : selectedFlavour,
+        varientId: isCombo ? 0 : selectedVarientId,
       },
       {
         onSuccess: () => {

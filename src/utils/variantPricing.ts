@@ -95,7 +95,7 @@ export function getVariantMarketPrice(variant: any) {
 }
 
 export function getVariantSellingPrice(variant: any) {
-  return getNumericPrice(variant?.sellingPrice);
+  return getNumericPrice(variant?.sellingPrice ?? variant?.price);
 }
 
 export function getVariantSavings(variant: any) {

@@ -100,11 +100,12 @@ export default function ProductCard({
     }
   }, []);
 
+  const isComboPath = pathname === 'combo';
   const addWish = (e: any) => {
     e.stopPropagation();
     setIsWishListed(true);
     addToWishList(
-      { productId: product?.id as number, userId: userData?.id as number },
+      { productId: product?.id as number, userId: userData?.id as number, isCombo: isComboPath },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["all-Products"] });
@@ -142,9 +143,12 @@ export default function ProductCard({
   };
 
   if (product) {
+    const isCombo = pathname === 'combo';
     const firstVariant = product?.varients?.[0];
-    const firstFlavor = getFirstFlavorLabel(firstVariant);
-    const firstVariantPricing = resolveVariantSelection(firstVariant, firstFlavor);
+    const firstFlavor = isCombo ? "Combo" : getFirstFlavorLabel(firstVariant);
+    const firstVariantPricing = isCombo
+      ? { mrp: product?.mrp || 0, sellingPrice: product?.sellingPrice ?? product?.price ?? 0 }
+      : resolveVariantSelection(firstVariant, firstFlavor);
     const marketPrice = getVariantMarketPrice(firstVariantPricing);
     const sellingPrice = getVariantSellingPrice(firstVariantPricing);
     const discountPercent = getVariantDiscountPercent(firstVariantPricing);
@@ -200,9 +204,11 @@ export default function ProductCard({
           </div> */}
          </div>
          </div>
-          <p className="text-gray-600 text-xs">
-            {firstFlavor}
-          </p>
+          {!isCombo && (
+            <p className="text-gray-600 text-xs">
+              {firstFlavor}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-between ">
@@ -239,15 +245,15 @@ export default function ProductCard({
           }
 
           // Check if product has variants
-          if (!product?.varients || product.varients.length === 0) {
+          if (!isCombo && (!product?.varients || product.varients.length === 0)) {
             toast.dismiss();
             toast.error("This product is currently not available");
             return;
           }
 
           // Get the first variant and its first flavor
-          const firstVariant = product.varients[0];
-          const firstFlavor = getFirstFlavorLabel(firstVariant);
+          const firstVariant = isCombo ? { id: 0 } : product.varients[0];
+          const firstFlavor = isCombo ? "Combo" : getFirstFlavorLabel(firstVariant);
 
           // Debug log
           console.log("Adding to cart:", {

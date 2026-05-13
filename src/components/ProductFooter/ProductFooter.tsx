@@ -75,7 +75,7 @@ export function SimilarProductCard({
     e.stopPropagation();
     setIsWishListed(true);
     addToWishList(
-      { productId: product?.id as number, userId: userData?.id as number },
+      { productId: product?.id as number, userId: userData?.id as number, isCombo: pathname === "combo" },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["all-Products"] });
@@ -104,25 +104,27 @@ export function SimilarProductCard({
       }, 1500);
       return;
     }
+    if (!product?.id) return;
 
-    // Check if product has variants
-    if (!product?.varients || product.varients.length === 0) {
+    const isComboProduct = pathname === "combo";
+
+    // Regular products need variants. Combo products use combo-level pricing.
+    if (!isComboProduct && (!product?.varients || product.varients.length === 0)) {
       toast.dismiss();
       toast.error("This product is currently not available");
       return;
     }
 
-    // Get the first variant and its first flavor
-    const firstVariant = product.varients[0];
-    const firstFlavor = getFirstFlavorLabel(firstVariant);
+    const firstVariant = product?.varients?.[0];
+    const firstFlavor = isComboProduct ? "Combo" : getFirstFlavorLabel(firstVariant);
 
     addToCart(
       {
         user: userData.id,
-        product: product?.id,
+        product: product.id,
         qty: 1,
         flavour: firstFlavor,
-        varientId: firstVariant.id,
+        varientId: firstVariant?.id ?? 0,
       },
       {
         onSuccess: (data) => {
@@ -157,7 +159,8 @@ export function SimilarProductCard({
   if (product) {
     const firstVariant = product?.varients?.[0];
     const firstFlavor = getFirstFlavorLabel(firstVariant);
-    const firstVariantPricing = resolveVariantSelection(firstVariant, firstFlavor);
+    const firstVariantPricing =
+      resolveVariantSelection(firstVariant, firstFlavor) || product;
     const marketPrice = getVariantMarketPrice(firstVariantPricing);
     const sellingPrice = getVariantSellingPrice(firstVariantPricing);
     const discountPercent = getVariantDiscountPercent(firstVariantPricing);

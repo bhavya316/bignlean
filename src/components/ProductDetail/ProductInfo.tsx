@@ -30,10 +30,12 @@ export default function ProductInfo({
   product,
   selectedVarientId,
   selectedFlavour,
+  isCombo = false,
 }: {
   product: ProductDetailType;
   selectedVarientId: number;
   selectedFlavour: string;
+  isCombo?: boolean;
 }) {
   const router = useRouter();
   const { mutate: addToCart } = useAddToCartList();
@@ -41,10 +43,16 @@ export default function ProductInfo({
   const dispatch = useDispatchContext();
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
-  const varient = product.varients.find(
+  const varient = (product.varients || []).find(
     (varient) => varient.id === selectedVarientId
   );
-  const selectedVariantPricing = resolveVariantSelection(varient, selectedFlavour);
+  const selectedVariantPricing = isCombo
+    ? {
+        mrp: product?.mrp || 0,
+        sellingPrice: product?.sellingPrice ?? product?.price ?? 0,
+        stock: product?.stock ?? 999,
+      }
+    : resolveVariantSelection(varient, selectedFlavour);
   const maxQuantity = Number(selectedVariantPricing?.stock || 0);
   const isOutOfStock = maxQuantity <= 0;
 
@@ -80,8 +88,8 @@ export default function ProductInfo({
         user: userData.id,
         product: product?.id,
         qty: quantity,
-        flavour: selectedFlavour,
-        varientId: selectedVarientId,
+        flavour: isCombo ? "Combo" : selectedFlavour,
+        varientId: isCombo ? 0 : selectedVarientId,
       },
       {
         onSuccess: () => {
@@ -116,8 +124,8 @@ export default function ProductInfo({
         user: userData.id,
         product: product?.id,
         qty: quantity,
-        flavour: selectedFlavour,
-        varientId: selectedVarientId,
+        flavour: isCombo ? "Combo" : selectedFlavour,
+        varientId: isCombo ? 0 : selectedVarientId,
       },
       {
         onSuccess: () => {
@@ -225,7 +233,7 @@ const ProductRating = ({
     e.stopPropagation();
     setIsWishListed(true);
     addToWishList(
-      { productId: productId as number, userId: userData?.id as number },
+      { productId: productId as number, userId: userData?.id as number, isCombo: isCombo },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["all-Products"] });

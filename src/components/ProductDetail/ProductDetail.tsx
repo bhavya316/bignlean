@@ -11,22 +11,28 @@ import { getVariantFlavors, resolveVariantSelection } from "@/utils/variantPrici
 
 export default function ProductDetail({
   product,
+  isCombo = false,
 }: {
   product: ProductDetailType;
+  isCombo?: boolean;
 }) {
+  const variants = product?.varients || [];
   const [selectedVarientId, setSelectedVarientId] = useState(
-    product?.varients?.[0]?.id ?? 0
+    variants?.[0]?.id ?? 0
   );
   const [selectedFlavour, setSelectedFlavour] = useState(
-    getVariantFlavors(product?.varients?.[0])?.[0] || ""
+    getVariantFlavors(variants?.[0])?.[0] || ""
   );
   const selectedVarient =
-    product?.varients?.find((varient) => varient.id === selectedVarientId) ||
-    product?.varients?.[0];
+    variants?.find((varient) => varient.id === selectedVarientId) ||
+    variants?.[0];
   const selectedVariantPricing = resolveVariantSelection(
     selectedVarient,
     selectedFlavour
   );
+  const deliveryPrice = isCombo
+    ? Number(product?.sellingPrice ?? product?.price ?? 0)
+    : Number(selectedVariantPricing?.sellingPrice || 0);
 
   useEffect(() => {
     const flavors = getVariantFlavors(selectedVarient);
@@ -41,17 +47,20 @@ export default function ProductDetail({
         product={product}
         selectedVarientId={selectedVarientId}
         selectedFlavour={selectedFlavour}
+        isCombo={isCombo}
       />
-      <ProductVarient
-        product={product}
-        selectedFlavour={selectedFlavour}
-        selectedVarientId={selectedVarientId}
-        setSelectedFlavour={setSelectedFlavour}
-        setSelectedVarientId={setSelectedVarientId}
-      />
+      {!isCombo && (
+        <ProductVarient
+          product={product}
+          selectedFlavour={selectedFlavour}
+          selectedVarientId={selectedVarientId}
+          setSelectedFlavour={setSelectedFlavour}
+          setSelectedVarientId={setSelectedVarientId}
+        />
+      )}
       <ProductCouponOffers />
       <ProductDelivery 
-        price={Number(selectedVariantPricing?.sellingPrice || 0)}
+        price={deliveryPrice}
         countryOfOrigin={product?.countryOfOrigin || product?.brandOriginCountry || undefined}
         countryCode={product?.brandOriginCountryCode || undefined}
       />
@@ -62,6 +71,7 @@ export default function ProductDetail({
         product={product}
         selectedVarientId={selectedVarientId}
         selectedFlavour={selectedFlavour}
+        isCombo={isCombo}
       />
     </div>
   );

@@ -7,6 +7,10 @@ export interface ProductDetailType {
   name: string;
   isBestSeller: boolean;
   isOnFlashSale: boolean;
+  mrp?: string | number;
+  sellingPrice?: string | number;
+  price?: string | number;
+  stock?: string | number;
   images: string[];
   overView: OverView[];
   details: Detail[];

@@ -19,7 +19,10 @@ export default function ProductVarient({
   setSelectedFlavour: Dispatch<SetStateAction<string>>;
   selectedFlavour: string;
 }) {
-  const selectedVarient = product.varients.find(
+  const varients = product.varients || [];
+  if (varients.length === 0) return null;
+
+  const selectedVarient = varients.find(
     (varient) => varient.id === selectedVarientId
   );
   const selectedVariantPricing = resolveVariantSelection(
@@ -33,7 +36,7 @@ export default function ProductVarient({
       <WeightCard
         setSelectedVarientId={setSelectedVarientId}
         selectedVarientId={selectedVarientId}
-        varients={product?.varients}
+        varients={varients}
       />
       <StockStatusCard stock={Number(selectedVariantPricing?.stock || 0)} />
       <FlavourCard

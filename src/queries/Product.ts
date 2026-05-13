@@ -21,21 +21,21 @@ export function useGEtWishList(userId: number) {
   });
 }
 
-async function addToWishList(productId: number, userId: number) {
+async function addToWishList(productId: number, userId: number, isCombo?: boolean) {
   return axios({
     method: "POST",
     url: base_url + ApiPaths.FAVORITES,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
     },
-    data: JSON.stringify({ user: userId, product: productId }),
+    data: JSON.stringify({ user: userId, product: productId, isCombo: isCombo || false }),
   });
 }
 
 export function useAddToWishList() {
   return useMutation({
-    mutationFn: (data: { productId: number; userId: number }) =>
-      addToWishList(data?.productId, data?.userId),
+    mutationFn: (data: { productId: number; userId: number; isCombo?: boolean }) =>
+      addToWishList(data?.productId, data?.userId, data?.isCombo),
   });
 }
 
