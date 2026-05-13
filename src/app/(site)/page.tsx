@@ -2,6 +2,8 @@
 import {
   DownloadBanner,
   HomeCarosoul,
+  Banner1Section,
+  Banner2Section,
   Banner3Section,
   ProductSection,
   Quotes,
@@ -39,8 +41,10 @@ export default function Home() {
   const { data: comboCategoriesData, isLoading: comboCategoriesLoading } = useGetComboCategories();
   const { userData } = useAppContext();
 
-  // Filter banners by type
+// Filter banners by type
   const heroSliderBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Hero Slider") || [];
+  const banner1SectionBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Banner 1 Section") || [];
+  const banner2SectionBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Banner 2 Section") || [];
   const banner3SectionBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Banner 3 Section") || [];
   useGEtWishList(userData?.id as number);
   return (
@@ -67,6 +71,11 @@ export default function Home() {
         <PopularProducts isLoading={homeProductsLoading} />
         
         <BuyTwoOff />
+        
+        <Banner1SectionWrapper
+          isLoading={bannersLoading}
+          banners={banner1SectionBanners}
+        />
         
         {/* <Quotes
           authorName="Michael John Bobak"
@@ -120,6 +129,11 @@ export default function Home() {
                     )}
 
         {homeProductsLoading ? <PickOfTheDaySkeleton /> : <PickOfTheDay />}
+
+        <Banner2SectionWrapper
+          isLoading={bannersLoading}
+          banners={banner2SectionBanners}
+        />
 
         <Quotes
           authorName="Arnold Schwarzenegger"
@@ -395,4 +409,26 @@ function Banner3SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps
     );
   }
   return <Banner3Section banners={banners} />;
+}
+
+function Banner1SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
+  if (isLoading) {
+    return (
+      <div className="my-8 flex justify-center">
+        <div className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] bg-gray-200 rounded-lg shadow-lg animate-pulse" />
+      </div>
+    );
+  }
+  return <Banner1Section banners={banners} />;
+}
+
+function Banner2SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
+  if (isLoading) {
+    return (
+      <div className="my-8 flex justify-center">
+        <div className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] bg-gray-200 rounded-lg shadow-lg animate-pulse" />
+      </div>
+    );
+  }
+  return <Banner2Section banners={banners} />;
 }
