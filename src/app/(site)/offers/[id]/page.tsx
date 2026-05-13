@@ -11,16 +11,22 @@ export default function page({}: Props) {
   const params = useParams();
   const id = params?.id as string;
   const { data } = useGetOfferProducts(Number(id));
+  const offer = data?.offer;
+  const bannerImage = getMediaUrl(
+    offer?.banner || offer?.image,
+    "/assets/product.png"
+  );
+
   return (
-    <CustomPageWrapper className="flex flex-col items-center gap-10">
-      <div className="w-full max-w-[1200px] overflow-hidden rounded-lg bg-gray-100 shadow-sm">
+    <CustomPageWrapper className="flex flex-col gap-10">
+      <div className="w-full overflow-hidden rounded-lg bg-white shadow-sm">
         <img
-          src={getMediaUrl(data?.offer?.image, "/assets/product.png")}
-          alt={data?.offer?.name || "offer"}
-          className="h-[260px] w-full object-cover object-center max-[640px]:h-[190px]"
+          src={bannerImage}
+          alt={offer?.name || "offer"}
+          className="aspect-[16/6] max-h-[420px] min-h-[150px] w-full bg-gray-100 object-contain object-center max-[640px]:aspect-[16/9]"
         />
       </div>
-      <Products isOffer={true} products={data?.offer?.products} />
+      <Products isOffer={true} products={offer?.products} />
     </CustomPageWrapper>
   );
 }

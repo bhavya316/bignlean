@@ -27,11 +27,11 @@ export default function OffersPage() {
               key={offer.id}
               className="group overflow-hidden rounded-lg bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
             >
-              <div className="aspect-[16/9] bg-gray-100 overflow-hidden">
+              <div className="aspect-[16/9] overflow-hidden bg-white p-4">
                 <img
                   src={getMediaUrl(offer.image, "/assets/product.png")}
                   alt={offer.name}
-                  className="h-full w-full object-cover object-center transition duration-300 group-hover:scale-[1.03]"
+                  className="h-full w-full object-contain object-center transition duration-300 group-hover:scale-[1.03]"
                 />
               </div>
               <div className="p-4">

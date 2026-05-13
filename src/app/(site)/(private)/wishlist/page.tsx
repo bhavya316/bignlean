@@ -10,7 +10,7 @@ export default function Page() {
 
   return (
     <CustomPageWrapper heading="Wishlist" showContentFooter={false}>
-      {data?.data?.filteredList?.length === 0 && (
+      {data?.filteredList?.length === 0 && (
         <h3 className="text-center text-gray-400">Wishlist is Empty</h3>
       )}
       <div className="custom-grid2 mb-[70px]">
@@ -18,9 +18,9 @@ export default function Page() {
           data?.filteredList?.map((wishItem: any, index: number) => (
             <ProductCard
               fullidth
-              pathname="wishlist"
+              pathname={wishItem?.isCombo ? "combo" : "wishlist"}
               productData={wishItem}
-              key={index}
+              key={`${wishItem?.isCombo ? "combo" : "product"}-${wishItem?.id || index}`}
             />
           ))}
       </div>

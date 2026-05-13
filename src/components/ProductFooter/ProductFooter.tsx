@@ -61,21 +61,23 @@ export function SimilarProductCard({
   const { mutate: removeFromWishList } = useRemoveFormWishList();
   const { mutate: addToCart, isPending } = useAddToCartList();
   const wishListData: any = queryClient.getQueryData(["wishlist"]);
+  const isComboProduct =
+    pathname === "combo" ||
+    Boolean((product as any)?.isCombo || (product as any)?.isLegacyComboProduct);
 
   useEffect(() => {
     const prod = wishListData?.filteredList?.find(
-      (pro: any) => pro.id === product?.id
+      (pro: any) =>
+        pro.id === product?.id && Boolean(pro.isCombo) === Boolean(isComboProduct)
     );
-    if (prod) {
-      setIsWishListed(true);
-    }
-  }, [product?.id]);
+    setIsWishListed(Boolean(prod));
+  }, [wishListData, product?.id, isComboProduct]);
 
   const addWish = (e: any) => {
     e.stopPropagation();
     setIsWishListed(true);
     addToWishList(
-      { productId: product?.id as number, userId: userData?.id as number, isCombo: pathname === "combo" },
+      { productId: product?.id as number, userId: userData?.id as number, isCombo: isComboProduct },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["all-Products"] });
@@ -106,8 +108,6 @@ export function SimilarProductCard({
     }
     if (!product?.id) return;
 
-    const isComboProduct = pathname === "combo";
-
     // Regular products need variants. Combo products use combo-level pricing.
     if (!isComboProduct && (!product?.varients || product.varients.length === 0)) {
       toast.dismiss();
@@ -124,7 +124,8 @@ export function SimilarProductCard({
         product: product.id,
         qty: 1,
         flavour: firstFlavor,
-        varientId: firstVariant?.id ?? 0,
+        varientId: isComboProduct ? 0 : firstVariant?.id ?? 0,
+        isCombo: isComboProduct,
       },
       {
         onSuccess: (data) => {
@@ -142,7 +143,7 @@ export function SimilarProductCard({
     setIsWishListed(false);
 
     removeFromWishList(
-      { productId: product?.id as number, userId: userData?.id as number },
+      { productId: product?.id as number, userId: userData?.id as number, isCombo: isComboProduct },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["all-Products"] });
@@ -158,13 +159,14 @@ export function SimilarProductCard({
 
   if (product) {
     const firstVariant = product?.varients?.[0];
-    const firstFlavor = getFirstFlavorLabel(firstVariant);
-    const firstVariantPricing =
-      resolveVariantSelection(firstVariant, firstFlavor) || product;
+    const firstFlavor = isComboProduct ? "Combo" : getFirstFlavorLabel(firstVariant);
+    const firstVariantPricing = isComboProduct
+      ? { mrp: product?.mrp || 0, sellingPrice: product?.sellingPrice ?? product?.price ?? 0 }
+      : resolveVariantSelection(firstVariant, firstFlavor) || product;
     const marketPrice = getVariantMarketPrice(firstVariantPricing);
     const sellingPrice = getVariantSellingPrice(firstVariantPricing);
     const discountPercent = getVariantDiscountPercent(firstVariantPricing);
-    const link = pathname === 'combo'
+    const link = isComboProduct
       ? `/combo/${product?.id}`
       : isOffer
         ? `${urlPath}/product/${encodeURIComponent(product?.name)}?productId=${product?.id}`
@@ -203,9 +205,11 @@ export function SimilarProductCard({
           </div> */}
             </div>
           </div>
-          <p className="text-gray-600 text-xs">
-            {firstFlavor}
-          </p>
+          {!isComboProduct && (
+            <p className="text-gray-600 text-xs">
+              {firstFlavor}
+            </p>
+          )}
         </div>
         <div className="flex font-medium text-sm items-center gap-1">
           <StarIcon width={15} height={15} />{" "}

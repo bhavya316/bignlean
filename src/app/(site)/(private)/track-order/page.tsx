@@ -9,10 +9,15 @@ import { useAppContext } from "@/provider/ContextProvider/ContextProvider";
 import { useCancelOrder, useGetAllOrder } from "@/queries/Order";
 import { useTrackShipment, useGetTracking, TrackingData } from "@/queries/Shipping";
 import { getFlavorLabel, getOptionLabel } from "@/utils/variantPricing";
+import { getFirstMediaUrl } from "@/utils/media";
 
 export default function Page() {
   const { userData } = useAppContext();
   const { data, isLoading } = useGetAllOrder(userData?.id as number);
+  const orders = [...(data?.data?.orders || [])].sort(
+    (a: TrackOrder, b: TrackOrder) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 
   return (
     <CustomPageWrapper
@@ -20,8 +25,8 @@ export default function Page() {
       className="relative flex flex-col gap-8"
       headingClass="mb-0"
     >
-      {data?.data?.orders?.length > 0 ? (
-        data?.data?.orders?.map((order: TrackOrder) => (
+      {orders.length > 0 ? (
+        orders.map((order: TrackOrder) => (
           <div key={order?.id} className="w-full flex flex-col gap-4">
             <p className="w-full text-end text-black text-sm not-italic font-medium max-[1000px]:top-0 max-[450px]:static">
               AWB Tracking no: {order?.trackingID || "in process"}
@@ -73,6 +78,17 @@ const OrderCard = ({ order, userId }: { order: TrackOrder; userId: any }) => {
   );
 };
 
+const getOrderItemMeta = (product: TrackOrderProduct) => {
+  if (product?.isCombo) return "Combo";
+
+  const unit = getOptionLabel(product?.selectedUnits || product?.weight);
+  const flavor = getFlavorLabel(
+    (product?.selectedFlavor || product?.selectedFlavour || product?.flavor) as any
+  );
+
+  return [unit, flavor].filter(Boolean).join(" - ");
+};
+
 const ProductDetailCard = ({
   order,
   userId,
@@ -111,20 +127,28 @@ const ProductDetailCard = ({
 
   return (
     <div className="flex flex-1 gap-6 items-start max-[560px]:flex-col">
-      <img
-        src={order?.product[0]?.images?.[0] || "/assets/product.png"}
-        alt="product"
-        className="w-[100px] max-[1000px]:w-[80px] max-[600px]:w-[50px]"
-      />
-      <div className="flex flex-col gap-4 w-[195px] max-[1000px]:w-[170px] max-[860px]:flex-1 max-[860px]:flex-row max-[860px]:justify-between max-[860px]:items-center max-[450px]:flex-col">
-        <div className="flex flex-col gap-2">
-          <p className="text-black text-base not-italic font-medium max-[1000px]:text-sm">
-            {order?.product?.[0]?.name}
-          </p>
-          <p className="text-black text-sm not-italic font-normal opacity-40">
-            {getOptionLabel(order?.product?.[0]?.weight)}- {getFlavorLabel(order?.product?.[0]?.flavor as any)}
-          </p>
-        </div>
+      <div className="flex min-w-[260px] flex-col gap-4 max-[860px]:flex-1 max-[560px]:w-full">
+        {order?.product?.map((product, index) => (
+          <div key={`${product?.id || index}-${index}`} className="flex gap-4">
+            <img
+              src={getFirstMediaUrl(product?.images, "/assets/product.png")}
+              alt={product?.name || "product"}
+              className="h-[86px] w-[86px] object-contain rounded bg-gray-50 max-[600px]:h-[58px] max-[600px]:w-[58px]"
+            />
+            <div className="flex flex-col gap-1">
+              <p className="text-black text-base not-italic font-medium max-[1000px]:text-sm">
+                {product?.name}
+              </p>
+              <p className="text-black text-sm not-italic font-normal opacity-40">
+                {getOrderItemMeta(product)}
+              </p>
+              <p className="text-xs text-gray-500">
+                Qty {product?.qty || 0}
+                {product?.unitPrice ? ` | ${formatMoney(Number(product.unitPrice))}` : ""}
+              </p>
+            </div>
+          </div>
+        ))}
         {order?.status !== "Cancelled" && (
           <OutlinedButton
             onClick={handleCancelOrder}
@@ -419,24 +443,7 @@ const AWBTrackingSection = () => {
 type TrackOrder = {
   id: number;
   user: number;
-  product: [
-    {
-      id: number;
-      catId: number;
-      subCatId: number;
-      name: string;
-      price: number;
-      sellingPrice: number;
-      premiumPrice: number;
-      expireDate: string;
-      isBestSeller: boolean;
-      weight: number;
-      stock: number;
-      flavor: string;
-      images: string[];
-      qty: number;
-    }
-  ];
+  product: TrackOrderProduct[];
   address: number;
   usedCoupon: boolean;
   coupon: number | string;
@@ -455,4 +462,26 @@ type TrackOrder = {
   status: string;
   createdAt: string;
   updatedAt: string;
+};
+
+type TrackOrderProduct = {
+  id: number;
+  catId?: number;
+  subCatId?: number;
+  name: string;
+  price?: number;
+  sellingPrice?: number;
+  premiumPrice?: number;
+  unitPrice?: number;
+  expireDate?: string;
+  isBestSeller?: boolean;
+  weight?: string | number;
+  stock?: number;
+  flavor?: string;
+  selectedFlavor?: string;
+  selectedFlavour?: string;
+  selectedUnits?: string;
+  isCombo?: boolean;
+  images: string[];
+  qty: number;
 };

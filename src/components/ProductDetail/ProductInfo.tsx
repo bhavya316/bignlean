@@ -90,6 +90,7 @@ export default function ProductInfo({
         qty: quantity,
         flavour: isCombo ? "Combo" : selectedFlavour,
         varientId: isCombo ? 0 : selectedVarientId,
+        isCombo,
       },
       {
         onSuccess: () => {
@@ -126,6 +127,7 @@ export default function ProductInfo({
         qty: quantity,
         flavour: isCombo ? "Combo" : selectedFlavour,
         varientId: isCombo ? 0 : selectedVarientId,
+        isCombo,
       },
       {
         onSuccess: () => {
@@ -166,6 +168,7 @@ export default function ProductInfo({
         userId={userData?.id || 1}
         rating={product?.totalRating}
         avgRating={product?.averageRating}
+        isCombo={isCombo}
       />
       <div className="flex items-center justify-between">
         <PriceCard varient={selectedVariantPricing as Varient} className="mb-3" />
@@ -209,11 +212,13 @@ const ProductRating = ({
   avgRating,
   productId,
   userId,
+  isCombo = false,
 }: {
   rating: number;
   avgRating: number;
   userId: number;
   productId: number;
+  isCombo?: boolean;
 }) => {
   const queryClient = useQueryClient();
   const { userData } = useAppContext();
@@ -223,11 +228,12 @@ const ProductRating = ({
   const [isWishListed, setIsWishListed] = useState<boolean>(false);
 
   useEffect(() => {
-    const prod = data?.filteredList.find((pro: any) => pro.id === productId);
-    if (prod) {
-      setIsWishListed(true);
-    }
-  }, [dataUpdatedAt]);
+    const prod = data?.filteredList?.find(
+      (pro: any) =>
+        pro.id === productId && Boolean(pro.isCombo) === Boolean(isCombo)
+    );
+    setIsWishListed(Boolean(prod));
+  }, [dataUpdatedAt, data, productId, isCombo]);
 
   const addToWishlist = (e: any) => {
     e.stopPropagation();
@@ -256,7 +262,7 @@ const ProductRating = ({
     setIsWishListed(false);
 
     removeFromWishList(
-      { productId: productId as number, userId: userData?.id as number },
+      { productId: productId as number, userId: userData?.id as number, isCombo },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["all-Products"] });

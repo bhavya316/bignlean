@@ -11,6 +11,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { API_CONFIG } from "@/config/api";
 import { ApiPaths } from "@/constants";
+import { getMediaUrl } from "@/utils/media";
 
 // Define type interfaces for better type safety
 interface Category {
@@ -372,11 +373,11 @@ export default function SecondaryNavbar() {
                           href={`/offers/${offer?.id}`}
                           className="group overflow-hidden rounded-lg border border-gray-100 bg-white transition hover:border-red-100 hover:shadow-sm"
                         >
-                          <div className="aspect-[16/10] bg-gray-100">
+                          <div className="aspect-[16/10] bg-white p-2">
                             <img
-                              src={offer.image || "/assets/product.png"}
+                              src={getMediaUrl(offer.image, "/assets/product.png")}
                               alt={offer.name}
-                              className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                              className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]"
                             />
                           </div>
                           <div className="p-2.5">

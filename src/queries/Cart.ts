@@ -1,13 +1,12 @@
 "use client";
 import { ApiPaths } from "@/constants";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
-import { API_CONFIG } from "@/config/api";
+import axiosInstance from "@/lib/axios";
 
 async function getCartList(userId: number) {
-  return axios({
+  return axiosInstance({
     method: "GET",
-    url: API_CONFIG.BASE_URL + ApiPaths.CART_USER + "/" + userId,
+    url: ApiPaths.CART_USER + "/" + userId,
   });
 }
 
@@ -24,9 +23,9 @@ async function getCartPrice(payload: {
   coupon: string;
   addressId: number;
 }) {
-  return axios({
+  return axiosInstance({
     method: "GET",
-    url: API_CONFIG.BASE_URL + `/cart/details`,
+    url: `/cart/details`,
     params: {
       ...payload,
     },
@@ -45,29 +44,15 @@ export function useGetCartPrice(payload: {
   });
 }
 
-// async function addToCartList(payload: {
-//   user: number;
-//   product: number;
-//   qty: number;
-//   varientId: number;
-//   flavour: string;
-// }) {
-//   const { flavour, product, qty, user, varientId } = payload;
-//   return axios({
-//     method: "POST",
-//     url: base_url + ApiPaths.CART,
-//     data: { user, product, qty, flavour, varientId },
-//   });
-// }
-
 async function addToCartList(payload: {
   user: number | string;
   product: number;
   qty: number;
   varientId: number;
   flavour: string;
+  isCombo?: boolean;
 }) {
-  const { flavour, product, qty, user, varientId } = payload;
+  const { flavour, product, qty, user, varientId, isCombo } = payload;
 
   // Handle different user ID formats
   let userId = user;
@@ -82,17 +67,16 @@ async function addToCartList(payload: {
     userId = Number(user);
   }
 
-  console.log("Adding to cart with user ID:", userId, "Type:", typeof userId);
-
-  return axios({
+  return axiosInstance({
     method: "POST",
-    url: API_CONFIG.BASE_URL + ApiPaths.CART,
+    url: ApiPaths.CART,
     data: {
       user: userId,
       product,
       qty,
       flavour,
-      varientId
+      varientId,
+      isCombo: isCombo || false,
     },
   });
 }
@@ -119,20 +103,21 @@ export function useAddToCartList() {
       qty: number;
       varientId: number;
       flavour: string;
+      isCombo?: boolean;
     }) => addToCartList(payload),
   });
 }
 
 async function removeFromCart(productId: number) {
-  return axios({
+  return axiosInstance({
     method: "DELETE",
-    url: API_CONFIG.BASE_URL + ApiPaths.CART + "/" + productId,
+    url: ApiPaths.CART + "/" + productId,
   });
 }
 async function updateQuantityFromCart(productId: number, qty: number) {
-  return axios({
+  return axiosInstance({
     method: "PUT",
-    url: API_CONFIG.BASE_URL + ApiPaths.CART + "/" + productId,
+    url: ApiPaths.CART + "/" + productId,
     data: { qty },
   });
 }
@@ -161,9 +146,9 @@ export function useUpdateQuantityFromCart() {
 }
 
 async function getProductDetail(productId: number, userId: number) {
-  return axios({
+  return axiosInstance({
     method: "GET",
-    url: API_CONFIG.BASE_URL + ApiPaths.PRODUCTS + "/" + productId + "/" + userId,
+    url: ApiPaths.PRODUCTS + "/" + productId + "/" + userId,
   });
 }
 
@@ -176,9 +161,9 @@ export function useGetProductDetail(productId: number, userId: number) {
 }
 
 async function getWalletDetail(userId: number) {
-  return axios({
+  return axiosInstance({
     method: "GET",
-    url: API_CONFIG.BASE_URL + `/user/wallet/${userId}`,
+    url: `/user/wallet/${userId}`,
   });
 }
 
@@ -191,9 +176,9 @@ export function useGetWalletDetail(userId: number) {
 }
 
 async function getNotificationsList() {
-  return axios({
+  return axiosInstance({
     method: "GET",
-    url: API_CONFIG.BASE_URL + "/notifications",
+    url: "/notifications",
   });
 }
 

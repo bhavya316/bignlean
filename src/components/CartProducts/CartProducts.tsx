@@ -24,6 +24,7 @@ export type cartData = {
   product: ProductDataType;
   sellingPrice: number;
   premiumPrice: number;
+  isCombo?: boolean;
   createdAt: string;
   updatedAt: string;
 };

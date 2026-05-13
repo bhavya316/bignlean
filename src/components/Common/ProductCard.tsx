@@ -73,6 +73,9 @@ export default function ProductCard({
   const { mutate: removeFromWishList } = useRemoveFormWishList();
   const { mutate: addToCart, isPending } = useAddToCartList();
   const wishListData: any = queryClient.getQueryData(["wishlist"]);
+  const isComboPath =
+    pathname === "combo" ||
+    Boolean((product as any)?.isCombo || (product as any)?.isLegacyComboProduct);
 
   // Function to record product as recently viewed
   const recordProductView = async (productId: number) => {
@@ -92,15 +95,13 @@ export default function ProductCard({
   };
 
   useEffect(() => {
-    const prod = wishListData?.filteredList.find(
-      (pro: any) => pro.id === product?.id
+    const prod = wishListData?.filteredList?.find(
+      (pro: any) =>
+        pro.id === product?.id && Boolean(pro.isCombo) === Boolean(isComboPath)
     );
-    if (prod) {
-      setIsWishListed(true);
-    }
-  }, []);
+    setIsWishListed(Boolean(prod));
+  }, [wishListData, product?.id, isComboPath]);
 
-  const isComboPath = pathname === 'combo';
   const addWish = (e: any) => {
     e.stopPropagation();
     setIsWishListed(true);
@@ -128,7 +129,7 @@ export default function ProductCard({
     setIsWishListed(false);
 
     removeFromWishList(
-      { productId: product?.id as number, userId: userData?.id as number },
+      { productId: product?.id as number, userId: userData?.id as number, isCombo: isComboPath },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["all-Products"] });
@@ -143,7 +144,7 @@ export default function ProductCard({
   };
 
   if (product) {
-    const isCombo = pathname === 'combo';
+    const isCombo = isComboPath;
     const firstVariant = product?.varients?.[0];
     const firstFlavor = isCombo ? "Combo" : getFirstFlavorLabel(firstVariant);
     const firstVariantPricing = isCombo
@@ -152,7 +153,7 @@ export default function ProductCard({
     const marketPrice = getVariantMarketPrice(firstVariantPricing);
     const sellingPrice = getVariantSellingPrice(firstVariantPricing);
     const discountPercent = getVariantDiscountPercent(firstVariantPricing);
-    const link = pathname === 'combo'
+    const link = isCombo
       ? `/combo/${product?.id}`
       : isOffer
         ? `${urlPath}/product/${encodeURIComponent(product?.name)}?productId=${product?.id}`
@@ -255,12 +256,6 @@ export default function ProductCard({
           const firstVariant = isCombo ? { id: 0 } : product.varients[0];
           const firstFlavor = isCombo ? "Combo" : getFirstFlavorLabel(firstVariant);
 
-          // Debug log
-          console.log("Adding to cart:", {
-            variant: firstVariant,
-            flavor: firstFlavor
-          });
-          
           addToCart(
             {
               user: userData.id,
@@ -268,6 +263,7 @@ export default function ProductCard({
               qty: 1,
               flavour: firstFlavor,
               varientId: firstVariant.id,
+              isCombo,
             },
             {
               onSuccess: (data) => {

@@ -1,14 +1,12 @@
 "use client";
 import { ApiPaths } from "@/constants";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
-
-const base_url = process.env.NEXT_PUBLIC_BASE_URL;
+import axiosInstance from "@/lib/axios";
 
 async function getAllOrder(userId: number) {
-  return axios({
+  return axiosInstance({
     method: "GET",
-    url: base_url + ApiPaths.ORDER_USER + "/" + userId,
+    url: ApiPaths.ORDER_USER + "/" + userId,
   });
 }
 
@@ -23,9 +21,9 @@ export function useGetAllOrder(userId: number) {
 // Update the cancelOrder function to use the orderId in the URL path
 
 async function cancelOrder(orderId: number) {
-  return axios({
+  return axiosInstance({
     method: "DELETE",
-    url: `${base_url}${ApiPaths.CANCEL_ORDER}/${orderId}`,
+    url: `${ApiPaths.CANCEL_ORDER}/${orderId}`,
   });
 }
 
@@ -47,9 +45,9 @@ export async function placeOrder(payload: {
   bglCash: number;
   couponCode?: string;
 }) {
-  return axios({
+  return axiosInstance({
     method: "POST",
-    url: base_url + ApiPaths.PLACE_ORDER,
+    url: ApiPaths.PLACE_ORDER,
     data: payload,
   });
 }

@@ -28,7 +28,6 @@ import {
   useGetComboCategories,
 } from "@/queries/dataHandlers";
 import FirstOfferModal from "@/components/Home/FirstOfferModal";
-import Link from "next/link";
 
 export default function Home() {
   const { data: brandsData, isLoading: brandsLoading } = useGetAllBrands();
@@ -54,7 +53,6 @@ export default function Home() {
           isLoading={bannersLoading}
           heroBanners={heroSliderBanners}
         />
-        <MarketplaceTrustStrip />
 
       <div className="max-xl:w-[95%] mx-auto">
         <div className="max-[800px]:hidden">
@@ -143,36 +141,6 @@ export default function Home() {
           quote="“There are no shortcuts. Everything is reps, reps, reps. --”"
         />
         */}
-        {homeProductsLoading ? (
-          <DynamicComboSectionsSkeleton />
-        ) : (
-          homeProducts?.data
-            ?.filter((item: any) => item.type === "Combo")
-            .map((item: ComboType) => (
-              <div
-                key={item.id}
-                className="flex flex-col gap-2 py-10 w-[1200px] mx-auto mt-[60px] max-[1200px]:w-full max-xl:px-5"
-              >
-                <p className="font-semibold text-2xl">{item.name}</p>
-                <div className="w-full grid grid-cols-4 gap-5">
-                  {item.products.map((combo) => (
-                    <Link key={combo.id} href={`/combo/${combo?.id}`}>
-                      <div className="w-full aspect-square rounded">
-                        <img
-                          src={combo.image}
-                          alt="offer"
-                          className=" object-cover rounded w-full h-full"
-                        />
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))
-        )}
-
-
-
         {homeProductsLoading ? <RecentlyViewedSkeleton /> : <RecentlyViewed />}
 
         {homeProductsLoading ? <BestSellerSkeleton /> : <BestSeller />}
@@ -235,28 +203,6 @@ function HomepageHeroDeck({
   );
 }
 
-function MarketplaceTrustStrip() {
-  const items = [
-    ["100% Authentic", "Verified products and invoices"],
-    ["Fast Delivery", "Serviceability-aware shipping"],
-    ["Best Deals", "Coupons, combos and flash pricing"],
-    ["Easy Support", "Order tracking and help pages"],
-  ];
-
-  return (
-    <div className="w-[1200px] max-[1200px]:w-full mx-auto px-4 mt-4">
-      <div className="grid grid-cols-4 max-[850px]:grid-cols-2 max-[480px]:grid-cols-1 bg-white border border-gray-200 rounded-lg divide-x max-[850px]:divide-x-0 max-[850px]:divide-y shadow-sm">
-        {items.map(([title, subtitle]) => (
-          <div key={title} className="p-4">
-            <p className="text-sm font-bold text-black">{title}</p>
-            <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function MarketplaceSeoBlock() {
   return (
     <div className="w-[1200px] max-[1200px]:w-full mx-auto px-4 py-12">
@@ -310,21 +256,6 @@ function ComboCategoriesSkeleton() {
     </div>
   );
 }
-
-export type ComboType = {
-  id: number;
-  name: string;
-  type: "Single" | "Combo";
-  products: {
-    id: number;
-    image: string;
-    name: string;
-  }[];
-  isForLimitedTime: boolean;
-  expireDateTime: string;
-  createdAt: string;
-  updatedAt: string;
-};
 
 // Loading Skeleton Components
 function HomeCarosoulSkeleton() {
@@ -395,19 +326,6 @@ function BestSellerSkeleton() {
             </div>
             <div className="h-8 bg-gray-200 rounded"></div>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DynamicComboSectionsSkeleton() {
-  return (
-    <div className="flex flex-col gap-2 py-10 w-[1200px] mx-auto mt-[60px] max-[1200px]:w-full max-xl:px-5">
-      <div className="h-8 bg-gray-200 rounded w-48 animate-pulse mb-4"></div>
-      <div className="w-full grid grid-cols-4 gap-5">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="w-full aspect-square bg-gray-200 rounded animate-pulse"></div>
         ))}
       </div>
     </div>

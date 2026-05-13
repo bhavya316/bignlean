@@ -4,7 +4,6 @@ import {
   CartIcon,
   CertificateIcon,
   FaqIcon,
-  FlashSaleIcon,
   BlogIcon,
   MenuIcon,
   MyOrderIcon,
@@ -22,8 +21,6 @@ import { Dispatch, ReactNode, SetStateAction, useEffect, useState } from "react"
 import DeliverTo from "./DeliverTo/DeliverTo";
 import SearchForProducts from "./SearchForProducts/SearchForProducts";
 import Sidebar from "./Sidebar/Sidebar";
-import BMRIcon from "@/Icons/BMRIcon";
-import FitnessIcon from "@/Icons/FitnessIcon";
 import { API_CONFIG } from "@/config/api";
 
 // Placeholder icon for Shop by Category (you can replace with your actual icon)
@@ -90,14 +87,7 @@ type ProfileOption = {
 const profileOptions: ProfileOption[] = [
   { icon: <MyOrderIcon />, label: "My Orders", link: "/track-order" },
   { icon: <WalletIcon />, label: "Wallet", link: "/wallet" },
-  { icon: <BMRIcon />, label: "BMR", link: "/bmr" },
-  {
-    icon: <FitnessIcon />,
-    label: "Fitness",
-    link: "/fitness",
-  },
   { icon: <ReferIcon />, label: "Refer a Friend", link: "/refer-friend" },
-  { icon: <FlashSaleIcon />, label: "Flash Sale", link: "/" },
   { icon: <ReviewsIcon />, label: "My Reviews", link: "/reviews" },
   { icon: <AuthencityIcon />, label: "Authenticity", link: "/authenticity" },
   { icon: <BlogIcon />, label: "Blogs", link: "/blogs" },

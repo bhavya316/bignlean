@@ -103,6 +103,8 @@ export interface ProductDataType {
   sellingPrice?: string | number;
   price?: string | number;
   stock?: string | number;
+  isCombo?: boolean;
+  isLegacyComboProduct?: boolean;
   images: string[];
   overView: OverView[];
   details: Detail[];

@@ -72,6 +72,7 @@ export default function ProductBottomSheet({
         qty: quantity,
         flavour: isCombo ? "Combo" : selectedFlavour,
         varientId: isCombo ? 0 : selectedVarientId,
+        isCombo,
       },
       {
         onSuccess: () => {

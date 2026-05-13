@@ -33,7 +33,7 @@ export default function ComboCategorySection({ comboCategory }: Props) {
       {products?.length > 0 && (
         <div className="w-[1200px] mx-auto mt-[60px] max-[1200px]:w-full flex flex-col gap-[40px]">
           <SectionHeader
-            onClick={() => router.push("/combos")}
+            onClick={() => router.push("/combo")}
             label={comboCategoryInfo.name}
             showBtn
             btnLabel="View all"

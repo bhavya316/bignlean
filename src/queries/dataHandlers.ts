@@ -200,16 +200,19 @@ export function useGetOfferProducts(id: number) {
 async function getComboProducts(id: number) {
   const data = await axiosInstance({
     method: "GET",
-    url: `/admin/comboProducts?catId=${id}`,
+    url: `/admin/combo-products/category/${id}`,
   });
-  return data.data;
+  return {
+    ...data.data,
+    combo: data.data?.comboProducts || data.data?.products || data.data?.combo || [],
+  };
 }
 export function useGetComboProducts(id: number) {
   return useQuery({
     queryKey: ["combo", id],
     queryFn: () => getComboProducts(id),
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     enabled: !!id,
   });
 }
@@ -218,6 +221,8 @@ export interface Offer {
   id: number;
   name: string;
   image: string;
+  banner?: string;
+  logo?: string;
   products: Product[];
   createdAt: string;
   updatedAt: string;
@@ -349,8 +354,8 @@ export function useGetComboCategories() {
   return useQuery({
     queryKey: ["combo-categories"],
     queryFn: () => getComboCategories(),
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -363,8 +368,8 @@ export function useGetComboProductDetail(id: number) {
   return useQuery({
     queryKey: ["combo-product", id],
     queryFn: () => getComboProductDetail(id),
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     enabled: !!id,
   });
 }

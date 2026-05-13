@@ -1,14 +1,12 @@
 "use client";
 import { ApiPaths } from "@/constants";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
-
-const base_url = process.env.NEXT_PUBLIC_BASE_URL;
+import { useMutation, useQuery } from "@tanstack/react-query";
+import axiosInstance from "@/lib/axios";
 
 async function getWishList(userId: number) {
-  const data = await axios({
+  const data = await axiosInstance({
     method: "GET",
-    url: base_url + ApiPaths.WISHLIST + `/${userId}`,
+    url: ApiPaths.WISHLIST + `/${userId}`,
   });
   return data.data;
 }
@@ -22,13 +20,13 @@ export function useGEtWishList(userId: number) {
 }
 
 async function addToWishList(productId: number, userId: number, isCombo?: boolean) {
-  return axios({
+  return axiosInstance({
     method: "POST",
-    url: base_url + ApiPaths.FAVORITES,
+    url: ApiPaths.FAVORITES,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
     },
-    data: JSON.stringify({ user: userId, product: productId, isCombo: isCombo || false }),
+    data: { user: userId, product: productId, isCombo: isCombo || false },
   });
 }
 
@@ -39,26 +37,27 @@ export function useAddToWishList() {
   });
 }
 
-async function removeFromWishList(productId: number, userId: number) {
-  return axios({
+async function removeFromWishList(productId: number, userId: number, isCombo?: boolean) {
+  return axiosInstance({
     method: "DELETE",
-    url: base_url + ApiPaths.WISHLIST + "/" + userId + "/product/" + productId,
+    url: ApiPaths.WISHLIST + "/" + userId + "/product/" + productId,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
     },
+    params: { isCombo: isCombo || false },
   });
 }
 
 export function useRemoveFormWishList() {
   return useMutation({
-    mutationFn: (data: { productId: number; userId: number }) =>
-      removeFromWishList(data?.productId, data?.userId),
+    mutationFn: (data: { productId: number; userId: number; isCombo?: boolean }) =>
+      removeFromWishList(data?.productId, data?.userId, data?.isCombo),
   });
 }
 async function getCouponsList() {
-  return axios({
+  return axiosInstance({
     method: "GET",
-    url: base_url + "/admin/coupons",
+    url: "/admin/coupons",
   });
 }
 
@@ -70,11 +69,9 @@ export function useGEtCouponsList() {
   });
 }
 async function getPinCodeAvailability(input: string, productPrice: number) {
-  return axios({
+  return axiosInstance({
     method: "GET",
-    url:
-      base_url +
-      `/pinServiceability?input=${input}&productPrice=${productPrice}`,
+    url: `/pinServiceability?input=${input}&productPrice=${productPrice}`,
   });
 }
 export function useGEtPinCodeAvailability() {
@@ -96,9 +93,9 @@ async function getShippingServiceability(payload: {
   order_amount: number;
   weight: number;
 }) {
-  return axios({
+  return axiosInstance({
     method: "POST",
-    url: `${base_url}/admin/shipping/serviceability`,
+    url: "/admin/shipping/serviceability",
     data: payload,
   });
 }
@@ -116,9 +113,9 @@ export function useGetShippingServiceability() {
 }
 
 async function createShipment(shipmentData: any) {
-  return axios({
+  return axiosInstance({
     method: "POST",
-    url: `${base_url}/admin/shipping/create-shipment`,
+    url: "/admin/shipping/create-shipment",
     data: shipmentData,
   });
 }
