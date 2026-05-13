@@ -1,28 +1,49 @@
 (function () {
-  var countries = [
-    "India", "United States", "United Kingdom", "Canada", "Australia", "New Zealand",
-    "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland",
-    "Sweden", "Norway", "Denmark", "Ireland", "Poland", "Austria", "Portugal",
-    "United Arab Emirates", "Saudi Arabia", "Qatar", "Kuwait", "Singapore",
-    "Malaysia", "Thailand", "Indonesia", "Vietnam", "Philippines", "China",
-    "Japan", "South Korea", "Taiwan", "Hong Kong", "Brazil", "Mexico",
-    "South Africa", "Turkey"
+  var regionCodes = [
+    "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ",
+    "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS",
+    "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN",
+    "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE",
+    "EG", "EH", "ER", "ES", "ET", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF",
+    "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM",
+    "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM",
+    "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC",
+    "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG", "MH", "MK",
+    "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA",
+    "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG",
+    "PH", "PK", "PL", "PM", "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW",
+    "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS",
+    "ST", "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK", "TL", "TM", "TN", "TO",
+    "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI",
+    "VN", "VU", "WF", "WS", "YE", "YT", "ZA", "ZM", "ZW"
   ];
-  var countryCodes = {
-    India: "IN",
-    "United States": "US",
-    "United Kingdom": "GB",
-    Canada: "CA",
-    Australia: "AU",
-    Germany: "DE",
-    France: "FR",
-    Italy: "IT",
-    Spain: "ES",
-    Singapore: "SG",
-    China: "CN",
-    Japan: "JP",
-    "South Korea": "KR"
-  };
+  var countryCodes = {};
+  var countryDisplayNames = typeof Intl !== "undefined" && Intl.DisplayNames
+    ? new Intl.DisplayNames(["en"], { type: "region" })
+    : null;
+  var countries = regionCodes.map(function (code) {
+    var name = countryDisplayNames ? countryDisplayNames.of(code) || code : code;
+    countryCodes[name] = code;
+    countryCodes[name.toLowerCase()] = code;
+    return name;
+  }).sort(function (a, b) {
+    return a.localeCompare(b);
+  });
+  [
+    ["Bharat", "IN"],
+    ["USA", "US"],
+    ["US", "US"],
+    ["United States of America", "US"],
+    ["UK", "GB"],
+    ["UAE", "AE"],
+    ["Korea", "KR"],
+    ["South Korea", "KR"],
+    ["Russia", "RU"],
+    ["Vietnam", "VN"]
+  ].forEach(function (alias) {
+    countryCodes[alias[0]] = alias[1];
+    countryCodes[alias[0].toLowerCase()] = alias[1];
+  });
   var brandOriginValue = "";
   var brandOriginsByName = {};
 
@@ -51,7 +72,8 @@
   }
 
   function getCountryCode(country) {
-    return countryCodes[country] || "";
+    var value = String(country || "").trim();
+    return countryCodes[value] || countryCodes[value.toLowerCase()] || "";
   }
 
   function installBrandCountryField() {
@@ -279,7 +301,9 @@
     installBrandCountryField();
     installBlogToolbar();
     installFlavorPanels();
-    installFAQEnhancements();
+    // The FAQ page is a React-controlled tree. Replacing its form/card nodes
+    // from this runtime patch can make React crash on the first data rerender.
+    // Keep the native FAQ screen active and avoid mutating that subtree.
   }
 
   // FAQ Enhancements - Heading dropdown and Edit functionality
