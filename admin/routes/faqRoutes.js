@@ -23,6 +23,7 @@ router.post(
 );
 
 router.get("/faqs", faqController.getGroupedFAQs);
+router.get("/faqs/headings", faqController.getAllHeadings);
 router.get("/faq", faqController.getAllFAQs);
 
 router.put(

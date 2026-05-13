@@ -123,10 +123,26 @@ const getGroupedFAQs = async (req, res) => {
   }
 };
 
+// Get all unique headings
+const getAllHeadings = async (req, res) => {
+  try {
+    const faqs = await FAQ.findAll({
+      attributes: ["heading"],
+      group: ["heading"],
+      order: [["heading", "ASC"]],
+    });
+    const headings = faqs.map((faq) => faq.heading);
+    res.status(200).json({ status: true, message: "Headings retrieved", headings });
+  } catch (error) {
+    res.status(400).json({ status: false, message: "Unable to retrieve headings." });
+  }
+};
+
 module.exports = {
   addFAQ,
   getAllFAQs,
   updateFAQ,
   deleteFAQ,
   getGroupedFAQs,
+  getAllHeadings,
 };
