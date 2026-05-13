@@ -46,6 +46,8 @@
   });
   var brandOriginValue = "";
   var brandOriginsByName = {};
+  var webpackRequire = null;
+  var lastObservedPath = location.pathname;
 
   function injectStyle() {
     if (document.getElementById("bnl-admin-runtime-style")) return;
@@ -58,10 +60,24 @@
       ".bnl-editor-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px;}",
       ".bnl-editor-toolbar button{border:1px solid #d1d5db;background:#fff;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer;}",
       ".bnl-editor-toolbar button:hover{border-color:#e70f0f;color:#e70f0f;}",
-      ".add_product_varients__content__items{grid-template-columns:repeat(4,minmax(150px,1fr))!important;align-items:start!important;overflow:visible!important;}",
-      ".add_product_varients__content__items__item_desc.bnl-flavor-row{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:10px;align-items:end;min-width:0;}",
-      ".add_product_varients__content__items__item_desc.bnl-flavor-row label{grid-column:1/-1;margin-bottom:0!important;}",
-      ".add_product_varients__content__items__item_desc.bnl-flavor-row>input[name='flavor']{height:38px;margin:0;min-width:0;}",
+      ".bnl-product-draft-modal{position:fixed;inset:0;background:rgba(17,24,39,.45);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:20px;}",
+      ".bnl-product-draft-modal__card{width:min(420px,100%);background:#fff;border-radius:10px;padding:22px;box-shadow:0 20px 45px rgba(15,23,42,.25);}",
+      ".bnl-product-draft-modal__card h4{font-size:18px;margin:0 0 8px;color:#111827;}",
+      ".bnl-product-draft-modal__card p{font-size:14px;line-height:1.5;color:#4b5563;margin:0 0 18px;}",
+      ".bnl-product-draft-modal__actions{display:flex;gap:10px;justify-content:flex-end;}",
+      ".bnl-product-draft-modal__actions button{border:0;border-radius:8px;padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;}",
+      ".bnl-product-draft-modal__keep{background:#f3f4f6;color:#111827;}",
+      ".bnl-product-draft-modal__discard{background:#e70f0f;color:#fff;}",
+      ".add_product_varients__content__items{grid-template-columns:repeat(4,minmax(150px,1fr))!important;align-items:end!important;overflow:visible!important;}",
+      ".add_product_varients__content__items__item_desc{min-width:0;align-self:end;}",
+      ".add_product_varients__content__items__item_desc:nth-of-type(-n+4) label{min-height:42px;display:flex;flex-direction:column;justify-content:flex-end;}",
+      ".add_product_varients__content__items__item_desc.bnl-primary-flavor-row{grid-column:auto!important;display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;gap:0!important;margin-top:0!important;padding-top:0!important;border-top:0!important;align-self:end!important;min-width:0;}",
+      ".add_product_varients__content__items__item_desc.bnl-primary-flavor-row label{display:flex!important;justify-content:space-between!important;align-items:center!important;width:100%!important;min-height:42px;margin-bottom:8px!important;}",
+      ".add_product_varients__content__items__item_desc.bnl-primary-flavor-row label svg{display:none!important;}",
+      ".add_product_varients__content__items__item_desc.bnl-primary-flavor-row>input[name='flavor']{width:100%!important;height:38px;margin:0!important;min-width:0;flex:initial!important;}",
+      ".add_product_varients__content__items__item_desc.bnl-flavor-row{grid-column:1/-1!important;display:grid!important;grid-template-columns:repeat(5,minmax(120px,1fr));gap:10px!important;align-items:end;min-width:0;}",
+      ".add_product_varients__content__items__item_desc.bnl-flavor-row label{grid-column:1/-1;margin-bottom:0!important;min-height:auto!important;}",
+      ".add_product_varients__content__items__item_desc.bnl-flavor-row>input[name='flavor']{height:38px;margin:0!important;min-width:0;flex:initial!important;}",
       ".bnl-flavor-panel{display:grid;grid-column:2/-1;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px;margin:0;min-width:0;}",
       ".bnl-flavor-panel input{width:100%;height:38px;border:1px solid #d1d5db;border-radius:7px;padding:0 10px;min-width:0;}",
       ".add_product_varients__content__items>button{align-self:end;}",
@@ -165,6 +181,144 @@
     container.insertBefore(toolbar, textarea);
   }
 
+  function getWebpackRequire() {
+    if (webpackRequire) return webpackRequire;
+    try {
+      (window.webpackChunkbignlean = window.webpackChunkbignlean || []).push([[Date.now()], {}, function (require) {
+        webpackRequire = require;
+      }]);
+    } catch (error) {}
+    return webpackRequire;
+  }
+
+  function createDefaultProductVariant() {
+    return [{
+      id: 1,
+      mrp: "",
+      units: "",
+      sellingPrice: "",
+      premiumPrice: "",
+      date: "",
+      stock: "",
+      flavor: [""]
+    }];
+  }
+
+  function clearFlavorDrafts() {
+    try {
+      Object.keys(window.localStorage).forEach(function (key) {
+        if (key.indexOf("bnlFlavorPricing:") === 0) {
+          window.localStorage.removeItem(key);
+        }
+      });
+    } catch (error) {}
+  }
+
+  function resetProductDraftState() {
+    clearFlavorDrafts();
+    try {
+      var require = getWebpackRequire();
+      if (!require) return;
+      var storeModule = require(90);
+      var productActions = require(4439);
+      var store = storeModule && storeModule.Z;
+      if (!store || !store.dispatch || !productActions) return;
+      store.dispatch(productActions.KO({}));
+      store.dispatch(productActions.Wt(createDefaultProductVariant()));
+    } catch (error) {}
+  }
+
+  function isProductDraftPath(pathname) {
+    return /\/products\/(?:add_products|add_product_varients)\/?$/.test(pathname || location.pathname);
+  }
+
+  function isVariantDraftPath(pathname) {
+    return /\/products\/add_product_varients\/?$/.test(pathname || location.pathname);
+  }
+
+  function closeProductDraftPrompt() {
+    var modal = document.querySelector("[data-bnl-product-draft-modal]");
+    if (modal) modal.remove();
+  }
+
+  function showProductDraftPrompt(onDiscard) {
+    if (document.querySelector("[data-bnl-product-draft-modal]")) return;
+    var modal = document.createElement("div");
+    modal.className = "bnl-product-draft-modal";
+    modal.setAttribute("data-bnl-product-draft-modal", "true");
+    modal.innerHTML = [
+      '<div class="bnl-product-draft-modal__card" role="dialog" aria-modal="true">',
+      "<h4>Unsaved product changes</h4>",
+      "<p>Keep editing to preserve the current form, or discard changes and go back.</p>",
+      '<div class="bnl-product-draft-modal__actions">',
+      '<button type="button" class="bnl-product-draft-modal__keep">Keep Editing</button>',
+      '<button type="button" class="bnl-product-draft-modal__discard">Discard Changes</button>',
+      "</div>",
+      "</div>"
+    ].join("");
+    modal.querySelector(".bnl-product-draft-modal__keep").addEventListener("click", closeProductDraftPrompt);
+    modal.querySelector(".bnl-product-draft-modal__discard").addEventListener("click", function () {
+      closeProductDraftPrompt();
+      onDiscard();
+    });
+    document.body.appendChild(modal);
+  }
+
+  function installProductDraftGuard() {
+    if (window.__bnlProductDraftGuard) return;
+    window.__bnlProductDraftGuard = true;
+
+    document.addEventListener("click", function (event) {
+      var target = event.target && event.target.closest ? event.target : event.target && event.target.parentElement;
+      if (!target || !target.closest) return;
+
+      var backTarget = target.closest(".add_products .back__button,.add_product_varients .back__button,.add_product_varients__content__footer__back");
+      if (backTarget && isProductDraftPath()) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        showProductDraftPrompt(function () {
+          if (isVariantDraftPath()) {
+            clearFlavorDrafts();
+          } else {
+            resetProductDraftState();
+          }
+          window.history.back();
+        });
+        return;
+      }
+
+      var productEditTarget = target.closest(".product_action span");
+      if (productEditTarget && (productEditTarget.textContent || "").trim().toLowerCase() === "edit") {
+        resetProductDraftState();
+        return;
+      }
+
+      var linkTarget = target.closest("a[href]");
+      var href = linkTarget && linkTarget.getAttribute("href");
+      if (href && href.indexOf("/products/add_products") !== -1) {
+        resetProductDraftState();
+      }
+    }, true);
+
+    window.addEventListener("beforeunload", function (event) {
+      if (!isProductDraftPath()) return;
+      event.preventDefault();
+      event.returnValue = "";
+    });
+  }
+
+  function cleanupProductDraftOnRouteChange() {
+    var currentPath = location.pathname;
+    if (currentPath === lastObservedPath) return;
+    var wasProductDraft = isProductDraftPath(lastObservedPath);
+    var isProductDraft = isProductDraftPath(currentPath);
+    if (wasProductDraft && !isProductDraft) {
+      resetProductDraftState();
+    }
+    lastObservedPath = currentPath;
+  }
+
   function flavorKey(variantIndex, flavorIndex) {
     return "bnlFlavorPricing:" + location.pathname + ":" + variantIndex + ":" + flavorIndex;
   }
@@ -189,10 +343,20 @@
       rows.filter(function (row) {
         return row.querySelector('input[name="flavor"]');
       }).forEach(function (row, flavorIndex) {
+        var label = row.querySelector('label[for="flavor"]');
+        var panel = row.querySelector("[data-bnl-flavor-panel]");
+        row.classList.remove("bnl-primary-flavor-row", "bnl-flavor-row");
+        if (flavorIndex === 0) {
+          row.classList.add("bnl-primary-flavor-row");
+          if (label && label.firstChild) label.firstChild.nodeValue = "Primary Flavor";
+          if (panel) panel.remove();
+          return;
+        }
         row.classList.add("bnl-flavor-row");
-        if (row.querySelector("[data-bnl-flavor-panel]")) return;
+        if (label && label.firstChild) label.firstChild.nodeValue = "Flavor " + (flavorIndex + 1);
+        if (panel) return;
         var draft = readFlavorDraft(variantIndex, flavorIndex);
-        var panel = document.createElement("div");
+        panel = document.createElement("div");
         panel.className = "bnl-flavor-panel";
         panel.setAttribute("data-bnl-flavor-panel", "true");
         [
@@ -265,6 +429,9 @@
     XMLHttpRequest.prototype.send = function (body) {
       this.addEventListener("load", function () {
         try {
+          if (this.__bnlShouldClearFlavorDrafts && this.status >= 200 && this.status < 300) {
+            clearFlavorDrafts();
+          }
           if (String(this.__bnlUrl || "").indexOf("/brands") === -1) return;
           var data = JSON.parse(this.responseText || "{}");
           var list = Array.isArray(data.brands) ? data.brands : data.brand ? [data.brand] : [];
@@ -289,6 +456,7 @@
           }
           if (isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/products") && Array.isArray(payload.varients)) {
             body = JSON.stringify(normalizeProductVariants(payload));
+            this.__bnlShouldClearFlavorDrafts = true;
           }
         } catch (error) {}
       }
@@ -301,6 +469,8 @@
     installBrandCountryField();
     installBlogToolbar();
     installFlavorPanels();
+    installProductDraftGuard();
+    cleanupProductDraftOnRouteChange();
     // The FAQ page is a React-controlled tree. Replacing its form/card nodes
     // from this runtime patch can make React crash on the first data rerender.
     // Keep the native FAQ screen active and avoid mutating that subtree.
