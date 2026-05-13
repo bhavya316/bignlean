@@ -37,6 +37,109 @@ const normalizeComboPricingPayload = (payload) => {
   };
 };
 
+let comboProductTableReady = false;
+
+const ensureComboProductTable = async () => {
+  if (comboProductTableReady) return;
+  await ComboProduct.sync({ alter: true });
+  comboProductTableReady = true;
+};
+
+const serializeComboProduct = (comboProduct) => {
+  const data =
+    typeof comboProduct?.toJSON === "function"
+      ? comboProduct.toJSON()
+      : comboProduct?.dataValues || comboProduct || {};
+  const mrp = numberOr(data.mrp, 0);
+  const sellingPrice = numberOr(data.sellingPrice ?? data.price, 0);
+  const price = numberOr(data.price, sellingPrice);
+  const discountPercentage =
+    mrp > 0 && sellingPrice > 0 ? ((mrp - sellingPrice) / mrp) * 100 : 0;
+  const existingVariants = Array.isArray(data.varients) ? data.varients : [];
+  const fallbackVariant = {
+    id: 0,
+    mrp: String(mrp),
+    sellingPrice: String(sellingPrice),
+    premiumPrice: String(price || sellingPrice),
+    price: String(price || sellingPrice),
+    units: "Combo",
+    stock: data.stock == null ? "" : String(data.stock),
+    date: data.expiry_date || "",
+    flavor: ["Combo"],
+  };
+
+  return {
+    ...data,
+    mrp,
+    sellingPrice,
+    price,
+    isCombo: true,
+    varients: existingVariants.length ? existingVariants : [fallbackVariant],
+    discountPercentage,
+  };
+};
+
+const serializeLegacyComboProduct = (product, comboCatId = null) => {
+  const data =
+    typeof product?.toJSON === "function"
+      ? product.toJSON()
+      : product?.dataValues || product || {};
+  const variant = firstVariant(data);
+  const mrp = numberOr(data.mrp, numberOr(variant.mrp, 0));
+  const sellingPrice = numberOr(
+    data.sellingPrice ?? data.price,
+    numberOr(variant.sellingPrice ?? variant.premiumPrice ?? variant.price, 0)
+  );
+  const price = numberOr(data.price, sellingPrice);
+  const discountPercentage =
+    mrp > 0 && sellingPrice > 0 ? ((mrp - sellingPrice) / mrp) * 100 : 0;
+
+  return {
+    ...data,
+    comboCatId,
+    mrp,
+    sellingPrice,
+    price,
+    isCombo: true,
+    products: [data.id].filter(Boolean),
+    selectedProductIds: [data.id].filter(Boolean),
+    varients: Array.isArray(data.varients) ? data.varients : [],
+    discountPercentage,
+    isLegacyComboProduct: true,
+  };
+};
+
+const getLegacyComboProductsForCategory = async (comboCatId) => {
+  const legacyCombos = await Combo.findAll({
+    where: { catId: comboCatId },
+    order: [["createdAt", "DESC"]],
+  });
+  const productIds = [
+    ...new Set(
+      legacyCombos.flatMap((combo) =>
+        Array.isArray(combo.products)
+          ? combo.products.map((id) => Number(id)).filter(Boolean)
+          : []
+      )
+    ),
+  ];
+
+  if (!productIds.length) return [];
+
+  const products = await Product.findAll({
+    where: { id: productIds },
+  });
+  const productOrder = new Map(productIds.map((id, index) => [id, index]));
+
+  return products
+    .sort(
+      (a, b) =>
+        (productOrder.get(Number(a.id)) || 0) -
+        (productOrder.get(Number(b.id)) || 0)
+    )
+    .map((product) => serializeLegacyComboProduct(product, comboCatId));
+};
+
 const buildComboFromProducts = async (body) => {
   const productIds = Array.isArray(body.products)
     ? body.products.map((id) => Number(id)).filter(Boolean)
@@ -101,6 +204,7 @@ const buildComboFromProducts = async (body) => {
       certificates: body.certificates || [],
       supplements: body.supplements || [],
       brand: body.brand || {},
+      products: productIds,
       selectedProductIds: productIds,
       varients: [],
       expiry_date: body.expiry_date || null,
@@ -118,8 +222,7 @@ const addComboProduct = async (req, res) => {
     });
   }
   try {
-    // Ensure table exists
-    await ComboProduct.sync({ alter: true });
+    await ensureComboProductTable();
 
     if (req.body.comboCategoryId && !req.body.comboCatId) {
       req.body.comboCatId = req.body.comboCategoryId;
@@ -153,7 +256,11 @@ const addComboProduct = async (req, res) => {
     }
 
     const comboProduct = await ComboProduct.create(payload);
-    res.status(201).json({ status: true, message: "Combo product added.", comboProduct });
+    res.status(201).json({
+      status: true,
+      message: "Combo product added.",
+      comboProduct: serializeComboProduct(comboProduct),
+    });
   } catch (error) {
     console.log("Combo Product Error:", error);
     console.log("Error details:", error.errors || error.message);
@@ -167,10 +274,15 @@ const addComboProduct = async (req, res) => {
 
 const getAllComboProducts = async (req, res) => {
   try {
+    await ensureComboProductTable();
     const comboProducts = await ComboProduct.findAll({
       order: [["createdAt", "DESC"]],
     });
-    res.status(200).json({ status: true, message: "OK", comboProducts });
+    res.status(200).json({
+      status: true,
+      message: "OK",
+      comboProducts: comboProducts.map(serializeComboProduct),
+    });
   } catch (error) {
     res.status(400).json({
       status: false,
@@ -183,13 +295,25 @@ const getComboProductsByCategory = async (req, res) => {
   const { comboCatId } = req.params;
 
   try {
+    await ensureComboProductTable();
     const comboProducts = await ComboProduct.findAll({
       where: {
         comboCatId: comboCatId,
       },
       order: [["createdAt", "DESC"]],
     });
-    res.status(200).json({ status: true, message: "OK", comboProducts });
+    const serializedComboProducts = comboProducts.map(serializeComboProduct);
+    const products =
+      serializedComboProducts.length > 0
+        ? serializedComboProducts
+        : await getLegacyComboProductsForCategory(comboCatId);
+
+    res.status(200).json({
+      status: true,
+      message: "OK",
+      comboProducts: products,
+      combo: products,
+    });
   } catch (error) {
     res.status(400).json({
       status: false,
@@ -210,6 +334,7 @@ const updateComboProduct = async (req, res) => {
   }
 
   try {
+    await ensureComboProductTable();
     const comboProduct = await ComboProduct.findByPk(id);
     if (!comboProduct) {
       return res.status(404).json({
@@ -218,13 +343,27 @@ const updateComboProduct = async (req, res) => {
       });
     }
 
+    let payload = req.body;
+    if (Array.isArray(req.body.products)) {
+      const comboBuild = await buildComboFromProducts({
+        ...comboProduct.toJSON(),
+        ...req.body,
+      });
+      if (!comboBuild.status) {
+        return res
+          .status(comboBuild.code)
+          .json({ status: false, message: comboBuild.message });
+      }
+      payload = comboBuild.data;
+    }
+
     const updatedComboProduct = await comboProduct.update(
-      normalizeComboPricingPayload(req.body)
+      normalizeComboPricingPayload(payload)
     );
     res.status(200).json({
       status: true,
       message: "Combo product updated.",
-      comboProduct: updatedComboProduct,
+      comboProduct: serializeComboProduct(updatedComboProduct),
     });
   } catch (error) {
     res.status(400).json({
@@ -238,6 +377,7 @@ const deleteComboProduct = async (req, res) => {
   const { id } = req.params;
 
   try {
+    await ensureComboProductTable();
     const comboProduct = await ComboProduct.findByPk(id);
 
     if (!comboProduct) {
@@ -262,11 +402,12 @@ const previewComboFromProducts = async (req, res) => {
   if (!comboBuild.status) {
     return res.status(comboBuild.code).json(comboBuild);
   }
-  res.status(200).json({ status: true, data: comboBuild.data });
+  res.status(200).json({ status: true, data: serializeComboProduct(comboBuild.data) });
 };
 
 const getAllComboProductsPaginated = async (req, res) => {
   try {
+    await ensureComboProductTable();
     const {
       page = 1,
       limit = 20,
@@ -299,21 +440,7 @@ const getAllComboProductsPaginated = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    const enrichedComboProducts = comboProducts.map((comboProduct) => {
-      const data = comboProduct.dataValues;
-
-      const comboMrp = Number(data.mrp || 0);
-      const comboSellingPrice = Number(data.sellingPrice || data.price || 0);
-      const discountPercentage =
-        comboMrp > 0 && comboSellingPrice > 0
-          ? ((comboMrp - comboSellingPrice) / comboMrp) * 100
-          : 0;
-
-      return {
-        ...data,
-        discountPercentage,
-      };
-    });
+    const enrichedComboProducts = comboProducts.map(serializeComboProduct);
 
     const totalPages = Math.ceil(count / parseInt(limit));
     const currentPage = parseInt(page);
@@ -345,6 +472,7 @@ const getAllComboProductsPaginated = async (req, res) => {
 
 const getAllComboCategoriesWithProducts = async (req, res) => {
   try {
+    await ensureComboProductTable();
     // Get all unique combo categories that have products
     const comboCategories = await ComboProduct.findAll({
       attributes: [
@@ -353,7 +481,9 @@ const getAllComboCategoriesWithProducts = async (req, res) => {
       raw: true
     });
 
-    const comboCatIds = comboCategories.map(item => item.comboCatId);
+    const comboCatIds = comboCategories
+      .map(item => item.comboCatId)
+      .filter(Boolean);
 
     // For each combo category, get all products
     const result = [];
@@ -390,7 +520,7 @@ const getAllComboCategoriesWithProducts = async (req, res) => {
 
       // Transform products data
       const productsWithDetails = products.map(product => {
-        const productData = product.toJSON();
+        const productData = serializeComboProduct(product);
         return {
           id: productData.id,
           catId: productData.catId,
@@ -404,6 +534,8 @@ const getAllComboCategoriesWithProducts = async (req, res) => {
           mrp: productData.mrp || 0,
           sellingPrice: productData.sellingPrice || productData.price || 0,
           price: productData.price || productData.sellingPrice || 0,
+          products: productData.products || productData.selectedProductIds || [],
+          selectedProductIds: productData.selectedProductIds || productData.products || [],
           images: productData.images || [],
           overView: productData.overView || [],
           details: productData.details || [],
@@ -435,6 +567,43 @@ const getAllComboCategoriesWithProducts = async (req, res) => {
       });
     }
 
+    const legacyCombos = await Combo.findAll({ order: [["createdAt", "DESC"]] });
+    const legacyComboCatIds = [
+      ...new Set(
+        legacyCombos
+          .map((combo) => combo.catId)
+          .filter(Boolean)
+      ),
+    ];
+
+    for (const legacyComboCatId of legacyComboCatIds) {
+      const hasNewProducts = result.some(
+        (category) =>
+          String(category.comboCategoryId) === String(legacyComboCatId)
+      );
+      if (hasNewProducts) continue;
+
+      const productsWithDetails = await getLegacyComboProductsForCategory(
+        legacyComboCatId
+      );
+      if (!productsWithDetails.length) continue;
+
+      const comboCatInfo = await require("../model/comboCat").findByPk(
+        legacyComboCatId
+      );
+
+      result.push({
+        comboCategoryId: legacyComboCatId,
+        comboCategoryInfo: comboCatInfo ? {
+          id: comboCatInfo.id,
+          name: comboCatInfo.name,
+          image: comboCatInfo.image
+        } : null,
+        products: productsWithDetails,
+        productCount: productsWithDetails.length
+      });
+    }
+
     res.status(200).json({
       status: true,
       message: "All combo categories with products retrieved successfully",
@@ -456,6 +625,7 @@ const getComboProductByIdWithDetails = async (req, res) => {
   const { id } = req.params;
 
   try {
+    await ensureComboProductTable();
     const comboProduct = await ComboProduct.findByPk(id, {
       include: [
         {
@@ -480,14 +650,44 @@ const getComboProductByIdWithDetails = async (req, res) => {
     });
 
     if (!comboProduct) {
-      return res.status(404).json({
-        status: false,
-        message: "Combo product not found",
+      const legacyProduct = await Product.findByPk(id);
+      if (!legacyProduct) {
+        return res.status(404).json({
+          status: false,
+          message: "Combo product not found",
+        });
+      }
+
+      const productData = serializeLegacyComboProduct(legacyProduct);
+      const [brandInfo, categoryInfo, subCategoryInfo] = await Promise.all([
+        productData.brandId ? Brand.findByPk(productData.brandId) : null,
+        productData.catId ? Category.findByPk(productData.catId) : null,
+        productData.subCatId ? SubCategory.findByPk(productData.subCatId) : null,
+      ]);
+
+      return res.status(200).json({
+        status: true,
+        message: "OK",
+        result: {
+          ...productData,
+          brandInfo: brandInfo || null,
+          categoryInfo: categoryInfo || null,
+          subCategoryInfo: subCategoryInfo || null,
+          ratings: [],
+          userRating: [],
+          averageRating: 0,
+          averageTasteRate: 0,
+          averageMixabilityRate: 0,
+          averageEfficacyRate: 0,
+          averageValueForMoneyRate: 0,
+          totalRating: 0,
+        },
+        similarComboProducts: [],
       });
     }
 
     // Transform the data to match the regular product API format
-    const productData = comboProduct.toJSON();
+    const productData = serializeComboProduct(comboProduct);
     const result = {
       id: productData.id,
       catId: productData.catId,
@@ -501,6 +701,8 @@ const getComboProductByIdWithDetails = async (req, res) => {
       mrp: productData.mrp || 0,
       sellingPrice: productData.sellingPrice || productData.price || 0,
       price: productData.price || productData.sellingPrice || 0,
+      products: productData.products || productData.selectedProductIds || [],
+      selectedProductIds: productData.selectedProductIds || productData.products || [],
       images: productData.images || [],
       overView: productData.overView || [],
       details: productData.details || [],
@@ -522,7 +724,7 @@ const getComboProductByIdWithDetails = async (req, res) => {
       averageMixabilityRate: 0,
       averageEfficacyRate: 0,
       averageValueForMoneyRate: 0,
-      discountPercentage: null,
+      discountPercentage: productData.discountPercentage,
       totalRating: 0
     };
 
@@ -559,7 +761,7 @@ const getComboProductByIdWithDetails = async (req, res) => {
 
     // Transform similar combo products data
     for (const combo of similarCombos) {
-      const comboData = combo.toJSON();
+      const comboData = serializeComboProduct(combo);
       const transformedCombo = {
         id: comboData.id,
         catId: comboData.catId,
@@ -573,6 +775,8 @@ const getComboProductByIdWithDetails = async (req, res) => {
         mrp: comboData.mrp || 0,
         sellingPrice: comboData.sellingPrice || comboData.price || 0,
         price: comboData.price || comboData.sellingPrice || 0,
+        products: comboData.products || comboData.selectedProductIds || [],
+        selectedProductIds: comboData.selectedProductIds || comboData.products || [],
         images: comboData.images || [],
         overView: comboData.overView || [],
         details: comboData.details || [],
@@ -597,7 +801,7 @@ const getComboProductByIdWithDetails = async (req, res) => {
         averageMixabilityRate: 0,
         averageEfficacyRate: 0,
         averageValueForMoneyRate: 0,
-        discountPercentage: null,
+        discountPercentage: comboData.discountPercentage,
         totalRating: 0
       };
       similarComboProducts.push(transformedCombo);

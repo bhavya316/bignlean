@@ -9,12 +9,53 @@ const getFlavorLabel = (flavor) => {
   return flavor?.name || flavor?.flavor || flavor?.label || "";
 };
 
+const firstVariant = (product) => {
+  const variants = Array.isArray(product?.varients)
+    ? product.varients
+    : Array.isArray(product?.dataValues?.varients)
+    ? product.dataValues.varients
+    : [];
+  return variants.length > 0 ? variants[0] : {};
+};
+
 const getVariantFlavorOptions = (variant) => {
   if (Array.isArray(variant?.flavors)) return variant.flavors;
   if (Array.isArray(variant?.flavour)) return variant.flavour;
   if (Array.isArray(variant?.flavor)) return variant.flavor;
   return [];
 };
+
+const toBoolean = (value) =>
+  value === true || value === "true" || value === 1 || value === "1";
+
+const isComboCartSignal = ({ isCombo, varientId, flavour }) => {
+  const normalizedFlavour = String(flavour || "").toLowerCase();
+  return (
+    toBoolean(isCombo) ||
+    normalizedFlavour === "combo" ||
+    (Number(varientId) === 0 && normalizedFlavour !== "")
+  );
+};
+
+const buildComboVariant = (productDetails, cartItem = {}) => ({
+  id: 0,
+  mrp: String(cartItem.mrp ?? productDetails.mrp ?? 0),
+  sellingPrice: String(
+    cartItem.sellingPrice ?? productDetails.sellingPrice ?? productDetails.price ?? 0
+  ),
+  premiumPrice: String(
+    cartItem.premiumPrice ??
+      productDetails.price ??
+      productDetails.sellingPrice ??
+      productDetails.mrp ??
+      0
+  ),
+  price: String(cartItem.sellingPrice ?? productDetails.price ?? productDetails.sellingPrice ?? 0),
+  units: "Combo",
+  stock: "999",
+  date: productDetails.expiry_date || "",
+  flavor: ["Combo"],
+});
 
 const resolveVariantPricing = (variant, selectedFlavour) => {
   const flavors = getVariantFlavorOptions(variant);
@@ -49,13 +90,16 @@ const addToCart = async (req, res) => {
   }
 
   try {
-    const { user, product, qty, varientId, flavour } = req.body;
+    const { user, product, qty, varientId, flavour, isCombo: isComboInput } = req.body;
 
-    // Use frontend signal to determine product type
-    const isCombo = varientId === 0 && flavour === "Combo";
+    const isCombo = isComboCartSignal({ isCombo: isComboInput, varientId, flavour });
+    const selectedVarientId = isCombo ? 0 : varientId;
     let productDetails;
     if (isCombo) {
       productDetails = await ComboProduct.findByPk(product);
+      if (!productDetails) {
+        productDetails = await Product.findByPk(product);
+      }
     } else {
       productDetails = await Product.findByPk(product);
     }
@@ -66,10 +110,20 @@ const addToCart = async (req, res) => {
     let mrp, sellingPrice, premiumPrice, selectedFlavour;
 
     if (isCombo) {
-      mrp = parseFloat(productDetails.mrp || 0);
-      sellingPrice = parseFloat(productDetails.sellingPrice || productDetails.price || 0);
-      premiumPrice = mrp;
-      selectedFlavour = flavour || "Combo";
+      const comboVariant = firstVariant(productDetails);
+      mrp = parseFloat(productDetails.mrp ?? comboVariant.mrp ?? 0);
+      sellingPrice = parseFloat(
+        productDetails.sellingPrice ??
+          productDetails.price ??
+          comboVariant.sellingPrice ??
+          comboVariant.premiumPrice ??
+          comboVariant.price ??
+          0
+      );
+      premiumPrice = parseFloat(
+        productDetails.price ?? comboVariant.premiumPrice ?? mrp
+      );
+      selectedFlavour = "Combo";
     } else {
       if (!productDetails.varients || !Array.isArray(productDetails.varients) || productDetails.varients.length === 0) {
         return res.status(400).json({
@@ -79,7 +133,7 @@ const addToCart = async (req, res) => {
       }
 
       const selectedVariant = productDetails.varients.find(
-        (item) => `${item.id}` === `${varientId}`
+        (item) => `${item.id}` === `${selectedVarientId}`
       );
 
       if (!selectedVariant) {
@@ -139,7 +193,7 @@ const addToCart = async (req, res) => {
     }
 
     const existingCartItem = await Cart.findOne({
-      where: { user, product, varientId, flavour: selectedFlavour },
+      where: { user, product, varientId: selectedVarientId, flavour: selectedFlavour },
     });
 
     if (existingCartItem) {
@@ -156,7 +210,7 @@ const addToCart = async (req, res) => {
     }
 
     const newCartItem = await Cart.create({
-      user, product, qty, varientId,
+      user, product, qty, varientId: selectedVarientId,
       flavour: selectedFlavour,
       mrp, sellingPrice, premiumPrice,
     });
@@ -275,10 +329,13 @@ const getCartByUser = async (req, res) => {
 
     const filteredList = [];
     for (const item of cartItems) {
-      const isComboItem = item.varientId === 0 && item.flavour === "Combo";
+      const isComboItem = isComboCartSignal(item);
       let product;
       if (isComboItem) {
         product = await ComboProduct.findByPk(item.product);
+        if (!product) {
+          product = await Product.findByPk(item.product);
+        }
       } else {
         product = await Product.findByPk(item.product);
       }
@@ -287,10 +344,23 @@ const getCartByUser = async (req, res) => {
       const newItem = { ...product.dataValues };
 
       if (isComboItem) {
+        const comboVariant = firstVariant(product);
+        newItem.mrp = Number(product.mrp ?? comboVariant.mrp ?? item.mrp ?? 0);
+        newItem.sellingPrice = Number(
+          product.sellingPrice ??
+            product.price ??
+            comboVariant.sellingPrice ??
+            comboVariant.premiumPrice ??
+            comboVariant.price ??
+            item.sellingPrice ??
+            0
+        );
+        newItem.price = Number(product.price ?? newItem.sellingPrice ?? 0);
+        newItem.isCombo = true;
         newItem.averageRating = 0;
-        newItem.discountPercentage = product.mrp > 0 && product.sellingPrice > 0
-          ? ((product.mrp - product.sellingPrice) / product.mrp) * 100 : 0;
-        newItem.varients = [];
+        newItem.discountPercentage = newItem.mrp > 0 && newItem.sellingPrice > 0
+          ? ((newItem.mrp - newItem.sellingPrice) / newItem.mrp) * 100 : 0;
+        newItem.varients = [buildComboVariant(newItem, item)];
       } else {
         const ratings = await Rating.findAll({ where: { product: product.id } });
         const totalRating = ratings.reduce((sum, rating) => sum + rating.rate, 0);

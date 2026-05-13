@@ -8,6 +8,9 @@ const Offer = sequelize.define("offers", {
   image: {
     type: DataTypes.STRING,
   },
+  banner: {
+    type: DataTypes.STRING,
+  },
   products: {
     type: DataTypes.JSON,
   },

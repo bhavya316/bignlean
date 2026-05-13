@@ -51,6 +51,16 @@ const ComboProduct = sequelize.define("comboProducts", {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: true,
   },
+  products: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [],
+  },
+  selectedProductIds: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [],
+  },
   images: {
     type: DataTypes.JSON,
     allowNull: true,

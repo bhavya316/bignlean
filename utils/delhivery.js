@@ -66,10 +66,15 @@ const parseAmount = (value) => {
   return Number.isFinite(amount) ? amount : 0;
 };
 
+const isComboCartItem = (item = {}) => {
+  const normalizedFlavour = String(item.flavour || item.flavor || "").toLowerCase();
+  return normalizedFlavour === "combo" || (Number(item.varientId) === 0 && normalizedFlavour !== "");
+};
+
 const buildOrderItemSnapshot = (product, cartItem, isPremium) => {
   const productData =
     product && typeof product.toJSON === "function" ? product.toJSON() : product;
-  const isCombo = cartItem.varientId === 0 && cartItem.flavour === "Combo";
+  const isCombo = isComboCartItem(cartItem);
 
   let mrp, sellingPrice, premiumPrice, unitPrice, qty, flavour;
   qty = parseAmount(cartItem.qty);
@@ -101,6 +106,10 @@ const buildOrderItemSnapshot = (product, cartItem, isPremium) => {
   return {
     product: cartItem.product,
     productId: cartItem.product,
+    isCombo,
+    productType: isCombo ? "combo" : "product",
+    name: productData?.name,
+    images: productData?.images || [],
     varientId: cartItem.varientId,
     variantId: cartItem.varientId,
     flavour,
@@ -122,6 +131,144 @@ const buildOrderItemSnapshot = (product, cartItem, isPremium) => {
       premiumPrice,
     },
   };
+};
+
+const getOrderItemProductId = (orderItem, fallbackId) =>
+  orderItem?.productId || orderItem?.product || fallbackId;
+
+const buildOrderProductResponse = async (productId, qty, orderItem = {}) => {
+  let isComboProduct = isComboCartItem(orderItem) || orderItem.isCombo === true;
+  let product = isComboProduct
+    ? await ComboProduct.findByPk(productId)
+    : await Product.findByPk(productId);
+
+  if (isComboProduct && !product) {
+    product = await Product.findByPk(productId);
+  }
+  if (!isComboProduct && !product) {
+    product = await ComboProduct.findByPk(productId);
+    isComboProduct = Boolean(product);
+  }
+
+  if (!product) return null;
+
+  const productData =
+    typeof product.toJSON === "function" ? product.toJSON() : product.dataValues || product;
+
+  if (isComboProduct) {
+    const firstVariant =
+      Array.isArray(productData.varients) && productData.varients.length > 0
+        ? productData.varients[0]
+        : {};
+    const mrp = parseAmount(orderItem.mrp ?? productData.mrp ?? firstVariant.mrp);
+    const sellingPrice = parseAmount(
+      orderItem.sellingPrice ??
+        productData.sellingPrice ??
+        productData.price ??
+        firstVariant.sellingPrice ??
+        firstVariant.premiumPrice ??
+        firstVariant.price
+    );
+    const premiumPrice = parseAmount(
+      orderItem.premiumPrice ??
+        productData.price ??
+        firstVariant.premiumPrice ??
+        sellingPrice ??
+        mrp
+    );
+    const unitPrice = parseAmount(orderItem.unitPrice) || sellingPrice || premiumPrice || mrp;
+    const lineTotal = parseAmount(orderItem.lineTotal ?? orderItem.amount) || unitPrice * qty;
+    const comboVariant = {
+      id: 0,
+      units: "Combo",
+      stock: 999,
+      mrp,
+      sellingPrice,
+      premiumPrice,
+      price: sellingPrice || premiumPrice || mrp,
+      flavor: ["Combo"],
+    };
+
+    return {
+      ...productData,
+      isCombo: true,
+      productType: "combo",
+      qty,
+      amount: lineTotal,
+      lineTotal,
+      unitPrice,
+      mrp,
+      sellingPrice,
+      premiumPrice,
+      price: sellingPrice || productData.price || premiumPrice || mrp,
+      selectedVariant: comboVariant,
+      selectedVariantId: 0,
+      selectedFlavour: "Combo",
+      selectedFlavor: "Combo",
+      selectedUnits: "Combo",
+      weight: "Combo",
+      flavor: "Combo",
+      varients: [comboVariant],
+      orderItem,
+    };
+  }
+
+  const variants = Array.isArray(productData.varients) ? productData.varients : [];
+  const selectedVariant =
+    variants.find((item) => `${item.id}` === `${orderItem.varientId || orderItem.variantId}`) ||
+    variants[0] ||
+    {};
+  const selectedPricing = resolveVariantPricing(
+    selectedVariant,
+    orderItem.flavour || orderItem.flavor
+  );
+  const mrp = parseAmount(orderItem.mrp ?? selectedPricing.mrp);
+  const sellingPrice = parseAmount(
+    orderItem.sellingPrice ?? selectedPricing.sellingPrice ?? selectedPricing.price
+  );
+  const premiumPrice = parseAmount(orderItem.premiumPrice ?? selectedPricing.premiumPrice);
+  const unitPrice = parseAmount(orderItem.unitPrice) || sellingPrice || premiumPrice || mrp;
+  const lineTotal = parseAmount(orderItem.lineTotal ?? orderItem.amount) || unitPrice * qty;
+  const selectedFlavour =
+    orderItem.flavour ||
+    orderItem.flavor ||
+    getFlavorLabel(getVariantFlavorOptions(selectedVariant)[0]);
+
+  return {
+    ...productData,
+    isCombo: false,
+    productType: "product",
+    qty,
+    amount: lineTotal,
+    lineTotal,
+    unitPrice,
+    mrp,
+    sellingPrice: sellingPrice || premiumPrice || mrp,
+    premiumPrice,
+    selectedVariant,
+    selectedVariantId: orderItem.varientId || orderItem.variantId || selectedVariant.id,
+    selectedFlavour,
+    selectedFlavor: selectedFlavour,
+    selectedUnits: orderItem.units || selectedVariant.units || "",
+    orderItem,
+  };
+};
+
+const buildOrderProductList = async (order) => {
+  const productIds = Array.isArray(order.product) ? order.product : [];
+  const productQty = Array.isArray(order.qty) ? order.qty : [];
+  const items = Array.isArray(order.items) ? order.items : [];
+
+  const products = await Promise.all(
+    productIds.map((productId, index) => {
+      const orderItem = items[index] || {};
+      const id = getOrderItemProductId(orderItem, productId);
+      const qty = parseAmount(orderItem.qty || productQty[index] || 0);
+      return buildOrderProductResponse(id, qty, orderItem);
+    })
+  );
+
+  return products.filter(Boolean);
 };
 
 async function loginUserAndGetToken() {
@@ -377,17 +524,28 @@ async function calculateCartDetails(user, coupon, addressId) {
     var totalCouponDiscount = 0;
 
     for (const cartItem of cartItems) {
-      let product = await Product.findByPk(cartItem.product);
-      let isCombo = false;
-      if (!product) {
-        product = await ComboProduct.findByPk(cartItem.product);
-        isCombo = true;
+      const isCombo = isComboCartItem(cartItem);
+      let product = isCombo
+        ? await ComboProduct.findByPk(cartItem.product)
+        : await Product.findByPk(cartItem.product);
+      if (isCombo && !product) {
+        product = await Product.findByPk(cartItem.product);
       }
       if (!product) continue;
 
       if (isCombo) {
-        const mrp = parseAmount(product.mrp);
-        const sellingPrice = parseAmount(product.sellingPrice ?? product.price);
+        const comboVariant =
+          Array.isArray(product.varients) && product.varients.length > 0
+            ? product.varients[0]
+            : {};
+        const mrp = parseAmount(product.mrp ?? comboVariant.mrp);
+        const sellingPrice = parseAmount(
+          product.sellingPrice ??
+            product.price ??
+            comboVariant.sellingPrice ??
+            comboVariant.premiumPrice ??
+            comboVariant.price
+        );
         const productPrice = sellingPrice || mrp;
         totalPrice += productPrice * cartItem.qty;
         totalWeight += 500 * cartItem.qty;
@@ -1179,7 +1337,7 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
     const orderItems = [];
 
     for (const item of cartItems) {
-      const isComboItem = item.varientId === 0 && item.flavour === "Combo";
+      const isComboItem = isComboCartItem(item);
       let product;
       if (isComboItem) {
         product = await ComboProduct.findByPk(item.product);
@@ -1303,9 +1461,32 @@ async function calculateCartDetailsFallback(user, coupon, addressId) {
     var totalWeight = 0;
 
     for (const cartItem of cartItems) {
-      const product = await Product.findByPk(cartItem.product);
+      const isCombo = isComboCartItem(cartItem);
+      let product = isCombo
+        ? await ComboProduct.findByPk(cartItem.product)
+        : await Product.findByPk(cartItem.product);
+      if (isCombo && !product) {
+        product = await Product.findByPk(cartItem.product);
+      }
 
-      if (product) {
+      if (product && isCombo) {
+        const comboVariant =
+          Array.isArray(product.varients) && product.varients.length > 0
+            ? product.varients[0]
+            : {};
+        const mrp = parseAmount(product.mrp ?? comboVariant.mrp);
+        const sellingPrice = parseAmount(
+          product.sellingPrice ??
+            product.price ??
+            comboVariant.sellingPrice ??
+            comboVariant.premiumPrice ??
+            comboVariant.price
+        );
+        const productPrice = sellingPrice || mrp;
+        totalPrice += productPrice * cartItem.qty;
+        totalWeight += 500 * cartItem.qty;
+        totalDiscount += (mrp - sellingPrice) * cartItem.qty;
+      } else if (product) {
         const varients = product.varients;
         const selectedVariant = varients.find(
           (item) => `${item.id}` === `${cartItem.varientId}`
@@ -1454,42 +1635,28 @@ router.delete("/order/cancel/:id", authMiddleware, requireOwnedResource(Order, "
 router.get("/order/user/:user", authMiddleware, requireSameUserParam("user"), async (req, res) => {
   try {
     const user = req.params.user;
-    const orders = await Order.findAll({ where: { user } });
+    const orders = await Order.findAll({
+      where: { user },
+      order: [["createdAt", "DESC"]],
+    });
     let ordersList = [];
     for (const order of orders) {
-      const productIds = order.product;
-      const productQty = order.qty;
-      let finalProductList = [];
-
-      const items = order.items || [];
-      for (var i = 0; i < productIds.length; i++) {
-        const itemDetail = items[i] || {};
-        const isComboProduct = itemDetail.varientId === 0 && itemDetail.flavour === "Combo";
-        let product;
-        if (isComboProduct) {
-          product = await ComboProduct.findByPk(productIds[i]);
-        } else {
-          product = await Product.findByPk(productIds[i]);
-        }
-        if (product) {
-          const newProduct = { ...product.dataValues, qty: productQty[i] };
-          finalProductList.push(newProduct);
-        }
-      }
-
-      delete order.qty;
-      delete order.usedCoupon;
-      delete order.coupon;
-      delete order.usedBGLCash;
-      delete order.updatedAt;
-      order.product = finalProductList;
-      const orderDate = formatDate(order.createdAt);
-      order.createdAt = orderDate;
-      ordersList.push(order);
+      const orderData = order.toJSON();
+      const originalCreatedAt = orderData.createdAt;
+      orderData.product = await buildOrderProductList(orderData);
+      orderData.formattedCreatedAt = formatDate(originalCreatedAt);
+      orderData.createdAt = originalCreatedAt;
+      delete orderData.qty;
+      delete orderData.usedCoupon;
+      delete orderData.coupon;
+      delete orderData.usedBGLCash;
+      delete orderData.updatedAt;
+      ordersList.push(orderData);
     }
 
     res.status(200).json({ status: true, message: "OK", orders: ordersList });
   } catch (e) {
+    console.log(e);
     res.status(500).json({ status: false, message: "Server Error" });
   }
 });
@@ -1500,25 +1667,7 @@ router.get("/order/track/:id", authMiddleware, requireOwnedResource(Order, "id",
     const ordersDetails = await Order.findByPk(id);
     const orders = ordersDetails.toJSON();
     const token = await loginUserAndGetToken();
-    const productIds = orders.product;
-    const productQty = orders.qty;
-    let finalProductList = [];
-
-    const items = orders.items || [];
-    for (var i = 0; i < productIds.length; i++) {
-      const itemDetail = items[i] || {};
-      const isComboProduct = itemDetail.varientId === 0 && itemDetail.flavour === "Combo";
-      let product;
-      if (isComboProduct) {
-        product = await ComboProduct.findByPk(productIds[i]);
-      } else {
-        product = await Product.findByPk(productIds[i]);
-      }
-      if (product) {
-        const newProduct = { ...product.dataValues, qty: productQty[i] };
-        finalProductList.push(newProduct);
-      }
-    }
+    const finalProductList = await buildOrderProductList(orders);
 
     delete orders.qty;
     delete orders.usedCoupon;
@@ -1528,7 +1677,7 @@ router.get("/order/track/:id", authMiddleware, requireOwnedResource(Order, "id",
     delete orders.updatedAt;
     orders.product = finalProductList;
     const orderDate = formatDate(orders.createdAt);
-    orders.createdAt = orderDate;
+    orders.formattedCreatedAt = orderDate;
     if (orders.status == "Processing") {
       return res
         .status(200)
@@ -1640,31 +1789,17 @@ router.put("/order/accept/:id", async (req, res) => {
       const orderItemsDetails = order.items || [];
       for (let i = 0; i < order.product.length; i++) {
         const itemDetail = orderItemsDetails[i] || {};
-        const isComboProduct = itemDetail.varientId === 0 && itemDetail.flavour === "Combo";
-        let product;
-        if (isComboProduct) {
-          product = await ComboProduct.findByPk(order.product[i]);
-        } else {
-          product = await Product.findByPk(order.product[i]);
-        }
+        const product = await buildOrderProductResponse(
+          order.product[i],
+          parseAmount(itemDetail.qty || order.qty[i] || 0),
+          itemDetail
+        );
         if (product) {
-          let price = 0;
-          if (isComboProduct) {
-            price = parseFloat(product.sellingPrice || product.price || 0);
-          } else if (product.varients && Array.isArray(product.varients) && product.varients.length > 0) {
-            const firstVariant = product.varients[0];
-            price = firstVariant.sellingPrice ? parseFloat(firstVariant.sellingPrice) || 0 : 0;
-          }
-          
-          if (price === 0) {
-            price = 100;
-            console.log(`No price found for product ${product.id}, using default: ${price}`);
-          }
-          
+          const price = product.unitPrice || product.sellingPrice || product.price || 100;
           const details = {
-            name: product.dataValues.name,
-            qty: order.qty[i],
-            price: price,
+            name: product.name,
+            qty: product.qty || order.qty[i],
+            price,
           };
           orderItems.push(details);
         }
@@ -1923,27 +2058,17 @@ router.post("/order/create-shipment/:id", async (req, res) => {
     const createItemsDetails = order.items || [];
     for (let i = 0; i < order.product.length; i++) {
       const itemDetail = createItemsDetails[i] || {};
-      const isComboProduct = itemDetail.varientId === 0 && itemDetail.flavour === "Combo";
-      let product;
-      if (isComboProduct) {
-        product = await ComboProduct.findByPk(order.product[i]);
-      } else {
-        product = await Product.findByPk(order.product[i]);
-      }
+      const product = await buildOrderProductResponse(
+        order.product[i],
+        parseAmount(itemDetail.qty || order.qty[i] || 0),
+        itemDetail
+      );
       if (product) {
-        let price = 0;
-        if (isComboProduct) {
-          price = parseFloat(product.sellingPrice || product.price || 0);
-        } else if (product.varients && Array.isArray(product.varients) && product.varients.length > 0) {
-          const firstVariant = product.varients[0];
-          price = firstVariant.sellingPrice ? parseFloat(firstVariant.sellingPrice) || 0 : 0;
-        }
-        if (price === 0) price = 100;
-        
+        const price = product.unitPrice || product.sellingPrice || product.price || 100;
         const details = {
-          name: product.dataValues.name,
-          qty: order.qty[i],
-          price: price,
+          name: product.name,
+          qty: product.qty || order.qty[i],
+          price,
         };
         orderItems.push(details);
       }
@@ -2133,45 +2258,29 @@ router.get("/order", async (req, res) => {
       whereClause.status = status;
     }
 
-    const orders = await Order.findAll({ where: whereClause });
+    const orders = await Order.findAll({
+      where: whereClause,
+      order: [["createdAt", "DESC"]],
+    });
     let ordersList = [];
     
     for (const order of orders) {
-      const productIds = order.product;
-      const productQty = order.qty;
-      let finalProductList = [];
-
-      const items = order.items || [];
-      for (let i = 0; i < productIds.length; i++) {
-        const itemDetail = items[i] || {};
-        const isComboProduct = itemDetail.varientId === 0 && itemDetail.flavour === "Combo";
-        let product;
-        if (isComboProduct) {
-          product = await ComboProduct.findByPk(productIds[i]);
-        } else {
-          product = await Product.findByPk(productIds[i]);
-        }
-        if (product) {
-          const newProduct = { ...product.dataValues, qty: productQty[i] };
-          finalProductList.push(newProduct);
-        }
-      }
-
-      // Remove unnecessary fields
-      delete order.qty;
-      delete order.usedCoupon;
-      delete order.coupon;
-      delete order.usedBGLCash;
-      delete order.updatedAt;
-      
-      order.product = finalProductList;
-      const orderDate = formatDate(order.createdAt);
-      order.createdAt = orderDate;
-      ordersList.push(order);
+      const orderData = order.toJSON();
+      const originalCreatedAt = orderData.createdAt;
+      orderData.product = await buildOrderProductList(orderData);
+      orderData.formattedCreatedAt = formatDate(originalCreatedAt);
+      orderData.createdAt = originalCreatedAt;
+      delete orderData.qty;
+      delete orderData.usedCoupon;
+      delete orderData.coupon;
+      delete orderData.usedBGLCash;
+      delete orderData.updatedAt;
+      ordersList.push(orderData);
     }
 
     res.status(200).json({ status: true, message: "OK", orders: ordersList });
   } catch (e) {
+    console.log(e);
     res.status(500).json({ status: false, message: "Server Error" });
   }
 });

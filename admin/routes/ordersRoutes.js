@@ -69,6 +69,7 @@ const Order = require("../../user/model/order");
 const Address = require("../../user/model/address");
 const User = require("../../user/model/user");
 const Product = require("../model/product");
+const ComboProduct = require("../model/comboProduct");
 
 function formatDate(inputDate) {
   const date = new Date(inputDate);
@@ -120,7 +121,52 @@ const resolveVariantPricing = (variant, selectedFlavour) => {
 const getOrderItemProductId = (orderItem, fallbackId) =>
   orderItem?.productId || orderItem?.product || orderItem?.id || fallbackId;
 
+const isComboOrderItem = (orderItem = {}) => {
+  const flavour = String(orderItem.flavour || orderItem.flavor || "").toLowerCase();
+  return orderItem.isCombo === true || flavour === "combo" || (Number(orderItem.varientId) === 0 && flavour !== "");
+};
+
 const getVariantPrice = (product, orderItem = {}) => {
+  if (isComboOrderItem(orderItem)) {
+    const firstVariant =
+      Array.isArray(product?.varients) && product.varients.length > 0
+        ? product.varients[0]
+        : {};
+    const mrp = parseAmount(orderItem.mrp ?? product.mrp ?? firstVariant.mrp);
+    const sellingPrice = parseAmount(
+      orderItem.sellingPrice ??
+        product.sellingPrice ??
+        product.price ??
+        firstVariant.sellingPrice ??
+        firstVariant.premiumPrice ??
+        firstVariant.price
+    );
+    const premiumPrice = parseAmount(
+      orderItem.premiumPrice ?? product.price ?? firstVariant.premiumPrice ?? sellingPrice ?? mrp
+    );
+    const unitPrice = parseAmount(orderItem.unitPrice) || sellingPrice || premiumPrice || mrp;
+    const variant = {
+      id: 0,
+      units: "Combo",
+      stock: 999,
+      mrp,
+      sellingPrice,
+      premiumPrice,
+      price: sellingPrice || premiumPrice || mrp,
+      flavor: ["Combo"],
+    };
+
+    return {
+      mrp,
+      sellingPrice: sellingPrice || premiumPrice || mrp,
+      premiumPrice,
+      unitPrice,
+      variant,
+      flavour: "Combo",
+      units: "Combo",
+    };
+  }
+
   const variants = Array.isArray(product?.varients) ? product.varients : [];
   const requestedVariantId =
     orderItem.varientId || orderItem.variantId || orderItem.variant?.id;
@@ -247,9 +293,6 @@ router.get("/orders", async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
-    const active = [];
-    const completed = [];
-
     // Process orders in parallel to improve performance
     const orderPromises = orders.map(async (order) => {
       const productIds = order.product || []; // Ensure product is an array
@@ -265,7 +308,17 @@ router.get("/orders", async (req, res) => {
       // Fetch products in parallel
       const productPromises = itemSource.map(async (orderItem, index) => {
         const id = getOrderItemProductId(orderItem, productIds[index]);
-        const product = await Product.findByPk(id);
+        let isCombo = isComboOrderItem(orderItem);
+        let product = isCombo
+          ? await ComboProduct.findByPk(id)
+          : await Product.findByPk(id);
+        if (isCombo && !product) {
+          product = await Product.findByPk(id);
+        }
+        if (!isCombo && !product) {
+          product = await ComboProduct.findByPk(id);
+          isCombo = Boolean(product);
+        }
         if (!product) return null;
 
         const productData = product.toJSON();
@@ -276,6 +329,8 @@ router.get("/orders", async (req, res) => {
 
         return {
           ...productData,
+          isCombo,
+          productType: isCombo ? "combo" : "product",
           details: withVariantDetails(productData.details, variantSummary),
           qty,
           amount: lineAmount,
@@ -289,6 +344,9 @@ router.get("/orders", async (req, res) => {
           selectedFlavour: pricing.flavour,
           selectedFlavor: pricing.flavour,
           selectedUnits: pricing.units,
+          weight: isCombo ? "Combo" : productData.weight,
+          flavor: isCombo ? "Combo" : productData.flavor,
+          varients: isCombo ? [pricing.variant] : productData.varients,
           createdAt: order.createdAt,
         };
       });
@@ -313,15 +371,20 @@ router.get("/orders", async (req, res) => {
       orderData.address = await Address.findByPk(order.address);
       orderData.user = await User.findByPk(order.user);
 
-      // Categorize order based on status
+      return orderData;
+    });
+
+    const processedOrders = await Promise.all(orderPromises);
+    const active = [];
+    const completed = [];
+
+    processedOrders.forEach((orderData) => {
       if (orderData.status === "Delivered") {
         completed.push(orderData);
       } else {
         active.push(orderData);
       }
     });
-
-    await Promise.all(orderPromises);
 
     res.status(200).json({ status: true, message: "OK", active, completed });
   } catch (error) {
