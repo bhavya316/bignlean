@@ -1,11 +1,20 @@
 "use client";
 import {
   DownloadBanner,
+<<<<<<< HEAD
   HomeCarosoul,
   Banner1Section,
   Banner2Section,
   Banner3Section,
   Quotes,
+=======
+  HomeCarosoul,
+  Banner1Section,
+  Banner2Section,
+  Banner3Section,
+  ProductSection,
+  Quotes,
+>>>>>>> 4cec4dc58269bc71c6bee113f61d3e2fcc807467
   RecentlyViewed,
   BestSeller,
   ExtraOffFreebies,
@@ -38,7 +47,11 @@ export default function Home() {
   const { data: comboCategoriesData, isLoading: comboCategoriesLoading } = useGetComboCategories();
   const { userData } = useAppContext();
 
+<<<<<<< HEAD
   // Filter banners by type
+=======
+// Filter banners by type
+>>>>>>> 4cec4dc58269bc71c6bee113f61d3e2fcc807467
   const heroSliderBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Hero Slider") || [];
   const banner1SectionBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Banner 1 Section") || [];
   const banner2SectionBanners = bannersData?.banner?.filter((banner: any) => banner.type === "Banner 2 Section") || [];
@@ -73,6 +86,11 @@ export default function Home() {
         <PopularProducts isLoading={homeProductsLoading} />
         
         <BuyTwoOff />
+        
+        <Banner1SectionWrapper
+          isLoading={bannersLoading}
+          banners={banner1SectionBanners}
+        />
         
         {/* <Quotes
           authorName="Michael John Bobak"
@@ -119,6 +137,7 @@ export default function Home() {
           })} */}
                     {comboCategoriesLoading ? (
                       <ComboCategoriesSkeleton />
+<<<<<<< HEAD
                     ) : (
                       comboCategoriesData?.comboCategories?.map((category: any) => (
                         <ComboCategorySection key={category.comboCategoryId} comboCategory={category} />
@@ -140,6 +159,23 @@ export default function Home() {
         {/*
         <Quotes
           authorName="Arnold Schwarzenegger"
+=======
+                    ) : (
+                      comboCategoriesData?.comboCategories?.map((category: any) => (
+                        <ComboCategorySection key={category.comboCategoryId} comboCategory={category} />
+                      ))
+                    )}
+
+        {homeProductsLoading ? <PickOfTheDaySkeleton /> : <PickOfTheDay />}
+
+        <Banner2SectionWrapper
+          isLoading={bannersLoading}
+          banners={banner2SectionBanners}
+        />
+
+        <Quotes
+          authorName="Arnold Schwarzenegger"
+>>>>>>> 4cec4dc58269bc71c6bee113f61d3e2fcc807467
           quote="“There are no shortcuts. Everything is reps, reps, reps. --”"
         />
         */}
@@ -419,6 +455,7 @@ type BannerSectionWrapperProps = {
   banners: any[];
 };
 
+<<<<<<< HEAD
 function Banner1SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
   if (isLoading) {
     return (
@@ -441,6 +478,8 @@ function Banner2SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps
   return <Banner2Section banners={banners} />;
 }
 
+=======
+>>>>>>> 4cec4dc58269bc71c6bee113f61d3e2fcc807467
 function Banner3SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
   if (isLoading) {
     return (
@@ -450,4 +489,29 @@ function Banner3SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps
     );
   }
   return <Banner3Section banners={banners} />;
+<<<<<<< HEAD
+=======
+}
+
+function Banner1SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
+  if (isLoading) {
+    return (
+      <div className="my-8 flex justify-center">
+        <div className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] bg-gray-200 rounded-lg shadow-lg animate-pulse" />
+      </div>
+    );
+  }
+  return <Banner1Section banners={banners} />;
+}
+
+function Banner2SectionWrapper({ isLoading, banners }: BannerSectionWrapperProps) {
+  if (isLoading) {
+    return (
+      <div className="my-8 flex justify-center">
+        <div className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] bg-gray-200 rounded-lg shadow-lg animate-pulse" />
+      </div>
+    );
+  }
+  return <Banner2Section banners={banners} />;
+>>>>>>> 4cec4dc58269bc71c6bee113f61d3e2fcc807467
 }
