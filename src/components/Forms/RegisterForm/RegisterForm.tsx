@@ -132,7 +132,8 @@ const handleGoogleSignIn = async () => {
         idToken,
         provider: "google",
         name: user?.displayName || "",
-        email: user?.email || ""
+        email: user?.email || "",
+        image: user?.photoURL || ""
       }),
     });
     
@@ -175,7 +176,8 @@ const handleFacebookSignIn = async () => {
         idToken,
         provider: "facebook",
         name: user?.displayName || "",
-        email: user?.email || ""
+        email: user?.email || "",
+        image: user?.photoURL || ""
       }),
     });
     
