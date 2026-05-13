@@ -279,6 +279,226 @@
     installBrandCountryField();
     installBlogToolbar();
     installFlavorPanels();
+    installFAQEnhancements();
+  }
+
+  // FAQ Enhancements - Heading dropdown and Edit functionality
+  function installFAQEnhancements() {
+    var faqForm = document.querySelector(".faq__content__form");
+    if (!faqForm || faqForm.querySelector("[data-bnl-faq-enhanced]")) return;
+
+    faqForm.setAttribute("data-bnl-faq-enhanced", "true");
+
+    // Create styles for FAQ enhancements
+    var faqStyle = document.createElement("style");
+    faqStyle.textContent = [
+      ".bnl-faq-heading-row{display:flex;gap:10px;align-items:flex-start;}",
+      ".bnl-faq-heading-row>div{flex:1;}",
+      ".bnl-faq-heading-select{height:42px;border:1px solid #d1d5db;border-radius:8px;padding:0 12px;width:100%;}",
+      ".bnl-faq-actions{display:flex;gap:8px;}",
+      ".bnl-faq-edit-btn,.bnl-faq-delete-btn{background:none;border:none;cursor:pointer;padding:4px;}",
+      ".bnl-faq-edit-btn:hover,.bnl-faq-delete-btn:hover{opacity:0.7}",
+      ".bnl-faq-edit-btn svg,.bnl-faq-delete-btn svg{width:18px;height:18px;}",
+      ".bnl-faq-item-card{position:relative;}",
+      ".bnl-faq-item-actions{position:absolute;top:10px;right:10px;display:flex;gap:8px;}",
+      ".bnl-cancel-btn{background:#6b7280 !important;}"
+    ].join("");
+    document.head.appendChild(faqStyle);
+
+    // Get API base URL
+    var apiBase = "http://localhost:3002";
+    var headings = [];
+    var editingFaqId = null;
+
+    // Fetch existing headings
+    fetch(apiBase + "/admin/faqs/headings")
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.headings) headings = data.headings;
+      })
+      .catch(function() {});
+
+    // Create heading row with dropdown and input
+    var headingRow = faqForm.querySelector(".faq__content__form__heading");
+    if (!headingRow) return;
+
+    var newHeadingRow = document.createElement("div");
+    newHeadingRow.className = "bnl-faq-heading-row";
+    newHeadingRow.innerHTML = [
+      '<div><label>Select Heading</label>',
+      '<select class="bnl-faq-heading-select" id="bnl-heading-select">',
+      '<option value="">-- Select Existing --</option>',
+      '</select></div>',
+      '<div><label>Or Enter New Heading</label>',
+      '<input type="text" id="bnl-new-heading" placeholder="Enter new heading" style="height:42px;border:1px solid #d1d5db;border-radius:8px;padding:0 12px;width:100%;"></input></div>'
+    ].join("");
+
+    var selectEl = newHeadingRow.querySelector("#bnl-heading-select");
+    headings.forEach(function(h) {
+      var opt = document.createElement("option");
+      opt.value = h;
+      opt.textContent = h;
+      selectEl.appendChild(opt);
+    });
+
+    // Declare variables in outer scope for access in edit handlers
+    var headingSelect = selectEl;
+    var newHeadingInput = newHeadingRow.querySelector("#bnl-new-heading");
+
+    selectEl.addEventListener("change", function() {
+      var newInput = newHeadingRow.querySelector("#bnl-new-heading");
+      if (this.value) {
+        newInput.value = "";
+      }
+    });
+
+    newHeadingRow.querySelector("#bnl-new-heading").addEventListener("input", function() {
+      if (this.value) {
+        selectEl.value = "";
+      }
+    });
+
+    headingRow.parentNode.replaceChild(newHeadingRow, headingRow);
+
+    // Update submit button
+    var submitBtn = faqForm.querySelector("button");
+    if (submitBtn) {
+      submitBtn.textContent = "Add FAQ";
+      submitBtn.id = "bnl-faq-submit-btn";
+    }
+
+    // Handle form submission
+    faqForm.addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      var heading = headingSelect.value || newHeadingInput.value;
+      var question = faqForm.querySelector('input[name="question"]').value;
+      var answer = faqForm.querySelector('input[name="answer"]').value;
+
+      if (!heading || !question || !answer) {
+        alert("Please fill all fields");
+        return;
+      }
+
+      var url = apiBase + "/admin/faqs";
+      var method = "POST";
+
+      if (editingFaqId) {
+        url = apiBase + "/admin/faqs/" + editingFaqId;
+        method = "PUT";
+      }
+
+      fetch(url, {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ heading: heading, question: question, answer: answer })
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.status) {
+          // Reset form
+          headingSelect.value = "";
+          newHeadingInput.value = "";
+          faqForm.querySelector('input[name="question"]').value = "";
+          faqForm.querySelector('input[name="answer"]').value = "";
+          submitBtn.textContent = "Add FAQ";
+          editingFaqId = null;
+          // Reload page to show updated data
+          location.reload();
+        } else {
+          alert(data.message || "Error saving FAQ");
+        }
+      })
+      .catch(function(err) {
+        alert("Error saving FAQ");
+      });
+    });
+
+    // Add edit/delete buttons to existing FAQ items
+    setTimeout(function() {
+      // First fetch all FAQs with their IDs
+      fetch(apiBase + "/admin/faqs")
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (!data.faqs) return;
+          
+          // Map questions to their IDs
+          var faqIdMap = {};
+          Object.keys(data.faqs).forEach(function(heading) {
+            data.faqs[heading].forEach(function(faq) {
+              faqIdMap[faq.question] = faq.id;
+            });
+          });
+
+          // Add buttons to each card
+          var faqCards = document.querySelectorAll(".faq__content__faq_list__content__faq__content__card");
+          faqCards.forEach(function(card) {
+            if (card.querySelector(".bnl-faq-item-actions")) return;
+
+            var questionEl = card.querySelector(".faq__content__faq_list__content__faq__content__card__content__question");
+            var answerEl = card.querySelector(".faq__content__faq_list__content__faq__content__card__content__answer");
+            if (!questionEl) return;
+
+            var questionText = questionEl.textContent.trim();
+            var answerText = answerEl ? answerEl.textContent.trim() : "";
+
+            // Find the parent heading section to get the heading name
+            var headingEl = card.closest(".faq__content__faq_list__content__faq");
+            var headingText = "";
+            if (headingEl) {
+              var headingTitle = headingEl.querySelector("h4, .heading");
+              if (headingTitle) headingText = headingTitle.textContent.trim();
+            }
+
+            // Get FAQ ID from the map using question text
+            var faqId = faqIdMap[questionText] || Date.now();
+
+        var actionsDiv = document.createElement("div");
+        actionsDiv.className = "bnl-faq-item-actions";
+
+        // Edit button (pencil icon)
+        var editBtn = document.createElement("button");
+        editBtn.className = "bnl-faq-edit-btn";
+        editBtn.title = "Edit";
+        editBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+        editBtn.addEventListener("click", function() {
+          headingSelect.value = headings.includes(headingText) ? headingText : "";
+          newHeadingInput.value = headings.includes(headingText) ? "" : headingText;
+          faqForm.querySelector('input[name="question"]').value = questionText;
+          faqForm.querySelector('input[name="answer"]').value = answerText;
+          submitBtn.textContent = "Update FAQ";
+          editingFaqId = faqId;
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+
+        // Delete button (trash icon)
+        var deleteBtn = document.createElement("button");
+        deleteBtn.className = "bnl-faq-delete-btn";
+        deleteBtn.title = "Delete";
+        deleteBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+        deleteBtn.addEventListener("click", function() {
+          if (confirm("Are you sure you want to delete this FAQ?")) {
+            fetch(apiBase + "/admin/faqs/" + faqId, { method: "DELETE" })
+              .then(function(res) { return res.json(); })
+              .then(function(data) {
+                if (data.status) {
+                  location.reload();
+                } else {
+                  alert(data.message || "Error deleting FAQ");
+                }
+              })
+              .catch(function() {
+                alert("Error deleting FAQ");
+              });
+          }
+        });
+
+        actionsDiv.appendChild(editBtn);
+          actionsDiv.appendChild(deleteBtn);
+          card.appendChild(actionsDiv);
+        });
+      });
+    }, 1000);
   }
 
   patchRequests();
