@@ -51,6 +51,7 @@
   var offerDraftProducts = [];
   var comboDraftPayload = null;
   var comboEditPricesLoaded = false;
+  var comboVariantNavigationGuardInstalled = false;
   var webpackRequire = null;
   var lastObservedPath = location.pathname;
 
@@ -84,6 +85,8 @@
       ".bnl-combo-price-field label{font-size:13px;font-weight:700;color:#111827;}",
       ".bnl-combo-price-field input{height:42px;border:1px solid #d1d5db;border-radius:8px;padding:0 12px;font-size:14px;outline:none;}",
       ".bnl-combo-price-field input:focus{border-color:#e70f0f;box-shadow:0 0 0 3px rgba(231,15,15,.08);}",
+      ".bnl-combo-no-variants-note{margin-top:12px!important;padding:10px 12px;border-radius:8px;background:#f9fafb;border:1px solid #e5e7eb;color:#374151!important;font-size:13px!important;}",
+      "html.bnl-combo-no-variants a[href*='add_product_varients'],html.bnl-combo-no-variants .bnl-hidden-combo-variant,html.bnl-combo-no-variants .add_product_varients,html.bnl-combo-no-variants .add_product_varients__content{display:none!important;}",
       ".bnl-combo-preview{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;background:#fff7f7;border:1px solid #fecaca;border-radius:8px;margin-top:14px;padding:12px;}",
       ".bnl-combo-preview[hidden]{display:none;}",
       ".bnl-combo-preview strong{display:block;color:#111827;font-size:15px;margin-bottom:4px;}",
@@ -1002,7 +1005,8 @@
     comboDraftPayload = Object.assign({}, data, {
       comboCatId: comboCatId || data.comboCatId,
       comboCategoryId: comboCatId || data.comboCategoryId,
-      varients: []
+      varients: [],
+      variants: []
     });
 
     setNativeInputValue(document.querySelector('.add_products__content__form input#name[name="name"]'), data.name || "");
@@ -1041,6 +1045,13 @@
     });
   }
 
+  function stripComboVariantsFromPayload(payload) {
+    if (!payload || typeof payload !== "object") return payload;
+    payload.varients = [];
+    delete payload.variants;
+    return payload;
+  }
+
   function mergeComboDraftIntoPayload(payload) {
     var merged = Object.assign({}, payload || {});
     if (!merged.comboCatId && merged.comboCategoryId) merged.comboCatId = merged.comboCategoryId;
@@ -1052,7 +1063,7 @@
         merged.sellingPrice = priceInputs.sellingPrice;
         merged.price = priceInputs.sellingPrice;
       }
-      merged.varients = [];
+      stripComboVariantsFromPayload(merged);
       delete merged.products;
       return merged;
     }
@@ -1076,7 +1087,7 @@
       merged.price = merged.sellingPrice;
     }
     if (shouldUseDraftArray(merged.images) && Array.isArray(comboDraftPayload.images)) merged.images = comboDraftPayload.images;
-    merged.varients = [];
+    stripComboVariantsFromPayload(merged);
     ["overView", "details", "tables", "information", "certificates", "supplements"].forEach(function (key) {
       if (shouldUseDraftArray(merged[key]) && Array.isArray(comboDraftPayload[key])) {
         merged[key] = comboDraftPayload[key];
@@ -1091,6 +1102,7 @@
       delete merged.products;
       delete merged.selectedProductIds;
     }
+    stripComboVariantsFromPayload(merged);
     return merged;
   }
 
@@ -1110,6 +1122,7 @@
       "<div><h4>Build Combo from Products</h4><p>Select 2 or 3 products from the catalog, preview the computed combo, then customize the form before saving.</p></div>",
       '<button type="button" class="bnl-combo-picker__open">Select Products</button>',
       "</div>",
+      '<p class="bnl-combo-no-variants-note">Combos use combo-level MRP and price only. Product variants are disabled for combo creation.</p>',
       '<div class="bnl-combo-price-row">',
       '<div class="bnl-combo-price-field"><label for="bnl-combo-mrp">Combo MRP</label><input id="bnl-combo-mrp" data-bnl-combo-mrp type="number" min="0" step="0.01" placeholder="Enter combo MRP" /></div>',
       '<div class="bnl-combo-price-field"><label for="bnl-combo-price">Combo Price</label><input id="bnl-combo-price" data-bnl-combo-price type="number" min="0" step="0.01" placeholder="Enter combo price" /></div>',
@@ -1137,6 +1150,11 @@
 
   function hideComboVariantControls() {
     try {
+      if (!isComboFormPath()) {
+        document.documentElement.classList.remove("bnl-combo-no-variants");
+        return;
+      }
+      document.documentElement.classList.add("bnl-combo-no-variants");
       if (!isComboFormPage()) return;
 
       var heading = document.querySelector(".add_products__content__form__flash_sale h4");
@@ -1144,12 +1162,64 @@
         heading.textContent = heading.textContent.replace(/\s*[&,]\s*Varients/i, "").trim();
       }
 
-      var variantLink = document.querySelector('a[href*="add_product_varients"]');
-      if (variantLink) {
-        variantLink.style.display = "none";
-        variantLink.setAttribute("aria-hidden", "true");
-      }
+      Array.prototype.forEach.call(document.querySelectorAll('a[href*="add_product_varients"]'), function (link) {
+        var target = link.closest("li,.nav-item,.MuiStep-root,.step,.steps__item") || link;
+        target.classList.add("bnl-hidden-combo-variant");
+        target.setAttribute("aria-hidden", "true");
+        link.setAttribute("tabindex", "-1");
+      });
+
+      Array.prototype.forEach.call(document.querySelectorAll("button,a,[role='button']"), function (control) {
+        if (control.closest("[data-bnl-combo-picker],[data-bnl-combo-modal]")) return;
+        var text = String(control.textContent || "").trim().toLowerCase();
+        var href = String(control.getAttribute("href") || "").toLowerCase();
+        if (href.indexOf("add_product_varients") === -1 && text.indexOf("variant") === -1 && text.indexOf("varient") === -1) return;
+        var wrapper = control.closest("li,.nav-item,.MuiStep-root,.step,.steps__item") || control;
+        wrapper.classList.add("bnl-hidden-combo-variant");
+        wrapper.setAttribute("aria-hidden", "true");
+        if ("disabled" in control) control.disabled = true;
+        control.setAttribute("tabindex", "-1");
+      });
     } catch (error) {}
+  }
+
+  function installComboVariantNavigationGuard() {
+    if (comboVariantNavigationGuardInstalled) return;
+    comboVariantNavigationGuardInstalled = true;
+
+    function isVariantStepUrl(url) {
+      return typeof url === "string" && url.indexOf("add_product_varients") !== -1;
+    }
+
+    var pushState = history.pushState;
+    var replaceState = history.replaceState;
+    history.pushState = function (state, title, url) {
+      var args = Array.prototype.slice.call(arguments);
+      if (isComboFormPath() && isVariantStepUrl(args[2])) {
+        args[2] = "/combo";
+      }
+      return pushState.apply(this, args);
+    };
+    history.replaceState = function (state, title, url) {
+      var args = Array.prototype.slice.call(arguments);
+      if (isComboFormPath() && isVariantStepUrl(args[2])) {
+        args[2] = "/combo";
+      }
+      return replaceState.apply(this, args);
+    };
+
+    document.addEventListener("click", function (event) {
+      try {
+        if (!isComboFormPath()) return;
+        var target = event.target && event.target.closest ? event.target.closest('a[href*="add_product_varients"],button,[role="button"]') : null;
+        if (!target) return;
+        var href = String(target.getAttribute("href") || "");
+        var text = String(target.textContent || "").toLowerCase();
+        if (href.indexOf("add_product_varients") === -1 && text.indexOf("variant") === -1 && text.indexOf("varient") === -1) return;
+        event.preventDefault();
+        event.stopPropagation();
+      } catch (error) {}
+    }, true);
   }
 
   function openComboProductPicker(section) {
@@ -1973,6 +2043,9 @@
           if (isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/combo-products") && String(this.__bnlUrl || "").indexOf("/combo-products/preview") === -1) {
             body = JSON.stringify(mergeComboDraftIntoPayload(payload));
           }
+          if (isComboFormPath() && isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/products")) {
+            body = JSON.stringify(stripComboVariantsFromPayload(payload));
+          }
           if (isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/offers")) {
             if (payload.image && !payload.logo) payload.logo = payload.image;
             var payloadProductIds = normalizeOfferProductIdsForAdmin(payload.products);
@@ -1989,7 +2062,7 @@
             body = JSON.stringify(payload);
             this.__bnlShouldClearOfferBanner = true;
           }
-          if (isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/products") && Array.isArray(payload.varients)) {
+          if (!isComboFormPath() && isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/products") && Array.isArray(payload.varients)) {
             body = JSON.stringify(normalizeProductVariants(payload));
             this.__bnlShouldClearFlavorDrafts = true;
           }
@@ -2099,6 +2172,7 @@
       installProductDraftGuard();
       cleanupProductDraftOnRouteChange();
       installComboProductPicker();
+      installComboVariantNavigationGuard();
       installOfferBannerUpload();
       installOfferProductPicker();
       hideComboVariantControls();
