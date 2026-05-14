@@ -1377,6 +1377,62 @@
     return "";
   }
 
+  function isCancelledOrderStatus(value) {
+    var text = String(value || "").trim().toLowerCase();
+    return (
+      text === "cn" ||
+      text === "cancel" ||
+      text === "canceled" ||
+      text === "cancelled" ||
+      text.indexOf("cancel") !== -1
+    );
+  }
+
+  function isCurrentOrderCancelled() {
+    var order = getCurrentOrder();
+    return Boolean(
+      order &&
+        (
+          isCancelledOrderStatus(order.status) ||
+          isCancelledOrderStatus(order.orderStatus) ||
+          isCancelledOrderStatus(order.shippingStatus)
+        )
+    );
+  }
+
+  function updateCurrentOrderState(patch) {
+    var routeState = window.history && window.history.state;
+    if (!routeState || !routeState.usr || !routeState.usr.data) return null;
+
+    var nextOrder = Object.assign({}, routeState.usr.data, patch || {});
+    var nextState = Object.assign({}, routeState, {
+      usr: Object.assign({}, routeState.usr, { data: nextOrder })
+    });
+
+    window.history.replaceState(nextState, "", window.location.href);
+    return nextOrder;
+  }
+
+  function applyOrderActionResponse(data, isAccept) {
+    var responseOrder = data && data.order ? data.order : {};
+    var patch = Object.assign({}, responseOrder);
+
+    if (!patch.status) {
+      patch.status = isAccept ? "Accepted" : "Cancelled";
+    }
+
+    if (!isAccept && !patch.trackingID) {
+      patch.trackingID = null;
+    }
+
+    return updateCurrentOrderState(patch);
+  }
+
+  function getCurrentOrderActionStatus() {
+    var order = getCurrentOrder();
+    return String(order && order.status ? order.status : "").trim();
+  }
+
   function installOrderActionGuard() {
     if (window.__bnlOrderActionGuard) return;
     window.__bnlOrderActionGuard = true;
@@ -1389,6 +1445,15 @@
 
       var orderId = getCurrentOrderId();
       if (!orderId) return;
+
+      if (isCurrentOrderCancelled()) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        button.disabled = true;
+        button.textContent = "Cancelled";
+        alert("This order is already cancelled.");
+        return;
+      }
 
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -1411,6 +1476,7 @@
           });
         })
         .then(function (data) {
+          applyOrderActionResponse(data, isAccept);
           alert(
             data.message ||
               (isAccept
@@ -1425,6 +1491,403 @@
           alert(error.message || (isAccept ? "Failed to accept order" : "Failed to reject order"));
         });
     }, true);
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function formatCurrency(value) {
+    var amount = Number(value || 0);
+    if (!Number.isFinite(amount)) amount = 0;
+    return "Rs. " + amount.toFixed(2);
+  }
+
+  function getOrderLineItems(order) {
+    var products = Array.isArray(order && order.product) ? order.product : [];
+    return products.map(function (product, index) {
+      var qty = Number(product.qty || (order.qty && order.qty[index]) || 0);
+      var unitPrice = Number(
+        product.unitPrice ||
+          product.sellingPrice ||
+          product.price ||
+          product.mrp ||
+          0
+      );
+      var lineTotal = Number(product.lineTotal || product.amount || unitPrice * qty);
+      return {
+        name: product.name || "Product",
+        variant: [
+          product.selectedUnits || product.weight,
+          product.selectedFlavor || product.selectedFlavour || product.flavor,
+        ].filter(Boolean).join(" - "),
+        qty: qty,
+        unitPrice: unitPrice,
+        lineTotal: lineTotal,
+      };
+    });
+  }
+
+  function buildOrderDetailsHtml(order) {
+    var address = order.address || {};
+    var user = order.user || {};
+    var items = getOrderLineItems(order);
+    var shipping = Number(order.shippingCharge || order.shiping || 0);
+    var subtotal = Number(order.subtotalAmount || order.totalAmount || order.amount || 0);
+    var couponDiscount = Number(order.couponDiscount || 0);
+    var walletDiscount = Number(order.walletDiscount || order.bglCash || 0);
+    var finalAmount = Number(order.finalAmount || order.payableAmount || 0);
+    if (!finalAmount) {
+      finalAmount = Math.max(0, subtotal - couponDiscount - walletDiscount + shipping);
+    }
+
+    var addressText = [
+      address.name,
+      address.phone,
+      address.flat,
+      address.landmark,
+      address.city,
+      address.state,
+      address.pincode,
+    ].filter(Boolean).join(", ");
+
+    var rows = items.map(function (item) {
+      return [
+        "<tr>",
+        "<td>", escapeHtml(item.name), item.variant ? "<br><small>" + escapeHtml(item.variant) + "</small>" : "", "</td>",
+        "<td>", escapeHtml(item.qty), "</td>",
+        "<td>", escapeHtml(formatCurrency(item.unitPrice)), "</td>",
+        "<td>", escapeHtml(formatCurrency(item.lineTotal)), "</td>",
+        "</tr>",
+      ].join("");
+    }).join("");
+
+    return [
+      "<!doctype html><html><head><meta charset=\"utf-8\"><title>Order ",
+      escapeHtml(order.orderID || order.id || ""),
+      "</title><style>",
+      "body{font-family:Arial,sans-serif;color:#111;margin:32px;}h1{font-size:24px;margin:0 0 16px;}h2{font-size:16px;margin:24px 0 8px;}table{width:100%;border-collapse:collapse;margin-top:12px;}th,td{border:1px solid #ddd;padding:10px;text-align:left;font-size:13px;}th{background:#f5f5f5}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;font-size:14px}.totals{margin-left:auto;max-width:320px}.totals div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}.muted{color:#666}.total{font-weight:700;font-size:16px}",
+      "</style></head><body>",
+      "<h1>Order Details</h1>",
+      "<div class=\"grid\">",
+      "<div><strong>Order ID:</strong> ", escapeHtml(order.orderID || order.id || "N/A"), "</div>",
+      "<div><strong>Status:</strong> ", escapeHtml(order.status || "N/A"), "</div>",
+      "<div><strong>Tracking ID:</strong> ", escapeHtml(order.trackingID || "N/A"), "</div>",
+      "<div><strong>Payment:</strong> ", escapeHtml(order.paymentMethod || "N/A"), "</div>",
+      "<div><strong>Customer:</strong> ", escapeHtml(user.name || address.name || "N/A"), "</div>",
+      "<div><strong>Email:</strong> ", escapeHtml(user.email || "N/A"), "</div>",
+      "<div style=\"grid-column:1/-1\"><strong>Address:</strong> ", escapeHtml(addressText || "N/A"), "</div>",
+      "</div>",
+      "<h2>Products</h2>",
+      "<table><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>",
+      rows || "<tr><td colspan=\"4\">No products found</td></tr>",
+      "</tbody></table>",
+      "<h2>Summary</h2>",
+      "<div class=\"totals\">",
+      "<div><span>Subtotal</span><span>", escapeHtml(formatCurrency(subtotal)), "</span></div>",
+      "<div><span>Coupon</span><span>-", escapeHtml(formatCurrency(couponDiscount)), "</span></div>",
+      "<div><span>Wallet</span><span>-", escapeHtml(formatCurrency(walletDiscount)), "</span></div>",
+      "<div><span>Shipping</span><span>", escapeHtml(formatCurrency(shipping)), "</span></div>",
+      "<div class=\"total\"><span>Final Amount</span><span>", escapeHtml(formatCurrency(finalAmount)), "</span></div>",
+      "</div>",
+      "<p class=\"muted\">Generated on ", escapeHtml(new Date().toLocaleString()), "</p>",
+      "</body></html>",
+    ].join("");
+  }
+
+  function sanitizePdfText(value) {
+    return String(value == null ? "" : value)
+      .replace(/[^\x20-\x7E]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function escapePdfText(value) {
+    return sanitizePdfText(value)
+      .replace(/\\/g, "\\\\")
+      .replace(/\(/g, "\\(")
+      .replace(/\)/g, "\\)");
+  }
+
+  function wrapPdfText(value, maxLength) {
+    var words = sanitizePdfText(value).split(" ").filter(Boolean);
+    var lines = [];
+    var current = "";
+
+    words.forEach(function (word) {
+      if (word.length > maxLength) {
+        if (current) {
+          lines.push(current);
+          current = "";
+        }
+        for (var index = 0; index < word.length; index += maxLength) {
+          lines.push(word.slice(index, index + maxLength));
+        }
+        return;
+      }
+
+      var next = current ? current + " " + word : word;
+      if (next.length > maxLength) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    });
+
+    if (current) lines.push(current);
+    return lines.length ? lines : [""];
+  }
+
+  function createPdfDocument(pageStreams) {
+    var objects = [];
+    function addObject(body) {
+      objects.push(body);
+      return objects.length;
+    }
+
+    var catalogId = addObject("<< /Type /Catalog /Pages 2 0 R >>");
+    var pagesId = addObject("");
+    var regularFontId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+    var boldFontId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
+    var pageIds = [];
+
+    pageStreams.forEach(function (stream) {
+      var contentId = addObject(
+        "<< /Length " + stream.length + " >>\nstream\n" + stream + "endstream"
+      );
+      var pageId = addObject(
+        "<< /Type /Page /Parent " + pagesId + " 0 R /MediaBox [0 0 612 792] " +
+          "/Resources << /Font << /F1 " + regularFontId + " 0 R /F2 " + boldFontId + " 0 R >> >> " +
+          "/Contents " + contentId + " 0 R >>"
+      );
+      pageIds.push(pageId);
+    });
+
+    objects[pagesId - 1] =
+      "<< /Type /Pages /Kids [" +
+      pageIds.map(function (id) { return id + " 0 R"; }).join(" ") +
+      "] /Count " + pageIds.length + " >>";
+
+    var pdf = "%PDF-1.4\n";
+    var offsets = [0];
+    objects.forEach(function (body, index) {
+      offsets.push(pdf.length);
+      pdf += (index + 1) + " 0 obj\n" + body + "\nendobj\n";
+    });
+
+    var xrefOffset = pdf.length;
+    pdf += "xref\n0 " + (objects.length + 1) + "\n";
+    pdf += "0000000000 65535 f \n";
+    for (var i = 1; i < offsets.length; i += 1) {
+      pdf += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
+    }
+    pdf +=
+      "trailer\n<< /Size " + (objects.length + 1) + " /Root " + catalogId + " 0 R >>\n" +
+      "startxref\n" + xrefOffset + "\n%%EOF";
+
+    return pdf;
+  }
+
+  function buildOrderDetailsPdf(order) {
+    var address = order.address || {};
+    var user = order.user || {};
+    var items = getOrderLineItems(order);
+    var shipping = Number(order.shippingCharge || order.shiping || 0);
+    var subtotal = Number(order.subtotalAmount || order.totalAmount || order.amount || 0);
+    var couponDiscount = Number(order.couponDiscount || 0);
+    var walletDiscount = Number(order.walletDiscount || order.bglCash || 0);
+    var finalAmount = Number(order.finalAmount || order.payableAmount || 0);
+    if (!finalAmount) {
+      finalAmount = Math.max(0, subtotal - couponDiscount - walletDiscount + shipping);
+    }
+
+    var addressText = [
+      address.name,
+      address.phone,
+      address.flat,
+      address.landmark,
+      address.city,
+      address.state,
+      address.pincode,
+    ].filter(Boolean).join(", ");
+
+    var pages = [];
+    var content = "";
+    var y = 752;
+
+    function pushPage() {
+      if (content) pages.push(content);
+      content = "";
+      y = 752;
+    }
+
+    function ensureSpace(lines, lineHeight) {
+      var required = (lines || 1) * (lineHeight || 14);
+      if (y - required < 48) pushPage();
+    }
+
+    function addText(text, options) {
+      options = options || {};
+      var size = options.size || 10;
+      var lineHeight = options.lineHeight || 14;
+      var x = options.x || 50;
+      var font = options.bold ? "/F2" : "/F1";
+      var lines = wrapPdfText(text, options.maxLength || 92);
+      ensureSpace(lines.length, lineHeight);
+      lines.forEach(function (line) {
+        content += "BT " + font + " " + size + " Tf 1 0 0 1 " + x + " " + y + " Tm (" + escapePdfText(line) + ") Tj ET\n";
+        y -= lineHeight;
+      });
+    }
+
+    function addGap(size) {
+      y -= size || 8;
+      if (y < 48) pushPage();
+    }
+
+    function addRule() {
+      ensureSpace(1, 8);
+      content += "0.82 0.82 0.82 RG 50 " + y + " m 562 " + y + " l S\n";
+      y -= 12;
+    }
+
+    addText("Order Details", { bold: true, size: 22, lineHeight: 26 });
+    addText("Generated on " + new Date().toLocaleString(), { size: 9, lineHeight: 12 });
+    addRule();
+    addText("Order ID: " + (order.orderID || order.id || "N/A"), { bold: true });
+    addText("Status: " + (order.status || "N/A"));
+    addText("Tracking ID: " + (order.trackingID || "N/A"));
+    addText("Payment: " + (order.paymentMethod || "N/A"));
+    addText("Customer: " + (user.name || address.name || "N/A"));
+    addText("Email: " + (user.email || "N/A"));
+    addText("Address: " + (addressText || "N/A"), { maxLength: 86 });
+    addGap(10);
+    addText("Products", { bold: true, size: 15, lineHeight: 18 });
+    addRule();
+
+    if (items.length) {
+      items.forEach(function (item, index) {
+        addText((index + 1) + ". " + item.name, { bold: true, maxLength: 82 });
+        if (item.variant) addText("Variant: " + item.variant, { x: 64, maxLength: 78 });
+        addText(
+          "Qty: " + item.qty +
+            " | Unit Price: " + formatCurrency(item.unitPrice) +
+            " | Line Total: " + formatCurrency(item.lineTotal),
+          { x: 64, maxLength: 78 }
+        );
+        addGap(4);
+      });
+    } else {
+      addText("No products found");
+    }
+
+    addGap(8);
+    addText("Summary", { bold: true, size: 15, lineHeight: 18 });
+    addRule();
+    addText("Subtotal: " + formatCurrency(subtotal));
+    addText("Coupon: -" + formatCurrency(couponDiscount));
+    addText("Wallet: -" + formatCurrency(walletDiscount));
+    addText("Shipping: " + formatCurrency(shipping));
+    addText("Final Amount: " + formatCurrency(finalAmount), { bold: true, size: 12, lineHeight: 16 });
+
+    pushPage();
+    return createPdfDocument(pages.length ? pages : [""]);
+  }
+
+  function downloadOrderDetails(order) {
+    if (!order) {
+      alert("Order details are not available yet.");
+      return;
+    }
+
+    var pdf = buildOrderDetailsPdf(order);
+    var blob = new Blob([pdf], { type: "application/pdf" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = "order-" + String(order.orderID || order.id || "details") + ".pdf";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(function () {
+      URL.revokeObjectURL(url);
+    }, 1000);
+  }
+
+  function installOrderDetailsDownload() {
+    if (window.__bnlOrderDetailsDownload) return;
+    window.__bnlOrderDetailsDownload = true;
+
+    document.addEventListener("click", function (event) {
+      var button = event.target && event.target.closest && event.target.closest("button");
+      if (!button || !document.querySelector(".orders_detail")) return;
+
+      var action = (button.textContent || "").trim().toLowerCase();
+      if (action.indexOf("download") === -1 || action.indexOf("detail") === -1) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      downloadOrderDetails(getCurrentOrder());
+    }, true);
+  }
+
+  function closestOrderActionScope(button) {
+    var node = button;
+    var depth = 0;
+    while (node && depth < 8) {
+      if (
+        node.tagName === "TR" ||
+        (node.className && String(node.className).toLowerCase().indexOf("order") !== -1)
+      ) {
+        return node;
+      }
+      node = node.parentElement;
+      depth += 1;
+    }
+    return button.parentElement;
+  }
+
+  function normalizeCancelledOrderActions() {
+    var detail = document.querySelector(".orders_detail");
+    if (detail && isCurrentOrderCancelled()) {
+      Array.prototype.slice.call(detail.querySelectorAll("button")).forEach(function (button) {
+        var action = (button.textContent || "").trim();
+        if (action !== "Accept" && action !== "Reject") return;
+        button.disabled = true;
+        button.textContent = "Cancelled";
+        button.style.pointerEvents = "none";
+      });
+    }
+
+    var detailStatus = getCurrentOrderActionStatus();
+    if (detail && detailStatus && detailStatus !== "Processing") {
+      Array.prototype.slice.call(detail.querySelectorAll("button")).forEach(function (button) {
+        var action = (button.textContent || "").trim();
+        if (action !== "Accept" && action !== "Reject") return;
+        button.disabled = true;
+        button.textContent = detailStatus === "Accepted" ? "Accepted" : detailStatus;
+        button.style.pointerEvents = "none";
+      });
+    }
+
+    Array.prototype.slice.call(document.querySelectorAll("button")).forEach(function (button) {
+      var action = (button.textContent || "").trim();
+      if (action !== "Accept" && action !== "Reject") return;
+
+      var scope = closestOrderActionScope(button);
+      var scopeText = scope ? scope.textContent || "" : "";
+      if (!isCancelledOrderStatus(scopeText)) return;
+
+      button.disabled = true;
+      button.textContent = "Cancelled";
+      button.style.pointerEvents = "none";
+    });
   }
 
   function enhanceOrderDetailContact() {
@@ -1642,6 +2105,8 @@
       fixComboConfig();
       fixComboNavButton();
       enhanceOrderDetailContact();
+      installOrderDetailsDownload();
+      normalizeCancelledOrderActions();
     } catch (error) {}
     window.__bnlTickRunning = false;
     // The FAQ page is a React-controlled tree. Replacing its form/card nodes
