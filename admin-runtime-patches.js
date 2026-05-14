@@ -1355,16 +1355,123 @@
     return /^(POST|PUT|PATCH)$/i.test(method || "") && String(url || "").indexOf(key) !== -1;
   }
 
+  function rewriteAdminOrderUrl(url) {
+    if (typeof url !== "string" || url.indexOf("order/cancel/") === -1) return url;
+    return url.replace(/(^|\/)order\/cancel\//, "$1admin/order/reject/");
+  }
+
+  function getCurrentOrder() {
+    var routeState = window.history && window.history.state;
+    return (
+      routeState &&
+      routeState.usr &&
+      routeState.usr.data
+    ) || null;
+  }
+
+  function getCurrentOrderId() {
+    var order = getCurrentOrder();
+    var orderId = order && order.id;
+    if (orderId) return orderId;
+
+    return "";
+  }
+
+  function installOrderActionGuard() {
+    if (window.__bnlOrderActionGuard) return;
+    window.__bnlOrderActionGuard = true;
+
+    document.addEventListener("click", function (event) {
+      var button = event.target && event.target.closest && event.target.closest("button");
+      if (!button || !document.querySelector(".orders_detail")) return;
+      var action = (button.textContent || "").trim();
+      if (action !== "Accept" && action !== "Reject") return;
+
+      var orderId = getCurrentOrderId();
+      if (!orderId) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      var isAccept = action === "Accept";
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.textContent = isAccept ? "Accepting..." : "Rejecting...";
+
+      fetch(
+        "http://localhost:3002/" + (isAccept ? "order/accept/" : "admin/order/reject/") + encodeURIComponent(orderId),
+        { method: isAccept ? "PUT" : "DELETE" }
+      )
+        .then(function (response) {
+          return response.json().then(function (data) {
+            if (!response.ok || !data.status) {
+              throw new Error(data.message || (isAccept ? "Failed to accept order" : "Failed to reject order"));
+            }
+            return data;
+          });
+        })
+        .then(function (data) {
+          alert(
+            data.message ||
+              (isAccept
+                ? "Order accepted and shipment created successfully."
+                : "Order rejected. No shipment was created.")
+          );
+          location.reload();
+        })
+        .catch(function (error) {
+          button.disabled = false;
+          button.textContent = originalText;
+          alert(error.message || (isAccept ? "Failed to accept order" : "Failed to reject order"));
+        });
+    }, true);
+  }
+
+  function enhanceOrderDetailContact() {
+    var order = getCurrentOrder();
+    if (!order || !document.querySelector(".orders_detail")) return;
+
+    var phone =
+      (order.address && order.address.phone) ||
+      (order.user && order.user.phone) ||
+      "";
+    if (!phone) return;
+
+    var cards = document.querySelectorAll(".orders_detail__content__cards__customer");
+    if (!cards || !cards.length) return;
+
+    Array.prototype.slice.call(cards, 0, 2).forEach(function (card) {
+      if (!card || card.querySelector("[data-bnl-order-phone]")) return;
+      var phoneLine = document.createElement("p");
+      phoneLine.setAttribute("data-bnl-order-phone", "true");
+      phoneLine.textContent = "Phone: " + phone;
+      card.appendChild(phoneLine);
+    });
+  }
+
   function patchRequests() {
     if (window.__bnlAdminRequestPatch) return;
     window.__bnlAdminRequestPatch = true;
+    var originalFetch = window.fetch;
     var open = XMLHttpRequest.prototype.open;
     var send = XMLHttpRequest.prototype.send;
 
+    if (typeof originalFetch === "function") {
+      window.fetch = function (input, init) {
+        if (typeof input === "string") {
+          return originalFetch.call(this, rewriteAdminOrderUrl(input), init);
+        }
+        return originalFetch.apply(this, arguments);
+      };
+    }
+
     XMLHttpRequest.prototype.open = function (method, url) {
+      var rewrittenUrl = rewriteAdminOrderUrl(url);
       this.__bnlMethod = method;
-      this.__bnlUrl = url;
-      return open.apply(this, arguments);
+      this.__bnlUrl = rewrittenUrl;
+      var args = Array.prototype.slice.call(arguments);
+      args[1] = rewrittenUrl;
+      return open.apply(this, args);
     };
 
     XMLHttpRequest.prototype.send = function (body) {
@@ -1534,6 +1641,7 @@
       hideComboVariantControls();
       fixComboConfig();
       fixComboNavButton();
+      enhanceOrderDetailContact();
     } catch (error) {}
     window.__bnlTickRunning = false;
     // The FAQ page is a React-controlled tree. Replacing its form/card nodes
@@ -1761,6 +1869,7 @@
   }
 
   patchRequests();
+  installOrderActionGuard();
   var tickTimer = null;
   tick();
   new MutationObserver(function () {
