@@ -11,7 +11,7 @@ type Props = {
   value?: string;
   required?: boolean;
   onChange?: (e: any) => void;
-    disabled?: boolean; // Add this line
+  disabled?: boolean;
 };
 export default function InputField({
   type,
@@ -25,25 +25,31 @@ export default function InputField({
   value,
   name,
   required = false,
+  disabled = false,
 }: Props) {
   if (type === "textarea") {
     return (
-      <textarea
-        onChange={onChange}
-        value={value}
-        name={name}
-        required={required}
-        placeholder={placeholder}
-        className={`w-full rounded-[15px] outline-none p-3 resize-none text-sm not-italic font-normal ${
-          shadow ? `sm-3` : `border border-[#D9D9D9]`
-        }`}
-        rows={5}
-      />
+      <label className={`flex flex-col ${className || ""}`}>
+        {label && <span className="mb-2 text-sm font-medium text-[#222]">{label}</span>}
+        <textarea
+          onChange={onChange}
+          value={value}
+          name={name}
+          required={required}
+          disabled={disabled}
+          placeholder={placeholder}
+          className={`w-full rounded-[15px] outline-none p-3 resize-none text-sm not-italic font-normal disabled:bg-gray-100 disabled:text-gray-500 ${
+            shadow ? `sm-3` : `border border-[#D9D9D9]`
+          }`}
+          rows={5}
+        />
+        {error && <span className="mt-1 text-xs text-red-600">{error}</span>}
+      </label>
     );
   }
   return (
-    <label className={`flex flex-col ${className}`}>
-      {label && <span>{label}</span>}
+    <label className={`flex flex-col ${className || ""}`}>
+      {label && <span className="mb-2 text-sm font-medium text-[#222]">{label}</span>}
       {type === "mobile" ? (
         <div
           className={`w-full rounded-[15px] flex items-center bg-white ${
@@ -58,8 +64,9 @@ export default function InputField({
             name={name}
             required={required}
             value={value}
+            disabled={disabled}
             type="text"
-            className="w-full outline-none p-5  text-sm not-italic font-normal"
+            className="w-full outline-none p-5 text-sm not-italic font-normal disabled:bg-gray-100 disabled:text-gray-500"
             placeholder={placeholder}
             maxLength={10}
           />
@@ -71,13 +78,14 @@ export default function InputField({
           name={name}
           required={required}
           value={value}
+          disabled={disabled}
           placeholder={placeholder}
-          className={`w-full rounded-[15px] outline-none p-5 text-sm not-italic font-normal ${
+          className={`w-full rounded-[15px] outline-none p-5 text-sm not-italic font-normal disabled:bg-gray-100 disabled:text-gray-500 ${
             shadow ? `sm-3` : `border border-[#D9D9D9]`
-          } ${inputClassName}`}
+          } ${inputClassName || ""}`}
         />
       )}
-      {error && <span>{error}</span>}
+      {error && <span className="mt-1 text-xs text-red-600">{error}</span>}
     </label>
   );
 }

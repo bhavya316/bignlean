@@ -29,7 +29,7 @@ export default function Page() {
         orders.map((order: TrackOrder) => (
           <div key={order?.id} className="w-full flex flex-col gap-4">
             <p className="w-full text-end text-black text-sm not-italic font-medium max-[1000px]:top-0 max-[450px]:static">
-              AWB Tracking no: {order?.trackingID || "in process"}
+              AWB Tracking no: {order?.trackingID || "Waiting for admin confirmation"}
             </p>
             <div className="flex flex-col gap-[22px]">
               <OrderCard order={order} userId={userData?.id} />
@@ -196,8 +196,8 @@ const ProductDetailCard = ({
 const ProcessingCard = ({ order, trackingData }: { order: TrackOrder; trackingData?: TrackingData }) => {
   const getStepDetails = (orderStatus: string, tData?: TrackingData) => {
     const baseSteps = [
-      { title: "Order Confirmed", detail: "Order is being processed" },
-      { title: "Shipped", detail: "Waiting for shipment" },
+      { title: "Order Placed", detail: "Waiting for admin confirmation" },
+      { title: "Shipped", detail: "Shipment will start after confirmation" },
       { title: "Out for Delivery", detail: "Not yet out for delivery" },
       { title: "Delivered", detail: "Not yet delivered" }
     ];

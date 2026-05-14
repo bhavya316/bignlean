@@ -7,7 +7,7 @@ import ShippingCard from "@/components/ShippingCard/ShippingCard";
 import CustomPageWrapper from "@/components/Wrappers/CustomPageWrapper";
 import { makePayment } from "@/queries/razor";
 import { useGetCartList, useGetCartPrice } from "@/queries/Cart";
-import { useGetShippingServiceability, useCreateShipment } from "@/queries/Product";
+import { useGetShippingServiceability } from "@/queries/Product";
 import React, { useCallback, useMemo, useState, useEffect } from "react";
 import Loader from "@/components/Loader/Loader";
 import { usePlaceOrder } from "@/queries/Order";
@@ -72,26 +72,13 @@ export default function Page() {
 
   const {
     mutate: placeAnOrder,
-    isSuccess,
     isPending: isOrderLoading,
   } = usePlaceOrder();
 
-  const {
-    mutate: checkServiceability,
-    isPending: isCheckingServiceability,
-  } = useGetShippingServiceability();
-
-  const {
-    mutate: createShipment,
-    isPending: isCreatingShipment,
-  } = useCreateShipment();
-
-  const [bestCourierId, setBestCourierId] = useState<string | null>(null);
-  const [selectedAddressObj, setSelectedAddressObj] = useState<any>(null);
+  const { mutate: checkServiceability } = useGetShippingServiceability();
 
   const handleAddressSelect = (address: any) => {
     setAddressId(address?.id);
-    setSelectedAddressObj(address);
     const total = effectiveCartPrice?.totalAmount || 0;
 
     const loadingToast = toast.loading("Checking delivery availability...");
@@ -112,33 +99,8 @@ export default function Page() {
         toast.dismiss(loadingToast);
         if (res?.data?.status && res?.data?.data?.length > 0) {
           toast.success("Delivery service available for this location");
-          // Logic to find the best courier (fastest/cheapest/specific criteria)
-          // For now, selecting the first available courier as default "best"
-          // You can enhance this logic based on 'freight_charges' or other fields in response
-          // Example: Sort by freight_charges and pick the lowest
-          const couriers = res.data.data;
-          // Sort by freight_charges ascending
-          couriers.sort(
-            (a: any, b: any) =>
-              Number(a.freight_charges || a.total_amount || 0) -
-              Number(b.freight_charges || b.total_amount || 0)
-          );
-          const bestCourier = couriers[0];
-          const courierId =
-            bestCourier.id ||
-            bestCourier.courier_id ||
-            bestCourier.courier_code ||
-            bestCourier.courier_name;
-          setBestCourierId(courierId);
-          console.log(
-            "Best courier selected:",
-            bestCourier.name || bestCourier.courier_name,
-            courierId
-          );
-
         } else {
           toast.error("Delivery not available for this location");
-          setBestCourierId(null);
           // setAddressId(null); // Optional: Reset address if not serviceable
         }
       },
@@ -150,7 +112,6 @@ export default function Page() {
           err?.message ||
           "Error checking delivery availability";
         toast.error(errorMsg);
-        setBestCourierId(null);
       },
     });
   };
@@ -226,16 +187,6 @@ export default function Page() {
       });
     }
   }, [couponId, addressId, userData?.id]);
-
-  // Navigate after successful order
-  useEffect(() => {
-    if (isSuccess) {
-      toast.success("Order placed successfully!");
-      setTimeout(() => {
-        router.push("/track-order");
-      }, 1000);
-    }
-  }, [isSuccess, router]);
 
   // Handle order placement
   const orderHandler = async () => {
@@ -327,7 +278,7 @@ export default function Page() {
         const loadingToast = toast.loading("Opening Razorpay...");
         try {
           await makePayment({ payload, amount });
-          toast.success("Order placed successfully!");
+          toast.success("Order placed. Please wait for admin confirmation.");
           setCouponId(null);
           setTimeout(() => {
             router.push("/track-order");
@@ -340,74 +291,8 @@ export default function Page() {
         const loadingToast = toast.loading("Processing your order...");
         placeAnOrder(payload, {
           onSuccess: (data) => {
-            // Attempt to create shipment if courier and address are available
-            if (bestCourierId && selectedAddressObj) {
-              const orderId = data?.data?.orderId; // Assuming the order response contains the new order ID
-              // If orderId is not directly in data.data.orderId, check the actual response structure.
-              // Usually it's in data.data.id or data.data.order.id
-              // For safety, let's log the data to see structure if debugging, but here we assume a structure.
-              // Based on typical patterns, let's try to get order ID.
-              // If we can't get order ID, we can't create shipment linked to it properly with order_number.
-
-              // NOTE: The admin code uses 'order_number'. We need to pass the actual order ID or Number from the placed order.
-              // Let's assume the response 'data' has the order info.
-
-              const orderItems =
-                cartList?.data?.cartItems?.map((item: any) => ({
-                  name: item.product?.name || "Product",
-                  qty: item.qty,
-                  price: item.sellingPrice,
-                })) || [];
-              const payableAmount = Math.max(
-                0,
-                Number(effectiveCartPrice?.totalAmount || 0) +
-                  Number(effectiveCartPrice?.shiping || 0) -
-                  safeBnlCash
-              );
-
-              const shipmentPayload = {
-                order_number: String(orderId || Date.now()), // Fallback if orderId missing, but should be there
-                payment_type: "cod",
-                order_amount: payableAmount,
-                collectable_amount: payableAmount,
-                courier_id: bestCourierId,
-                consignee: {
-                  name: userData?.name || "Customer",
-                  address: selectedAddressObj.flat + ", " + selectedAddressObj.landmark,
-                  address_2: "",
-                  city: selectedAddressObj.city,
-                  state: selectedAddressObj.state || selectedAddressObj.city || "NA",
-                  pincode: selectedAddressObj.pincode,
-                  phone: userData?.phone || ""
-                },
-                pickup: {
-                  warehouse_name: "Main Warehouse",
-                  name: "BigNLean",
-                  address: "Warehouse Address Line 1", // You might want to make this dynamic or config based
-                  address_2: "",
-                  city: "City",
-                  state: "State",
-                  pincode: "421204",
-                  phone: "9999999999"
-                },
-                order_items: orderItems,
-              };
-
-              createShipment(shipmentPayload, {
-                onSuccess: (shipRes) => {
-                  console.log("Shipment created successfully", shipRes);
-                  toast.success("Shipment initiated successfully");
-                },
-                onError: (shipErr) => {
-                  console.error("Failed to create shipment", shipErr);
-                  // We don't block order success if shipment fails, just log it or show warning
-                  toast.error("Order placed, but shipment creation failed. Please contact support.");
-                }
-              });
-            }
-
             toast.dismiss(loadingToast);
-            toast.success("Order placed successfully!");
+            toast.success(data?.data?.message || "Order placed. Please wait for admin confirmation.");
             setCouponId(null);
             setIsPlacingOrder(false);
             setTimeout(() => {
