@@ -12,6 +12,33 @@ const BASE_URL = "https://shipment.xpressbees.com/api";
 let cachedToken = null;
 let tokenExpiry = null;
 
+const getXpressbeesConfig = () => {
+  const testMode = isXpressbeesTestMode();
+  const email = process.env.XPRESSBEES_EMAIL;
+  const password = process.env.XPRESSBEES_PASSWORD;
+
+  return {
+    mode: process.env.XPRESSBEES_MODE || process.env.XPRESSBEES_ENV || "",
+    testMode,
+    email,
+    password,
+    configured: testMode || Boolean(email && password),
+  };
+};
+
+const getLiveCredentials = () => {
+  const config = getXpressbeesConfig();
+
+  if (!config.email || !config.password) {
+    throw new Error("XPRESSBEES_EMAIL and XPRESSBEES_PASSWORD are required outside test mode");
+  }
+
+  return {
+    email: config.email,
+    password: config.password,
+  };
+};
+
 // Get cached token or fetch new one if expired
 const getAuthToken = async () => {
   if (isXpressbeesTestMode()) {
@@ -26,9 +53,10 @@ const getAuthToken = async () => {
   }
 
   try {
+    const credentials = getLiveCredentials();
     const response = await axios.post(`${BASE_URL}/users/login`, {
-      email: process.env.XPRESSBEES_EMAIL || "orders@bignlean.com",
-      password: process.env.XPRESSBEES_PASSWORD || "Carry@2525"
+      email: credentials.email,
+      password: credentials.password,
     }, {
       headers: { "Content-Type": "application/json" },
       timeout: 30000
@@ -163,6 +191,25 @@ const getServiceability = async (serviceabilityData) => {
 // Generate manifest
 const generateManifest = async (awbs) => {
   try {
+    if (isXpressbeesTestMode()) {
+      const awbList = Array.isArray(awbs) ? awbs : [awbs];
+      return {
+        status: true,
+        message: "Xpressbees test mode: manifest simulated, no real manifest created",
+        data: {
+          manifest_id: `XBTEST-MANIFEST-${Date.now()}`,
+          total_shipments: awbList.length,
+          generated_at: new Date().toISOString(),
+          courier_name: "Xpressbees Test",
+          shipments: awbList.map((awb) => ({
+            awb_number: awb,
+            status: "Ready",
+          })),
+          testMode: true,
+        },
+      };
+    }
+
     const token = await getAuthToken();
     const response = await axios.post(`${BASE_URL}/shipments2/manifest`, {
       awbs: Array.isArray(awbs) ? awbs : [awbs]
@@ -242,5 +289,6 @@ module.exports = {
   generateManifest,
   getNDRList,
   createNDRAction,
-  isXpressbeesTestMode
+  isXpressbeesTestMode,
+  getXpressbeesConfig
 };

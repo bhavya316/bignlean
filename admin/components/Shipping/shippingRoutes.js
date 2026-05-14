@@ -16,7 +16,8 @@ const {
   createShipment,
   trackShipment,
   getServiceability,
-  isXpressbeesTestMode
+  isXpressbeesTestMode,
+  getXpressbeesConfig
 } = xpressbees;
 
 // Cancel shipment
@@ -25,6 +26,18 @@ router.post("/cancel-shipment", async (req, res) => {
     const { awb } = req.body;
     if (!awb) {
       return res.status(400).json({ status: false, message: "AWB number is required" });
+    }
+
+    const possibleOrderId = Number(awb);
+    if (Number.isInteger(possibleOrderId) && possibleOrderId > 0) {
+      const order = await Order.findByPk(possibleOrderId);
+      if (order && !order.trackingID) {
+        return res.json({
+          status: true,
+          skipped: true,
+          message: "No shipment exists for this order.",
+        });
+      }
     }
 
     const result = await cancelShipment(awb);
@@ -53,16 +66,20 @@ router.get("/test", (req, res) => {
 
 router.get("/providers/status", async (req, res) => {
   const checkShiprocket = req.query.check === "true" || req.query.provider === "shiprocket";
+  const checkXpressbees = req.query.check === "true" || req.query.provider === "xpressbees";
+  const xpressbeesConfig = getXpressbeesConfig();
   const shiprocketConfigured = Boolean(process.env.SHIPROCKET_EMAIL && process.env.SHIPROCKET_PASSWORD);
   const payload = {
     status: true,
     activeProvider: "xpressbees",
     xpressbees: {
-      configured: true,
-      usesFallbackCredentials: !process.env.XPRESSBEES_EMAIL || !process.env.XPRESSBEES_PASSWORD,
-      testMode: isXpressbeesTestMode(),
+      configured: xpressbeesConfig.configured,
+      credentialsConfigured: Boolean(xpressbeesConfig.email && xpressbeesConfig.password),
+      mode: xpressbeesConfig.mode || (xpressbeesConfig.testMode ? "test" : "live"),
+      testMode: xpressbeesConfig.testMode,
       mounted: true,
-      routes: ["/serviceability", "/create-shipment", "/track/:awb"],
+      authenticated: null,
+      routes: ["/serviceability", "/create-shipment", "/track/:awb", "/manifest"],
     },
     shiprocket: {
       configured: shiprocketConfigured,
@@ -70,6 +87,16 @@ router.get("/providers/status", async (req, res) => {
       authenticated: null,
     },
   };
+
+  if (checkXpressbees) {
+    try {
+      const token = await getAuthToken();
+      payload.xpressbees.authenticated = Boolean(token);
+    } catch (error) {
+      payload.xpressbees.authenticated = false;
+      payload.xpressbees.error = error.message;
+    }
+  }
 
   if (checkShiprocket && shiprocketConfigured) {
     const token = await shiprocket.authenticate();

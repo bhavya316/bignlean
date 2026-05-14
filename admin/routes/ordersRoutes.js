@@ -70,6 +70,7 @@ const Address = require("../../user/model/address");
 const User = require("../../user/model/user");
 const Product = require("../model/product");
 const ComboProduct = require("../model/comboProduct");
+const { addTransaction } = require("../../user/controllers/transactionController");
 
 function formatDate(inputDate) {
   const date = new Date(inputDate);
@@ -392,5 +393,63 @@ router.get("/orders", async (req, res) => {
     res.status(500).json({ status: false, message: "Internal Server Error" });
   }
 });
+
+const rejectPendingOrder = async (req, res) => {
+  try {
+    const order = await Order.findByPk(req.params.id);
+    if (!order) {
+      return res.status(404).json({
+        status: false,
+        message: "Order not found with given ID",
+      });
+    }
+
+    if (order.status !== "Processing") {
+      return res.status(400).json({
+        status: false,
+        message: `Only Processing orders can be rejected. Current status is ${order.status}.`,
+      });
+    }
+
+    if (order.trackingID) {
+      return res.status(400).json({
+        status: false,
+        message: "Order already has a tracking ID. Cancel the shipment instead of rejecting it.",
+      });
+    }
+
+    await order.update({ status: "Cancelled" });
+
+    if (Number(order.earnedBglCash) > 0) {
+      await addTransaction(
+        order.user,
+        order.id,
+        "Order Rejected",
+        "out",
+        order.earnedBglCash
+      );
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: "Order rejected. No shipment was created.",
+      order: {
+        id: order.id,
+        orderID: order.orderID,
+        status: "Cancelled",
+        trackingID: null,
+      },
+    });
+  } catch (error) {
+    console.error("Error rejecting order:", error.message, error.stack);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
+router.delete("/order/reject/:id", rejectPendingOrder);
+router.put("/order/reject/:id", rejectPendingOrder);
 
 module.exports = router;

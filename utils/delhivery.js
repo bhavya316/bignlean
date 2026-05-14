@@ -333,6 +333,16 @@ async function getCourierServiceabilityDetails(
   token
 ) {
   console.log(weight);
+  if (isXpressbeesTestMode()) {
+    return createTestServiceabilityResponse({
+      origin,
+      destination,
+      payment_type: paymentType,
+      order_amount: orderAmount,
+      weight,
+    });
+  }
+
   const apiUrl = "https://shipment.xpressbees.com/api/courier/serviceability";
 
   const requestData = {
@@ -366,6 +376,25 @@ async function getCourierServiceabilityDetails(
 }
 
 async function manifestShipments(awbs, token) {
+  if (isXpressbeesTestMode()) {
+    const awbList = Array.isArray(awbs) ? awbs : [awbs];
+    return {
+      status: true,
+      message: "Xpressbees test mode: manifest simulated, no real manifest created",
+      data: {
+        manifest_id: `XBTEST-MANIFEST-${Date.now()}`,
+        total_shipments: awbList.length,
+        generated_at: new Date().toISOString(),
+        courier_name: "Xpressbees Test",
+        shipments: awbList.map((awb) => ({
+          awb_number: awb,
+          status: "Ready",
+        })),
+        testMode: true,
+      },
+    };
+  }
+
   const apiUrl = "https://shipment.xpressbees.com/api/shipments2/manifest";
 
   const requestData = {
@@ -1409,7 +1438,7 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
 
       return res.status(200).json({
         status: true,
-        message: "Order Placed",
+        message: "Order placed. Please wait for admin confirmation.",
         earnedBglCash: earnedCoins,
         orderId: orderID
       });
@@ -1666,7 +1695,6 @@ router.get("/order/track/:id", authMiddleware, requireOwnedResource(Order, "id",
     const id = req.params.id;
     const ordersDetails = await Order.findByPk(id);
     const orders = ordersDetails.toJSON();
-    const token = await loginUserAndGetToken();
     const finalProductList = await buildOrderProductList(orders);
 
     delete orders.qty;
@@ -1678,11 +1706,12 @@ router.get("/order/track/:id", authMiddleware, requireOwnedResource(Order, "id",
     orders.product = finalProductList;
     const orderDate = formatDate(orders.createdAt);
     orders.formattedCreatedAt = orderDate;
-    if (orders.status == "Processing") {
+    if (orders.status == "Processing" || !orders.trackingID) {
       return res
         .status(200)
         .json({ status: true, isAccepted: false, order: orders });
     }
+    const token = await loginUserAndGetToken();
     const response = await trackShipment(orders.trackingID, token);
     response.orderDetails = orders;
     response.isAccepted = true;
@@ -1713,6 +1742,13 @@ router.put("/order/accept/:id", async (req, res) => {
       return res.status(400).json({
         status: false,
         message: `Order is already ${order.status}`
+      });
+    }
+
+    if (order.trackingID) {
+      return res.status(400).json({
+        status: false,
+        message: "Order already has a tracking ID"
       });
     }
 
@@ -1916,47 +1952,12 @@ router.put("/order/accept/:id", async (req, res) => {
   }
 });
 
-// Simple endpoint to manually accept order without shipment creation
+// Disabled: accepting an order must create a shipment and tracking ID.
 router.put("/order/accept-simple/:id", async (req, res) => {
-  try {
-    console.log(`Simple order accept for id: ${req.params.id}`);
-    const id = req.params.id;
-    
-    const order = await Order.findByPk(id);
-    if (!order) {
-      return res.status(404).json({ 
-        status: false, 
-        message: "Order not found with given ID" 
-      });
-    }
-
-    if (order.status !== "Processing") {
-      return res.status(400).json({
-        status: false,
-        message: `Order is already ${order.status}`
-      });
-    }
-
-    // Simply update the order status to Accepted
-    await order.update({ status: "Accepted" });
-    
-    console.log("Order status updated to Accepted");
-    return res.status(200).json({ 
-      status: true, 
-      message: "Order accepted successfully",
-      order: {
-        id: order.id,
-        status: "Accepted",
-        orderID: order.orderID
-      }
-    });
-  } catch (e) {
-    console.error("Simple order accept error:", e.message, e.stack);
-    return res.status(500).json({ 
-      status: false, 
-      message: "Server Error: " + e.message
-    });
-  }
+  return res.status(410).json({
+    status: false,
+    message: "Simple accept is disabled. Use /order/accept/:id so a shipment and tracking ID are created.",
+  });
 });
 
 // Endpoint to manually create shipment for an already accepted order
