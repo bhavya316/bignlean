@@ -20,6 +20,81 @@ const {
   getXpressbeesConfig
 } = xpressbees;
 
+const isCancelledStatusText = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return false;
+
+  return (
+    normalized === "cn" ||
+    normalized === "cancel" ||
+    normalized === "canceled" ||
+    normalized === "cancelled" ||
+    normalized.includes("cancel")
+  );
+};
+
+const trackingPayloadHasCancelledStatus = (payload = {}) => {
+  const data = payload.data || payload;
+  const directStatuses = [
+    payload.message,
+    payload.status,
+    payload.current_status,
+    payload.status_code,
+    data.message,
+    data.status,
+    data.current_status,
+    data.shipment_status,
+    data.status_code,
+  ];
+
+  if (directStatuses.some(isCancelledStatusText)) return true;
+
+  const history = Array.isArray(data.history) ? data.history : [];
+  return history.some((event) =>
+    [
+      event.status,
+      event.status_code,
+      event.current_status,
+      event.message,
+      event.description,
+    ].some(isCancelledStatusText)
+  );
+};
+
+const findOrderByAwbOrOrderId = async (awb) => {
+  const awbValue = String(awb || "").trim();
+  if (!awbValue) return { order: null, shipmentAwb: awb };
+
+  const orderByTracking = await Order.findOne({ where: { trackingID: awbValue } });
+  if (orderByTracking) {
+    return { order: orderByTracking, shipmentAwb: awbValue };
+  }
+
+  const possibleOrderId = Number(awbValue);
+  if (Number.isInteger(possibleOrderId) && possibleOrderId > 0) {
+    const order = await Order.findByPk(possibleOrderId);
+    if (order) {
+      return {
+        order,
+        shipmentAwb: order.trackingID || awbValue,
+      };
+    }
+  }
+
+  return { order: null, shipmentAwb: awbValue };
+};
+
+const markOrderCancelledForAwb = async (awb) => {
+  const { order } = await findOrderByAwbOrOrderId(awb);
+  if (!order) return null;
+
+  if (order.status !== "Cancelled") {
+    await order.update({ status: "Cancelled" });
+  }
+
+  return order;
+};
+
 // Cancel shipment
 router.post("/cancel-shipment", async (req, res) => {
   try {
@@ -28,20 +103,40 @@ router.post("/cancel-shipment", async (req, res) => {
       return res.status(400).json({ status: false, message: "AWB number is required" });
     }
 
-    const possibleOrderId = Number(awb);
-    if (Number.isInteger(possibleOrderId) && possibleOrderId > 0) {
-      const order = await Order.findByPk(possibleOrderId);
-      if (order && !order.trackingID) {
-        return res.json({
-          status: true,
-          skipped: true,
-          message: "No shipment exists for this order.",
-        });
-      }
+    const { order, shipmentAwb } = await findOrderByAwbOrOrderId(awb);
+    if (order && !order.trackingID) {
+      return res.json({
+        status: true,
+        skipped: true,
+        message: "No shipment exists for this order.",
+        order: {
+          id: order.id,
+          orderID: order.orderID,
+          status: order.status,
+          trackingID: order.trackingID,
+        },
+      });
     }
 
-    const result = await cancelShipment(awb);
-    res.json(result);
+    const result = await cancelShipment(shipmentAwb);
+    const cancelledRemotely =
+      result && (result.status !== false || trackingPayloadHasCancelledStatus(result));
+    if (cancelledRemotely && order) {
+      await order.update({ status: "Cancelled" });
+    }
+
+    res.json({
+      ...result,
+      orderStatus: cancelledRemotely && order ? "Cancelled" : undefined,
+      order: order
+        ? {
+            id: order.id,
+            orderID: order.orderID,
+            status: cancelledRemotely ? "Cancelled" : order.status,
+            trackingID: order.trackingID,
+          }
+        : undefined,
+    });
   } catch (error) {
     console.error("Cancel shipment error:", error);
     res.status(500).json({ status: false, message: "Internal server error" });
@@ -237,6 +332,18 @@ router.get("/track/:awb", async (req, res) => {
     }
 
     const result = await trackShipment(awb);
+    if (trackingPayloadHasCancelledStatus(result)) {
+      const order = await markOrderCancelledForAwb(awb);
+      if (order) {
+        result.isCancelled = true;
+        result.orderStatus = "Cancelled";
+        if (result.data && typeof result.data === "object") {
+          result.data.isCancelled = true;
+          result.data.orderStatus = "Cancelled";
+        }
+      }
+    }
+
     res.json(result);
   } catch (error) {
     console.error("Track shipment error:", error);

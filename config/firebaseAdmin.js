@@ -5,9 +5,9 @@ const logger = require("../utils/logger");
 
 const databaseURL =
   process.env.FIREBASE_DATABASE_URL ||
-  "https://biglean-4acf5-default-rtdb.firebaseio.com";
+  "https://bignlean-c2640-default-rtdb.firebaseio.com";
 
-const projectId = process.env.FIREBASE_PROJECT_ID || "biglean-4acf5";
+const projectId = process.env.FIREBASE_PROJECT_ID || "bignlean-c2640";
 
 const loadServiceAccount = () => {
   if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
