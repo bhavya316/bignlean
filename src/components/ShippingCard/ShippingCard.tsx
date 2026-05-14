@@ -9,10 +9,12 @@ export default function ShippingCard({
   setAddressId,
   err,
   onAddressSelect,
+  selectedAddressId,
 }: {
   setAddressId?: any;
   err: boolean;
   onAddressSelect?: (address: any) => void;
+  selectedAddressId?: number | string | null;
 }) {
   const { userData } = useAppContext();
   const { data } = useGetAllAddresses(userData?.id as number);
@@ -30,6 +32,7 @@ export default function ShippingCard({
             <AddressCard
               setAddressId={setAddressId}
               onAddressSelect={onAddressSelect}
+              selectedAddressId={selectedAddressId}
               key={address?.id}
               address={address}
             />

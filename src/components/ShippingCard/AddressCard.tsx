@@ -7,17 +7,19 @@ export default function AddressCard({
   address,
   setAddressId,
   onAddressSelect,
+  selectedAddressId,
 }: {
   address: any;
   setAddressId?: any;
   onAddressSelect?: (address: any) => void;
+  selectedAddressId?: number | string | null;
 }) {
   const { mutate: removeAddress } = useRemoveAddress();
   const router = useRouter();
   return (
     <div className="flex items-center gap-3 rounded-2xl bg-white sm-3 p-2 px-3">
       <input
-        onClick={() => {
+        onChange={() => {
           if (onAddressSelect) {
             onAddressSelect(address);
           }
@@ -27,6 +29,7 @@ export default function AddressCard({
         }}
         type="radio"
         name="address"
+        checked={Number(selectedAddressId) === Number(address?.id)}
         className="scale-150"
       />
       <div>

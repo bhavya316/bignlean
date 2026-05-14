@@ -8,6 +8,7 @@ import CustomPageWrapper from "@/components/Wrappers/CustomPageWrapper";
 import { makePayment } from "@/queries/razor";
 import { useGetCartList, useGetCartPrice } from "@/queries/Cart";
 import { useGetShippingServiceability } from "@/queries/Product";
+import { useGetAllAddresses } from "@/queries/Address";
 import React, { useCallback, useMemo, useState, useEffect } from "react";
 import Loader from "@/components/Loader/Loader";
 import { usePlaceOrder } from "@/queries/Order";
@@ -20,18 +21,84 @@ import {
   type WalletApiResponse,
 } from "@/queries/Wallet";
 
+const CART_COUPON_KEY = "bignlean_applied_coupon";
+const CART_CHECKOUT_STATE_KEY = "bignlean_cart_checkout_state";
+const DEFAULT_PAYMENT_METHOD = "RazorPay";
+
+type CartCheckoutState = {
+  couponId: string | null;
+  addressId: number | null;
+  paymentMethod: string;
+};
+
+const getStoredCheckoutState = (): CartCheckoutState => {
+  if (typeof window === "undefined") {
+    return {
+      couponId: null,
+      addressId: null,
+      paymentMethod: DEFAULT_PAYMENT_METHOD,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(
+      sessionStorage.getItem(CART_CHECKOUT_STATE_KEY) || "{}"
+    );
+    const legacyCoupon = sessionStorage.getItem(CART_COUPON_KEY);
+    const savedAddressId = Number(parsed.addressId);
+
+    return {
+      couponId: parsed.couponId || legacyCoupon || null,
+      addressId: Number.isFinite(savedAddressId) && savedAddressId > 0
+        ? savedAddressId
+        : null,
+      paymentMethod: parsed.paymentMethod || DEFAULT_PAYMENT_METHOD,
+    };
+  } catch {
+    return {
+      couponId: sessionStorage.getItem(CART_COUPON_KEY) || null,
+      addressId: null,
+      paymentMethod: DEFAULT_PAYMENT_METHOD,
+    };
+  }
+};
+
+const persistCheckoutState = (partial: Partial<CartCheckoutState>) => {
+  if (typeof window === "undefined") return;
+
+  const current = getStoredCheckoutState();
+  const next = {
+    ...current,
+    ...partial,
+    paymentMethod: partial.paymentMethod || current.paymentMethod || DEFAULT_PAYMENT_METHOD,
+  };
+
+  sessionStorage.setItem(CART_CHECKOUT_STATE_KEY, JSON.stringify(next));
+
+  if (next.couponId) {
+    sessionStorage.setItem(CART_COUPON_KEY, next.couponId);
+  } else {
+    sessionStorage.removeItem(CART_COUPON_KEY);
+  }
+};
+
+const isHomeAddress = (address: any) =>
+  String(address?.type || "").trim().toLowerCase() === "home";
+
 export default function Page() {
   const { userData } = useAppContext();
   const router = useRouter();
+  const storedCheckoutState = useMemo(() => getStoredCheckoutState(), []);
 
   const [addressErr, setAddressErr] = useState<boolean>(false);
   const [payErr, setPayErr] = useState<boolean>(false);
-  const [addressId, setAddressId] = useState<any>(null);
+  const [addressId, setAddressIdState] = useState<any>(
+    storedCheckoutState.addressId
+  );
   const [bnlCash, setBnlCash] = useState<number>(0);
-  const [couponId, setCouponIdState] = useState<any>(() => {
-    if (typeof window === "undefined") return null;
-    return sessionStorage.getItem("bignlean_applied_coupon");
-  });
+  const [couponId, setCouponIdState] = useState<any>(
+    storedCheckoutState.couponId
+  );
   const [isPlacingOrder, setIsPlacingOrder] = useState<boolean>(false);
   const [cartParams, setCartParams] = useState({
     user: userData?.id,
@@ -47,6 +114,11 @@ export default function Page() {
   } = useGetCartList(userData?.id as number);
   const { data: cartPrice, refetch: refetchCartPrice } =
     useGetCartPrice(cartParams);
+  const { data: addressData } = useGetAllAddresses(userData?.id as number);
+  const savedAddresses = useMemo(
+    () => addressData?.data?.addresses || [],
+    [addressData?.data?.addresses]
+  );
   const {
     data: walletData,
     isLoading: isWalletLoading,
@@ -54,20 +126,30 @@ export default function Page() {
   } = useGetWalletTransactions(userData?.id);
   const walletBalance = getWalletBalance(walletData);
 
-  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState(
+    storedCheckoutState.paymentMethod || DEFAULT_PAYMENT_METHOD
+  );
+
+  const setSelectedAddressId = useCallback((nextAddressId: any) => {
+    const normalizedAddressId = Number(nextAddressId);
+    const value =
+      Number.isFinite(normalizedAddressId) && normalizedAddressId > 0
+        ? normalizedAddressId
+        : null;
+
+    setAddressIdState(value);
+    persistCheckoutState({ addressId: value });
+  }, []);
 
   const setCouponId = useCallback((coupon: string | null) => {
     setCouponIdState(coupon);
-    if (typeof window === "undefined") return;
-    if (coupon) {
-      sessionStorage.setItem("bignlean_applied_coupon", coupon);
-    } else {
-      sessionStorage.removeItem("bignlean_applied_coupon");
-    }
+    persistCheckoutState({ couponId: coupon || null });
   }, []);
 
   const handleOptionChange = (event: any) => {
-    setPaymentMethod(event.target.value);
+    const nextPaymentMethod = event.target.value || DEFAULT_PAYMENT_METHOD;
+    setPaymentMethod(nextPaymentMethod);
+    persistCheckoutState({ paymentMethod: nextPaymentMethod });
   };
 
   const {
@@ -78,7 +160,7 @@ export default function Page() {
   const { mutate: checkServiceability } = useGetShippingServiceability();
 
   const handleAddressSelect = (address: any) => {
-    setAddressId(address?.id);
+    setSelectedAddressId(address?.id);
     const total = effectiveCartPrice?.totalAmount || 0;
 
     const loadingToast = toast.loading("Checking delivery availability...");
@@ -115,6 +197,32 @@ export default function Page() {
       },
     });
   };
+
+  useEffect(() => {
+    const addressesLoaded = Array.isArray(addressData?.data?.addresses);
+
+    if (!savedAddresses.length) {
+      if (addressesLoaded && addressId) {
+        setSelectedAddressId(null);
+      }
+      return;
+    }
+
+    const selectedAddressExists = savedAddresses.some(
+      (address: any) => Number(address?.id) === Number(addressId)
+    );
+
+    if (addressId && selectedAddressExists) return;
+
+    const defaultAddress =
+      savedAddresses.find(isHomeAddress) ||
+      savedAddresses.find((address: any) => Boolean(address?.isDefault)) ||
+      savedAddresses[0];
+
+    if (defaultAddress?.id) {
+      setSelectedAddressId(defaultAddress.id);
+    }
+  }, [addressData?.data?.addresses, addressId, savedAddresses, setSelectedAddressId]);
 
   // Calculate cart price manually from cart items
   const calculateCartPrice = useCallback(() => {
@@ -420,6 +528,7 @@ export default function Page() {
               <ShippingCard
                 err={addressErr}
                 onAddressSelect={handleAddressSelect}
+                selectedAddressId={addressId}
               />
               <div
                 className="flex justify-between items-center 

@@ -1,13 +1,11 @@
 import { ApiPaths } from "@/constants";
 import { useMutation } from "@tanstack/react-query";
-import axios from "axios";
-
-const base_url = process.env.NEXT_PUBLIC_BASE_URL;
+import axiosInstance from "@/lib/axios";
 
 async function updateUser(params: any) {
-  return axios({
+  return axiosInstance({
     method: "PUT",
-    url: base_url + `/users/${params.id}`,
+    url: `/users/${params.id}`,
     data: { ...params },
   });
 }
@@ -19,12 +17,12 @@ export function useUpdateUser() {
 }
 
 export async function uploadPhoto(formData: any) {
-  return axios({
+  return axiosInstance({
     method: "POST",
     headers: {
       "Content-Type": "multipart/form-data",
     },
-    url: base_url + ApiPaths.UPLOAD,
+    url: ApiPaths.UPLOAD,
     data: formData,
   });
 }

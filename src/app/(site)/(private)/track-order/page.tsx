@@ -11,6 +11,60 @@ import { useTrackShipment, useGetTracking, TrackingData } from "@/queries/Shippi
 import { getFlavorLabel, getOptionLabel } from "@/utils/variantPricing";
 import { getFirstMediaUrl } from "@/utils/media";
 
+const isCancelledStatusText = (value?: string | number | null) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return false;
+
+  return (
+    normalized === "cn" ||
+    normalized === "cancel" ||
+    normalized === "canceled" ||
+    normalized === "cancelled" ||
+    normalized.includes("cancel")
+  );
+};
+
+const hasCancelledTrackingSignal = (trackingData?: TrackingData | null) => {
+  if (!trackingData) return false;
+
+  const data = trackingData as TrackingData & {
+    current_status?: string;
+    shipment_status?: string;
+    status_code?: string;
+    orderStatus?: string;
+    isCancelled?: boolean;
+  };
+
+  if (data.isCancelled) return true;
+
+  const directStatuses = [
+    data.status,
+    data.current_status,
+    data.shipment_status,
+    data.status_code,
+    data.orderStatus,
+  ];
+  if (directStatuses.some(isCancelledStatusText)) return true;
+
+  return (data.history || []).some((event: any) =>
+    [
+      event.status,
+      event.status_code,
+      event.current_status,
+      event.message,
+      event.description,
+    ].some(isCancelledStatusText)
+  );
+};
+
+const getEffectiveOrderStatus = (
+  order: TrackOrder,
+  trackingData?: TrackingData | null
+) =>
+  isCancelledStatusText(order?.status) || hasCancelledTrackingSignal(trackingData)
+    ? "Cancelled"
+    : order?.status;
+
 export default function Page() {
   const { userData } = useAppContext();
   const { data, isLoading } = useGetAllOrder(userData?.id as number);
@@ -56,6 +110,7 @@ export default function Page() {
 const OrderCard = ({ order, userId }: { order: TrackOrder; userId: any }) => {
   const { data: trackingResponse } = useGetTracking(order?.trackingID ? String(order.trackingID) : null);
   const trackingData = trackingResponse?.data?.status ? trackingResponse.data.data : null;
+  const effectiveStatus = getEffectiveOrderStatus(order, trackingData);
 
   return (
     <div className="sm-3 bg-white rounded-lg p-[30px] max-[550px]:p-3">
@@ -63,7 +118,7 @@ const OrderCard = ({ order, userId }: { order: TrackOrder; userId: any }) => {
         <ProccessingIcon />
         <div className="flex flex-col gap-1">
           <span className="text-blue-900 text-center text-base not-italic font-semibold">
-            {order?.status} - {order?.orderID}
+            {effectiveStatus} - {order?.orderID}
           </span>
           <span className="text-gray-500 text-center text-xs not-italic font-medium">
             On {new Date(order?.createdAt).toDateString()}
@@ -71,8 +126,8 @@ const OrderCard = ({ order, userId }: { order: TrackOrder; userId: any }) => {
         </div>
       </div>
       <div className="flex gap-8 max-[1000px]:gap-4 max-[860px]:flex-col max-[600px]:gap-5">
-        <ProductDetailCard order={order} userId={userId} />
-        <ProcessingCard order={order} trackingData={trackingData} />
+        <ProductDetailCard order={order} userId={userId} effectiveStatus={effectiveStatus} />
+        <ProcessingCard order={order} trackingData={trackingData} effectiveStatus={effectiveStatus} />
       </div>
     </div>
   );
@@ -92,9 +147,11 @@ const getOrderItemMeta = (product: TrackOrderProduct) => {
 const ProductDetailCard = ({
   order,
   userId,
+  effectiveStatus,
 }: {
   order: TrackOrder;
   userId: any;
+  effectiveStatus: string;
 }) => {
   const { mutate: cancelOrder } = useCancelOrder();
   const [isCancelling, setIsCancelling] = useState(false);
@@ -149,7 +206,7 @@ const ProductDetailCard = ({
             </div>
           </div>
         ))}
-        {order?.status !== "Cancelled" && (
+        {!isCancelledStatusText(effectiveStatus) && (
           <OutlinedButton
             onClick={handleCancelOrder}
             label={isCancelling ? "Cancelling..." : "Cancel"}
@@ -193,7 +250,15 @@ const ProductDetailCard = ({
   );
 };
 
-const ProcessingCard = ({ order, trackingData }: { order: TrackOrder; trackingData?: TrackingData }) => {
+const ProcessingCard = ({
+  order,
+  trackingData,
+  effectiveStatus,
+}: {
+  order: TrackOrder;
+  trackingData?: TrackingData;
+  effectiveStatus: string;
+}) => {
   const getStepDetails = (orderStatus: string, tData?: TrackingData) => {
     const baseSteps = [
       { title: "Order Placed", detail: "Waiting for admin confirmation" },
@@ -236,8 +301,8 @@ const ProcessingCard = ({ order, trackingData }: { order: TrackOrder; trackingDa
   };
 
   const isRTO = trackingData?.status?.toUpperCase().startsWith('RT');
-  const isCancelled = order?.status === 'Cancelled';
-  const { steps, completedSteps } = getStepDetails(order?.status, trackingData);
+  const isCancelled = isCancelledStatusText(effectiveStatus) || hasCancelledTrackingSignal(trackingData);
+  const { steps, completedSteps } = getStepDetails(effectiveStatus || order?.status, trackingData);
 
   return (
     <div className="flex-1 h-full max-[450px]:flex-col max-[450px]:items-start max-[450px]:justify-center max-[450px]:gap-5">

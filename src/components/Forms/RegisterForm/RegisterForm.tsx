@@ -5,7 +5,7 @@ import FormWrapper from "@/components/Wrappers/FormWrapper";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
-import { signInWithGoogle, signInWithFacebook } from "@/utils/firebaseConfig";
+import { signInWithGoogle } from "@/utils/firebaseConfig";
 import { useDispatchContext } from "@/provider/ContextProvider/ContextProvider"; // Add this import
 import { API_CONFIG } from "@/config/api";
 import { persistAuthSession } from "@/utils/authSession";
@@ -88,7 +88,7 @@ export default function RegisterForm() {
       setDisable(false);
     }
   };
-  const completeSocialSignIn = (data: any, provider: "google" | "facebook", firebaseUser: any) => {
+  const completeSocialSignIn = (data: any, provider: "google", firebaseUser: any) => {
     if (!data?.user || !data?.token) {
       toast.dismiss();
       toast.error("Authentication failed");
@@ -105,7 +105,7 @@ export default function RegisterForm() {
     dispatch({ type: "SET_USER_DATA", payload: userProfile });
 
     toast.dismiss();
-    toast.success(`${provider === "google" ? "Google" : "Facebook"} sign-in successful!`);
+    toast.success("Google sign-in successful!");
     window.location.href = "/";
   };
 
@@ -153,51 +153,6 @@ const handleGoogleSignIn = async () => {
     setDisable(false);
   }
 };
-const handleFacebookSignIn = async () => {
-  try {
-    setDisable(true);
-    setErrorMessage("");
-
-    const { success, idToken, user, errorMessage } = await signInWithFacebook();
-    
-    if (!success || !idToken) {
-      toast.dismiss();
-      toast.error(errorMessage || "Facebook sign-in failed");
-      setDisable(false);
-      return;
-    }
-
-    const response = await fetch(`${API_CONFIG.BASE_URL}/auth/social`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        idToken,
-        provider: "facebook",
-        name: user?.displayName || "",
-        email: user?.email || "",
-        image: user?.photoURL || ""
-      }),
-    });
-    
-    const data = await response.json();
-    
-    if (data.status) {
-      completeSocialSignIn(data, "facebook", user);
-    } else {
-      toast.dismiss();
-      toast.error(data.message || "Authentication failed");
-    }
-  } catch (error) {
-    console.error("Facebook sign-in error:", error);
-    toast.dismiss();
-    toast.error("Error during Facebook sign-in");
-  } finally {
-    setDisable(false);
-  }
-};
-
   return (
     <FormWrapper
       label="Register"
@@ -245,23 +200,7 @@ const handleFacebookSignIn = async () => {
         <hr className="w-1/4 border-gray-300" />
       </div>
       <div className="flex justify-center space-x-4">
-        {/* Facebook Icon */}
-       <button
-  onClick={handleFacebookSignIn}
-  disabled={disable}
-  className="w-[70px] h-[70px] md:w-[50px] md:h-[50px] sm:w-[40px] sm:h-[40px] bg-white rounded-full flex items-center justify-center hover:bg-gray-100 transition duration-200"
-  style={{ boxShadow: '5px 4px 15px 0px #3333330D' }}
->
-  <svg
-    className="w-6 h-6 md:w-5 md:h-5 sm:w-4 sm:h-4"
-    viewBox="0 0 24 24"
-    fill="#1877F2"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v4.8c4.56-.93 8-4.96 8-9.8z" />
-  </svg>
-</button>
-
+        {/* Facebook login is disabled for now. */}
         {/* Google Icon */}
      <button
   onClick={handleGoogleSignIn}

@@ -33,7 +33,7 @@ export default function AddAddressForm({ addressId }: { addressId?: string }) {
     addressLine3: "",
     city: "",
     state: "",
-    type: "",
+    type: "home",
   });
   const { data } = useGetAllAddresses(userData?.id as number);
 

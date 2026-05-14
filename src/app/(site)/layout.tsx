@@ -2,6 +2,7 @@
 import { Footer, NavBar, SecondaryNavbar } from "@/components";
 import MobileFooter from "@/components/Footer/MobileFooter";
 import BreadCrumbs from "@/components/breadcrumbs/BreadCrumbs";
+import ProfileCompletionDialog from "@/components/ProfileCompletionDialog";
 import { useDispatchContext } from "@/provider/ContextProvider/ContextProvider";
 import { ReactNode, useEffect, Suspense } from "react";
 import { ToastContainer } from "react-toastify";
@@ -43,6 +44,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <BreadCrumbs />
       </Suspense>
       <div className=" ">{children}</div>
+      <ProfileCompletionDialog />
       <Footer />
       <MobileFooter />
     </div>
