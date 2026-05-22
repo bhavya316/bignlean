@@ -12,7 +12,10 @@ import {
   WalletIcon,
 } from "@/Icons";
 import BrandLogo from "@/Icons/BrandLogo";
-import { useAppContext } from "@/provider/ContextProvider/ContextProvider";
+import {
+  useAppContext,
+  useDispatchContext,
+} from "@/provider/ContextProvider/ContextProvider";
 import { logout } from "@/queries/Auth";
 import { useGetAllCategories } from "@/queries/dataHandlers";
 import Link from "next/link";
@@ -139,41 +142,136 @@ const MobileSideBar = ({
   const router = useRouter();
   const [showCategories, setShowCategories] = useState<boolean>(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [categoryHierarchy, setCategoryHierarchy] = useState<any[]>([]);
   const [categorySubcategories, setCategorySubcategories] = useState<any>({});
+  const [subcategorySubcategories2, setSubcategorySubcategories2] = useState<any>({});
+  const dispatch = useDispatchContext();
   const { data: categoryData } = useGetAllCategories();
+  const categoriesForMobile = categoryHierarchy.length > 0 ? categoryHierarchy : categoryData?.categories || [];
   interface Category {
     id: number;
     name: string;
     image?: string;
+    subcategories?: Subcategory[];
+    subCategories?: Subcategory[];
   }
 
   interface Subcategory {
     id: number;
     name: string;
+    catId?: number;
     categoryId?: number;
+    subcategories2?: Subcategory2[];
+    subCategories2?: Subcategory2[];
   }
-  // Fetch subcategories when a category is expanded
+
+  interface Subcategory2 {
+    id: number;
+    name: string;
+    subCategoryId?: number;
+  }
+
   useEffect(() => {
-    if (expandedCategory && categoryData?.categories) {
-      const category = categoryData.categories.find((cat: Category) => cat.name === expandedCategory);
-      if (category && !categorySubcategories[category.id]) {
-        fetch(`${API_CONFIG.BASE_URL}/subcategories/${category.id}`)
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.status && data.subcategories) {
-              setCategorySubcategories((prev: any) => ({
-                ...prev,
-                [category.id]: data.subcategories,
-              }));
-            }
-          })
-          .catch((error) => console.error("Error fetching subcategories:", error));
-      }
-    }
-  }, [expandedCategory, categoryData]);
+    let cancelled = false;
+
+    fetch(`${API_CONFIG.BASE_URL}/categories/hierarchy`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled) return;
+        const categories = Array.isArray(data?.categories)
+          ? data.categories
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+
+        setCategoryHierarchy(categories);
+
+        const subcategoryMap: any = {};
+        const subcategory2Map: any = {};
+        categories.forEach((category: Category) => {
+          const subcategories = category.subcategories || category.subCategories || [];
+          subcategoryMap[category.id] = subcategories;
+          subcategories.forEach((subcategory: Subcategory) => {
+            subcategory2Map[subcategory.id] = subcategory.subcategories2 || subcategory.subCategories2 || [];
+          });
+        });
+        setCategorySubcategories((prev: any) => ({ ...prev, ...subcategoryMap }));
+        setSubcategorySubcategories2((prev: any) => ({ ...prev, ...subcategory2Map }));
+      })
+      .catch((error) => console.error("Error fetching category hierarchy:", error));
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const sourceCategories = categoryHierarchy.length > 0 ? categoryHierarchy : categoryData?.categories || [];
+    if (!expandedCategory || sourceCategories.length === 0) return;
+
+    const category = sourceCategories.find((cat: Category) => cat.name === expandedCategory);
+    if (!category || categorySubcategories[category.id]) return;
+
+    let cancelled = false;
+
+    fetch(`${API_CONFIG.BASE_URL}/subcategories/${category.id}`)
+      .then((response) => response.json())
+      .then(async (data) => {
+        if (cancelled || !data.status || !data.subcategories) return;
+
+        const subcategories = data.subcategories as Subcategory[];
+        setCategorySubcategories((prev: any) => ({
+          ...prev,
+          [category.id]: subcategories,
+        }));
+
+        const subcategory2Entries = await Promise.all(
+          subcategories.map(
+            (subcategory: Subcategory): Promise<[number, Subcategory2[]]> =>
+              fetch(`${API_CONFIG.BASE_URL}/subcategories2/${subcategory.id}`)
+                .then((response) => response.json())
+                .then((sub2Data): [number, Subcategory2[]] => [
+                  subcategory.id,
+                  sub2Data.status && sub2Data.subcategories2 ? sub2Data.subcategories2 : [],
+                ])
+                .catch((): [number, Subcategory2[]] => [subcategory.id, []])
+          )
+        );
+
+        if (cancelled) return;
+        setSubcategorySubcategories2((prev: any) => {
+          const next = { ...prev };
+          subcategory2Entries.forEach(([subcategoryId, subcategories2]) => {
+            next[subcategoryId as number] = subcategories2;
+          });
+          return next;
+        });
+      })
+      .catch((error) => console.error("Error fetching subcategories:", error));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [expandedCategory, categoryHierarchy, categoryData]);
 
   const toggleCategory = (categoryName: string) => {
     setExpandedCategory(expandedCategory === categoryName ? null : categoryName);
+  };
+
+  const clearSelectedBrand = () => {
+    dispatch({ type: "SET_SELECTED_BRANDS", payload: null });
+  };
+
+  const goToCategory = (category: Category) => {
+    clearSelectedBrand();
+    sessionStorage.setItem('selectedCategoryId', category.id.toString());
+    sessionStorage.setItem('selectedCategoryName', category.name);
+    sessionStorage.removeItem('selectedSubcategoryId');
+    sessionStorage.removeItem('selectedSubcategoryName');
+    sessionStorage.removeItem('selectedSubcategory2Id');
+    sessionStorage.removeItem('selectedSubcategory2Name');
+    setToggle(false);
+    router.push(`/shop-by-brands?category=${category.id}`);
   };
 
   return (
@@ -233,37 +331,84 @@ const MobileSideBar = ({
               <BackArrowIcon />
             </button>
             <p className="text-[16px] font-semibold text-gray-800">Category</p>
+            <button
+              type="button"
+              onClick={() => {
+                setToggle(false);
+                router.push("/categories");
+              }}
+              className="ml-auto text-[13px] font-semibold text-[#FF0012]"
+            >
+              All
+            </button>
           </div>
 
           {/* Categories List - Scrollable */}
           <div className="flex flex-col overflow-y-auto h-[calc(100%-60px)]">
-            {categoryData?.categories?.map((category: Category) => (
+            {categoriesForMobile.map((category: Category) => (
               <div key={category.id} className="border-b">
-                <div
-                  className="flex items-center justify-between p-4 cursor-pointer"
-                  onClick={() => toggleCategory(category.name)}
-                >
-                  <p className="text-[16px] font-normal text-gray-800">
+                <div className="flex items-center justify-between p-4">
+                  <button
+                    type="button"
+                    onClick={() => goToCategory(category)}
+                    className="text-left text-[16px] font-normal text-gray-800"
+                  >
                     {category.name}
-                  </p>
-                  <ToggleIcon isOpen={expandedCategory === category.name} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleCategory(category.name)}
+                    className="p-1"
+                    aria-label={`${expandedCategory === category.name ? "Collapse" : "Expand"} ${category.name}`}
+                  >
+                    <ToggleIcon isOpen={expandedCategory === category.name} />
+                  </button>
                 </div>
                 {expandedCategory === category.name && (
                   <div className="pl-8 pb-4 max-h-[200px] overflow-y-auto">
                     {categorySubcategories[category.id] ? (
                       categorySubcategories[category.id].map((subcategory: Subcategory) => (
-                        <Link
-                          href={`/shop-by-brands?category=${category.id}`}
-                          key={subcategory.id}
-                          onClick={() => {
-                            sessionStorage.setItem('selectedCategoryId', category.id.toString());
-                            sessionStorage.setItem('selectedCategoryName', category.name);
-                            setToggle(false);
-                          }}
-                          className="block py-2 px-2 text-[14px] text-gray-700 hover:text-[#FF0012] hover:bg-gray-50"
-                        >
-                          {subcategory.name}
-                        </Link>
+                        <div key={subcategory.id} className="py-1">
+                          <Link
+                            href={`/shop-by-brands?category=${category.id}&subcategory=${subcategory.id}`}
+                            onClick={() => {
+                              clearSelectedBrand();
+                              sessionStorage.setItem('selectedCategoryId', category.id.toString());
+                              sessionStorage.setItem('selectedCategoryName', category.name);
+                              sessionStorage.setItem('selectedSubcategoryId', subcategory.id.toString());
+                              sessionStorage.setItem('selectedSubcategoryName', subcategory.name);
+                              sessionStorage.removeItem('selectedSubcategory2Id');
+                              sessionStorage.removeItem('selectedSubcategory2Name');
+                              setToggle(false);
+                            }}
+                            className="block py-1 px-2 text-[14px] font-semibold text-gray-800 hover:text-[#FF0012] hover:bg-gray-50"
+                          >
+                            {subcategory.name}
+                          </Link>
+                          {subcategorySubcategories2[subcategory.id]?.length > 0 && (
+                            <div className="ml-3 flex flex-col">
+                              {subcategorySubcategories2[subcategory.id].map((subcategory2: Subcategory2) => (
+                                <Link
+                                  href={`/shop-by-brands?category=${category.id}&subcategory=${subcategory.id}&subcategory2=${subcategory2.id}`}
+                                  key={subcategory2.id}
+                                  onClick={() => {
+                                    clearSelectedBrand();
+                                    sessionStorage.setItem('selectedCategoryId', category.id.toString());
+                                    sessionStorage.setItem('selectedCategoryName', category.name);
+                                    sessionStorage.setItem('selectedSubcategoryId', subcategory.id.toString());
+                                    sessionStorage.setItem('selectedSubcategoryName', subcategory.name);
+                                    sessionStorage.setItem('selectedSubcategory2Id', subcategory2.id.toString());
+                                    sessionStorage.setItem('selectedSubcategory2Name', subcategory2.name);
+                                    setToggle(false);
+                                  }}
+                                  className="block py-1 px-2 text-[13px] text-gray-600 hover:text-[#FF0012] hover:bg-gray-50"
+                                >
+                                  {subcategory2.name}
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ))
                     ) : (
                       <p className="text-[14px] text-gray-400 py-1">Loading subcategories...</p>
@@ -272,7 +417,7 @@ const MobileSideBar = ({
                 )}
               </div>
             ))}
-            {!categoryData?.categories && (
+            {categoriesForMobile.length === 0 && (
               <div className="p-4">
                 <p className="text-[14px] text-gray-400">Loading categories...</p>
               </div>

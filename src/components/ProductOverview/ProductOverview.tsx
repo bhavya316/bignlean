@@ -2,27 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { OutlinedButton } from "..";
-
-const VegIcon = (  ) => (
-  <svg
-       width={15} height={15} fill="#00A000"
-        viewBox="0 0 24 24"
-        xmlns="http://www.w3.org/2000/svg"
-    >
-        <title>Vegetarian Food Icon</title>
-        <path d="M12 2C9.243 2 7 4.243 7 7c0 3.333 3 7 5 9 2-2 5-5.667 5-9 0-2.757-2.243-5-5-5zm0 11.5c-1.127 0-2-.873-2-2h4c0 1.127-.873 2-2 2zm0-11.5C7.373 2 3 6.373 3 11.5S7.373 21 12 21s9-4.373 9-9.5S16.627 2 12 2z" />
-    </svg>
-);
-// const NonVegIcon = (  ) => (
-//   <svg
-//        width={15} height={15} fill="#FF0000"
-//         viewBox="0 0 24 24"
-//         xmlns="http://www.w3.org/2000/svg"
-//     >
-//         <title>Vegetarian Food Icon</title>
-//         <path d="M12 2C9.243 2 7 4.243 7 7c0 3.333 3 7 5 9 2-2 5-5.667 5-9 0-2.757-2.243-5-5-5zm0 11.5c-1.127 0-2-.873-2-2h4c0 1.127-.873 2-2 2zm0-11.5C7.373 2 3 6.373 3 11.5S7.373 21 12 21s9-4.373 9-9.5S16.627 2 12 2z" />
-//     </svg>
-// );
+import { getMediaUrl } from "@/utils/media";
 
 const ImageViewer = ({ images }: any) => {
   const [selectedImage, setSelectedImage] = useState(images?.[0]);
@@ -34,7 +14,7 @@ const ImageViewer = ({ images }: any) => {
         {images?.map((image: string, index: number) => (
           <img
             key={index}
-            src={image}
+            src={getMediaUrl(image)}
             alt={`Thumbnail ${index}`}
             onClick={() => setSelectedImage(image)}
             className={`cursor-pointer w-20 h-20 max-sm:mb-1 aspect-square rounded-xl object-contain ${
@@ -44,17 +24,8 @@ const ImageViewer = ({ images }: any) => {
         ))}
       </div>
       <div className="w-[80%] max-lg:w-full max-lg:shadow-none max-h-[475px] max-lg:max-h-[350px] shadow-md border rounded-xl overflow-hidden pointer-events-none relative ">
-           <div className="pointer-events-none absolute top-4 right-4 z-10 flex gap-2">
-           <div className="border-1.5  h-fit border-[#00A000] ">
-           <VegIcon />
-           {/* <NonVegIcon /> */}
-          </div>
-          {/* <div className="border-1.5  h-fit border-[#FF0000] ">
-           <NonVegIcon />
-          </div> */}
-         </div>
         <img
-          src={selectedImage}
+          src={getMediaUrl(selectedImage)}
           alt="Selected"
           className="w-full h-full object-contain "
         />
@@ -97,26 +68,6 @@ export const ProductBenefits = ({
           <h2 className="text-black text-sm not-italic font-bold mb-3">
             Product Benefits
           </h2>
-          <div className="flex gap-2 items-center text-black text-sm not-italic font-normal">
-            <div>
-              <svg
-                width="13"
-                height="10"
-                viewBox="0 0 13 10"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M1 5L4.5 8.5L11.5 1"
-                  stroke="black"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            Helps in Muscle Building
-          </div>
         </div>
         <div
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}

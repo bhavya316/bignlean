@@ -55,13 +55,9 @@ export default function Home() {
         />
 
       <div className="max-xl:w-[95%] mx-auto">
-        <div className="max-[800px]:hidden">
-          <ShopByBrands brandsData={brandsData?.brands} isLoading={brandsLoading} />
-        </div>
+        <ShopByBrands brandsData={brandsData?.brands} isLoading={brandsLoading} />
 
-        <div className="max-[800px]:hidden">
-          <ShopByCategory categoriesData={categoriesData?.categories} isLoading={categoriesLoading} />
-        </div>
+        <ShopByCategory categoriesData={categoriesData?.categories} isLoading={categoriesLoading} />
 
         <Banner1SectionWrapper
           isLoading={bannersLoading}
@@ -261,7 +257,7 @@ function ComboCategoriesSkeleton() {
 function HomeCarosoulSkeleton() {
   return (
     <div className="w-full mx-auto py-4">
-      <div className="w-full h-[300px] bg-gray-200 rounded-3xl animate-pulse mx-auto"></div>
+      <div className="w-full h-[170px] sm:h-[240px] md:h-[300px] bg-gray-200 rounded-3xl animate-pulse mx-auto"></div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import "swiper/css";
 import "swiper/css/pagination";
 import { Autoplay, Pagination, A11y } from "swiper/modules";
 import Link from "next/link";
+import { getMediaUrl } from "@/utils/media";
 
 interface Banner {
   id: number;
@@ -65,7 +66,7 @@ export default function BannerSection({
             >
               <Link href={getBannerLink(banner)} className="block h-full w-full">
                 <img
-                  src={banner?.web}
+                  src={getMediaUrl(banner?.web)}
                   alt={`banner-${index}`}
                   className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] object-cover object-center block mx-auto rounded-lg shadow-lg"
                 />
@@ -86,7 +87,7 @@ export default function BannerSection({
       <div className="flex justify-center">
         <Link href={getBannerLink(banners[0])} className="block w-full max-w-[972px]">
           <img
-            src={banners[0]?.web}
+            src={getMediaUrl(banners[0]?.web)}
             alt="banner"
             className="h-[386px] w-full rounded-[10px] object-cover"
           />

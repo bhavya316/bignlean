@@ -8,10 +8,12 @@ export default function ProductDelivery({
   price,
   countryOfOrigin,
   countryCode,
+  brandImportInfo,
 }: {
   price: number;
   countryOfOrigin?: string;
   countryCode?: string;
+  brandImportInfo?: { heading?: string; body?: string } | null;
 }) {
   return (
     <div className="w-[85%] max-lg:w-full max-[450px]:w-full">
@@ -21,6 +23,7 @@ export default function ProductDelivery({
       <PinCodeCard price={price} />
       {/* <BigLeanCashCard /> */}
       <OriginCard country={countryOfOrigin || "India"} countryCode={countryCode} />
+      <BrandAuthorizedImportCard brandImportInfo={brandImportInfo} />
       {/* <MembershipCard /> */}
     </div>
   );
@@ -114,7 +117,7 @@ const OriginCard = ({
     : `https://flagcdn.com/w80/${code}.png`;
 
   return (
-    <div className="flex items-center justify-around sm-3 rounded-lg p-4 mt-5">
+    <div className="flex items-center justify-around gap-3 sm-3 rounded-lg p-4 mt-5">
       <div className="flex flex-col gap-2 items-center">
         <img src="/assets/product/fssai.png" alt="fssai" className="w-[48px]" />
         {/* <p className="text-black text-xs not-italic font-normal">
@@ -135,6 +138,36 @@ const OriginCard = ({
           Origin: {country}
         </p>
       </div>
+      <div className="w-[1px] h-[60px] bg-gray-200"></div>
+      <div className="flex flex-col gap-2 items-center text-center max-w-[92px]">
+        <p className="text-black text-xs not-italic font-semibold leading-5">
+          Brand Authorized Import
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const BrandAuthorizedImportCard = ({
+  brandImportInfo,
+}: {
+  brandImportInfo?: { heading?: string; body?: string } | null;
+}) => {
+  const heading = brandImportInfo?.heading || "";
+  const body = brandImportInfo?.body || "";
+
+  if (!heading && !body) return null;
+
+  return (
+    <div className="rounded-lg bg-white p-4 mt-5 border border-gray-100 shadow-sm">
+      <p className="text-black text-sm not-italic font-bold">
+        {heading || "Brand Authorized Import"}
+      </p>
+      {body && (
+        <p className="mt-2 text-gray-600 text-sm not-italic font-normal leading-6">
+          {body}
+        </p>
+      )}
     </div>
   );
 };

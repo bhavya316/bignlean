@@ -1,5 +1,5 @@
 "use client";
-import { Swiper, SwiperSlide, useSwiper } from "swiper/react";
+import { Swiper, SwiperSlide } from "swiper/react";
 import Link from "next/link";
 
 // Import Swiper styles
@@ -7,9 +7,8 @@ import "swiper/css";
 import "swiper/css/pagination";
 
 import { Autoplay, Pagination, A11y } from "swiper/modules";
-import NextButton from "../SliderButtons/NextButton";
-import PrevButton from "../SliderButtons/PrevButton";
 import { Banners } from "@/utils/Schemas";
+import ResponsiveBannerImage, { getBannerHref } from "./ResponsiveBannerImage";
 
 export default function HomeCarosoul({
   className,
@@ -18,7 +17,6 @@ export default function HomeCarosoul({
   className?: string;
   bannersData: Banners[];
 }) {
-  const swiper = useSwiper();
   return (
     <div
       className={
@@ -44,20 +42,18 @@ export default function HomeCarosoul({
         {bannersData &&
           bannersData?.length > 0 &&
           bannersData.map((banner, index) => {
-            const bannerLink = (banner?.link && Array.isArray(banner.link) && banner.link.length > 0) 
-              ? banner.link[0] 
-              : ((typeof banner?.link === 'string') ? banner.link : "#");
+            const bannerLink = getBannerHref(banner?.link);
               
             return (
               <SwiperSlide
                 key={index}
-                className="flex items-center justify-center overflow-hidden cursor-pointer img-change h-[200px] sm:h-[250px] md:h-[300px]"
+                className="flex items-center justify-center overflow-hidden cursor-pointer img-change"
               >
-                <Link href={bannerLink} className="w-full h-full block">
-                  <img
-                    src={banner?.web}
-                    alt="carosoul"
-                    className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] object-cover object-center block mx-auto rounded-lg shadow-lg"
+                <Link href={bannerLink} className="w-full block">
+                  <ResponsiveBannerImage
+                    banner={banner}
+                    alt="carousel banner"
+                    className="w-full max-w-[1000px] aspect-[16/9] max-h-[320px] min-h-[140px] object-contain object-center block mx-auto rounded-lg bg-white shadow-lg"
                   />
                 </Link>
               </SwiperSlide>

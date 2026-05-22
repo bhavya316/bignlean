@@ -29,14 +29,14 @@ export default function OffersPage() {
             >
               <div className="aspect-[16/9] overflow-hidden bg-white p-4">
                 <img
-                  src={getMediaUrl(offer.image, "/assets/product.png")}
+                  src={getMediaUrl(offer.banner || offer.image || offer.logo, "/assets/product.png")}
                   alt={offer.name}
                   className="h-full w-full object-contain object-center transition duration-300 group-hover:scale-[1.03]"
                 />
               </div>
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-lg font-semibold text-black">
+                  <p className="text-lg font-bold text-black">
                     {offer.name}
                   </p>
                   <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-[#E70F0F]">

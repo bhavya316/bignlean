@@ -28,7 +28,7 @@ import { useAddToWishList, useRemoveFormWishList } from "@/queries/Product";
 import { ProductDataType } from "@/utils/Types";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import PrimaryButton from "../Buttons/PrimaryButton";
 import {
@@ -38,6 +38,7 @@ import {
   getVariantSellingPrice,
   resolveVariantSelection,
 } from "@/utils/variantPricing";
+import { getFirstMediaUrl } from "@/utils/media";
 
 type Props = {
   productData?: ProductDataType | ProductDetailType;
@@ -178,11 +179,11 @@ export function SimilarProductCard({
       >
         <div className="flex items-center justify-center">
           <NextImage
-            src={product?.images[0] || "/placeholder-product.png"}
+            src={getFirstMediaUrl(product?.images)}
             alt={product?.name || "Product"}
             width={200}
             height={140}
-            className="object-cover object-top w-auto h-[140px] cursor-pointer"
+            className="object-contain object-center w-auto h-[140px] cursor-pointer"
             onClick={() => router.push(link)}
             unoptimized={true}
           />
@@ -191,19 +192,10 @@ export function SimilarProductCard({
           <div className="flex justify-between mt-2 ">
             <p
               onClick={() => router.push(link)}
-              className="text-black line-clamp-2  not-italic font-medium  cursor-pointer"
+              className="text-black line-clamp-2  not-italic font-bold  cursor-pointer"
             >
               {product?.name}
             </p>
-            <div>
-              <div className="border-1.5  h-fit border-[#00A000] ">
-                <VegIcon />
-                {/* <NonVegIcon /> */}
-              </div>
-              {/* <div className="border-1.5  h-fit border-[#FF0000] ">
-           <NonVegIcon />
-          </div> */}
-            </div>
           </div>
           {!isComboProduct && (
             <p className="text-gray-600 text-xs">
@@ -268,29 +260,6 @@ export function SimilarProductCard({
   }
   return <></>;
 }
-
-const VegIcon = () => (
-  <svg
-    width={15} height={15} fill="#00A000"
-    viewBox="0 0 24 24"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <title>Vegetarian Food Icon</title>
-    <path d="M12 2C9.243 2 7 4.243 7 7c0 3.333 3 7 5 9 2-2 5-5.667 5-9 0-2.757-2.243-5-5-5zm0 11.5c-1.127 0-2-.873-2-2h4c0 1.127-.873 2-2 2zm0-11.5C7.373 2 3 6.373 3 11.5S7.373 21 12 21s9-4.373 9-9.5S16.627 2 12 2z" />
-  </svg>
-);
-// const NonVegIcon = (  ) => (
-//   <svg
-//        width={15} height={15} fill="#FF0000"
-//         viewBox="0 0 24 24"
-//         xmlns="http://www.w3.org/2000/svg"
-//     >
-//         <title>Vegetarian Food Icon</title>
-//         <path d="M12 2C9.243 2 7 4.243 7 7c0 3.333 3 7 5 9 2-2 5-5.667 5-9 0-2.757-2.243-5-5-5zm0 11.5c-1.127 0-2-.873-2-2h4c0 1.127-.873 2-2 2zm0-11.5C7.373 2 3 6.373 3 11.5S7.373 21 12 21s9-4.373 9-9.5S16.627 2 12 2z" />
-//     </svg>
-// );
-
-import { useRef } from "react";
 
 export default function ProductFooter({
   product,

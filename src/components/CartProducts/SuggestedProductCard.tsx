@@ -13,6 +13,7 @@ import {
   getVariantSellingPrice,
   resolveVariantSelection,
 } from "@/utils/variantPricing";
+import { getFirstMediaUrl } from "@/utils/media";
 
 export default function SuggestedProductCard({
   product,
@@ -34,12 +35,12 @@ export default function SuggestedProductCard({
   return (
     <div className={`flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:shadow-md transition-shadow ${className}`}>
       <img
-        src={product?.images?.[0] || "/placeholder-product.png"}
+        src={getFirstMediaUrl(product?.images)}
         alt={product?.name || "product"}
         className="w-[100px] h-[100px] object-contain bg-gray-50 rounded-md flex-shrink-0"
       />
       <div className="flex-1 min-w-0">
-        <p className="text-black line-clamp-2 text-sm not-italic font-semibold mb-1 overflow-hidden">
+        <p className="text-black line-clamp-2 text-sm not-italic font-bold mb-1 overflow-hidden">
           {product?.name || product?.brand?.heading || product?.brand?.body || 'Product'}
         </p>
         <p className="text-gray-600 text-xs not-italic font-normal mb-2">

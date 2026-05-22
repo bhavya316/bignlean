@@ -1,25 +1,14 @@
 import CustomPageWrapper from "@/components/Wrappers/CustomPageWrapper";
 import { ApiPaths } from "@/constants";
-import { Blog } from "@/utils/Schemas";
+import { getFirstMediaUrl } from "@/utils/media";
 
 const baseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   process.env.BASE_URL ||
   "http://localhost:3002";
 
-async function getAllBlogs() {
-  try {
-    const res = await fetch(baseUrl + ApiPaths.BLOGS, {
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data?.blogs || [];
-  } catch (error) {
-    console.error("Error fetching blogs:", error);
-    return [];
-  }
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 async function getBlogById(id: string) {
   try {
@@ -82,15 +71,6 @@ function renderBlogBody(bodyText = "") {
     });
 }
 
-// Add this function to generate all possible blog paths at build time
-export async function generateStaticParams() {
-  const blogs = await getAllBlogs();
-
-  return blogs.map((blog: Blog) => ({
-    id: blog.id.toString()
-  }));
-}
-
 export default async function Page({ params }: { params: { id: string } }) {
   const id = params?.id;
   const blog = await getBlogById(id);
@@ -103,11 +83,22 @@ export default async function Page({ params }: { params: { id: string } }) {
     );
   }
 
+  const blogImages = Array.isArray(blog?.images)
+    ? blog.images
+    : typeof blog?.images === "string"
+      ? [blog.images]
+      : [];
+  const blogImage = getFirstMediaUrl(blogImages, "/assets/blogs/Blog_Not_Found.png");
+  const createdAt = blog?.createdAt ? new Date(blog.createdAt) : null;
+  const dateLabel = createdAt && !Number.isNaN(createdAt.getTime())
+    ? `${createdAt.getDate()}-${createdAt.getMonth() + 1}-${createdAt.getFullYear()}`
+    : "";
+
   return (
     <CustomPageWrapper heading="Blogs">
       <div className="w-[90%] max-[900px]:w-full mx-auto relative rounded-[20px] overflow-hidden mb-[40px]">
         <img
-          src={blog?.images[0]}
+          src={blogImage}
           alt="blog image"
           className="w-full object-cover bg-center max-h-[500px] object-center max-[550px]:h-[300px]"
         />
@@ -118,12 +109,7 @@ export default async function Page({ params }: { params: { id: string } }) {
               {blog?.category}
             </p>
             <p className=" text-base not-italic font-semibold">
-              {blog &&
-                new Date(blog?.createdAt).getDate() +
-                "-" +
-                new Date(blog?.createdAt).getMonth() +
-                "-" +
-                new Date(blog?.createdAt).getFullYear()}
+              {dateLabel}
             </p>
             <p className=" text-base not-italic font-normal">
               {blog?.duration} mins read
@@ -135,7 +121,7 @@ export default async function Page({ params }: { params: { id: string } }) {
         </div>
       </div>
       <div className="text-gray-700 w-[95%] max-lg:w-full mx-auto text-lg not-italic font-normal mb-6">
-        {renderBlogBody(blog?.bodyText)}
+        {renderBlogBody(blog?.bodyText || blog?.body || "")}
       </div>
     </CustomPageWrapper>
   );

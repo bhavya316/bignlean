@@ -63,6 +63,7 @@ export default function ProductDetail({
         price={deliveryPrice}
         countryOfOrigin={product?.countryOfOrigin || product?.brandOriginCountry || undefined}
         countryCode={product?.brandOriginCountryCode || undefined}
+        brandImportInfo={product?.brand}
       />
       <div className="lg:hidden w-full">
         <ProductBenefits id={product?.id} information={product?.information} />

@@ -26,6 +26,8 @@ export default function ShopByBrandPage() {
   const brandParamKey = brandParams.length > 0 ? brandParams.join("&") : brandIdParam || "";
   const { filterProductsParams, selectedBrands } = useAppContext();
   const dispatch = useDispatchContext();
+  const isCategoryRoute = Boolean(category || subcategory || subcategory2);
+  const activeSelectedBrands = isCategoryRoute ? null : selectedBrands;
   const [sorting, setSorting] = useState<string | null>(null);
   const { data: bannersData } = useGetAllBanners();
 
@@ -67,8 +69,13 @@ export default function ShopByBrandPage() {
         type: "SET_SELECTED_BRANDS",
         payload: brandIds.map((brandId) => `brands[]=${brandId}`).join("&"),
       });
+    } else if (category || subcategory || subcategory2) {
+      dispatch({
+        type: "SET_SELECTED_BRANDS",
+        payload: null,
+      });
     }
-  }, [brandParamKey, dispatch]);
+  }, [brandParamKey, category, subcategory, subcategory2, dispatch]);
 
   // Fetch categories on component mount
   useEffect(() => {
@@ -157,7 +164,7 @@ export default function ShopByBrandPage() {
         .catch(error => console.error("Error fetching subcategory details:", error));
     }
     // If no subcategory in URL, try sessionStorage
-    else if (typeof window !== 'undefined') {
+    else if (typeof window !== 'undefined' && !category) {
       const storedSubcategoryId = sessionStorage.getItem('selectedSubcategoryId');
       const storedSubcategoryName = sessionStorage.getItem('selectedSubcategoryName');
 
@@ -187,9 +194,18 @@ export default function ShopByBrandPage() {
           setSelectedSubcategory2Name(storedSubcategory2Name);
         }
       }
+
+      fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORY2}/${subcategory2Id}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.status && data.subcategory2) {
+            setSelectedSubcategory2Name(data.subcategory2.name);
+          }
+        })
+        .catch(error => console.error("Error fetching subcategory2 details:", error));
     }
     // If no subcategory2 in URL, try sessionStorage
-    else if (typeof window !== 'undefined') {
+    else if (typeof window !== 'undefined' && !category && !subcategory) {
       const storedSubcategory2Id = sessionStorage.getItem('selectedSubcategory2Id');
       const storedSubcategory2Name = sessionStorage.getItem('selectedSubcategory2Name');
 
@@ -279,7 +295,7 @@ export default function ShopByBrandPage() {
   // Fetch all products when no category is selected
   const { data: allProducts, refetch } = useGetAllProducts(
     { ...filterProductsParams, sorting: sorting?.trimStart(), category },
-    selectedBrands as string
+    activeSelectedBrands as string
   );
 
   // Determine which products to display based on category selection
@@ -322,7 +338,7 @@ export default function ShopByBrandPage() {
       return selectedSubcategoryName;
     } else if (selectedCategoryName) {
       return selectedCategoryName;
-    } else if (selectedBrands) {
+    } else if (activeSelectedBrands) {
       return allProducts?.brandDetails?.name;
     } else {
       return "All Products";
@@ -340,17 +356,25 @@ export default function ShopByBrandPage() {
           />
         </div>
         <div className="col-span-3 col-start-2 max-xl:col-span-4 max-xl:col-start-1 flex flex-col items-center gap-4 px-5">
-          <div className="max-[1000px]:hidden">
+          <div className="w-full">
             <HomeCarosoul
               bannersData={
-                selectedBrands && !selectedBrands?.includes("&")
-                  ? [{ id: 1, web: allProducts?.brandDetails?.banner }]
+                activeSelectedBrands && !activeSelectedBrands?.includes("&")
+                  ? [{
+                      id: 1,
+                      web: allProducts?.brandDetails?.banner || allProducts?.brandDetails?.image,
+                      tab: allProducts?.brandDetails?.banner || allProducts?.brandDetails?.image,
+                      phone: allProducts?.brandDetails?.banner || allProducts?.brandDetails?.image,
+                      link: "#",
+                      createdAt: "",
+                      updatedAt: "",
+                    }]
                   : bannersData?.banner || []
               }
-              className="!w-[1000px]"
+              className="!w-full max-w-[1000px]"
             />
           </div>
-          {selectedBrands && !selectedBrands?.includes("&") && (
+          {activeSelectedBrands && !activeSelectedBrands?.includes("&") && (
             <div className="w-full ">
               <p className="text-black text-start text-[28px] max-sm:text-lg not-italic font-semibold">
                 {allProducts?.brandDetails?.name}

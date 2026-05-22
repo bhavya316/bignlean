@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, Fragment } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useDispatchContext } from "@/provider/ContextProvider/ContextProvider";
 import {
   Offer,
@@ -18,12 +18,17 @@ interface Category {
   id: number;
   name: string;
   image?: string;
+  subcategories?: Subcategory[];
+  subCategories?: Subcategory[];
 }
 
 interface Subcategory {
   id: number;
   name: string;
+  catId?: number;
   categoryId?: number;
+  subcategories2?: Subcategory2[];
+  subCategories2?: Subcategory2[];
 }
 
 interface Subcategory2 {
@@ -45,65 +50,141 @@ export default function SecondaryNavbar() {
   const { data: categoryData } = useGetAllCategories();
   const [show, setShow] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
+  const [categoryHierarchy, setCategoryHierarchy] = useState<Category[]>([]);
   const [categorySubcategories, setCategorySubcategories] = useState<CategorySubcategoriesMap>({});
   const [subcategorySubcategories2, setSubcategorySubcategories2] = useState<SubcategorySubcategories2Map>({});
   const [showOffers, setShowOffers] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<number | null>(null);
-  const [hoveredSubcategory, setHoveredSubcategory] = useState<number | null>(null);
   const router = useRouter();
   const dispatch = useDispatchContext();
   const pathname = usePathname();
   const { data: offersData } = useGetAllOffers();
+  const categoriesForNavbar = useMemo(
+    () => [...(categoryHierarchy.length > 0 ? categoryHierarchy : categoryData?.categories || [])].sort((a: Category, b: Category) => a.id - b.id),
+    [categoryHierarchy, categoryData]
+  );
 
-  // Fetch subcategories for all categories when categoryData is available
   useEffect(() => {
-    if (categoryData?.categories?.length > 0) {
-      categoryData.categories.forEach((category: Category) => {
-        if (!categorySubcategories[category.id]) {
-          fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORIES}/${category.id}`)
-            .then((response) => response.json())
-            .then((data) => {
-              if (data.status && data.subcategories) {
-                setCategorySubcategories((prev) => ({
-                  ...prev,
-                  [category.id]: data.subcategories,
-                }));
-              }
-            })
-            .catch((error) => console.error("Error fetching subcategories:", error));
+    let cancelled = false;
+
+    fetch(`${API_CONFIG.BASE_URL}${ApiPaths.CATEGORY_HIERARCHY}`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled) return;
+
+        const categories = Array.isArray(data?.categories)
+          ? data.categories
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+
+        setCategoryHierarchy(categories);
+
+        const subcategoryMap: CategorySubcategoriesMap = {};
+        const subcategory2Map: SubcategorySubcategories2Map = {};
+        categories.forEach((category: Category) => {
+          const subcategories = category.subcategories || category.subCategories || [];
+          subcategoryMap[category.id] = subcategories;
+          subcategories.forEach((subcategory: Subcategory) => {
+            const subcategories2 = subcategory.subcategories2 || subcategory.subCategories2 || [];
+            subcategory2Map[subcategory.id] = subcategories2;
+          });
+        });
+
+        setCategorySubcategories(subcategoryMap);
+        setSubcategorySubcategories2(subcategory2Map);
+        if (categories.length > 0) {
+          setHoveredCategory((current) => current ?? [...categories].sort((a: Category, b: Category) => a.id - b.id)[0].id);
         }
-      });
-    }
-  }, [categoryData, categorySubcategories]);
+      })
+      .catch((error) => console.error("Error fetching category hierarchy:", error));
 
-  // Fetch subcategories2 for all subcategories when a category is hovered
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
-    if (hoveredCategory && categorySubcategories[hoveredCategory]) {
-      categorySubcategories[hoveredCategory].forEach((subcategory) => {
-        if (!subcategorySubcategories2[subcategory.id]) {
+    if (categoriesForNavbar.length > 0 && hoveredCategory === null) {
+      setHoveredCategory(categoriesForNavbar[0].id);
+    }
+  }, [categoriesForNavbar, hoveredCategory]);
+
+  useEffect(() => {
+    if (!hoveredCategory) return;
+
+    let cancelled = false;
+    const existingSubcategories = categorySubcategories[hoveredCategory];
+
+    async function loadSubcategory2(subcategories: Subcategory[]) {
+      const missingSubcategories = subcategories.filter(
+        (subcategory) => subcategorySubcategories2[subcategory.id] === undefined
+      );
+      if (missingSubcategories.length === 0) return;
+
+      const subcategory2Entries = await Promise.all(
+        missingSubcategories.map((subcategory) =>
           fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORIES2}/${subcategory.id}`)
             .then((response) => response.json())
-            .then((data) => {
-              if (data.status && data.subcategories2) {
-                setSubcategorySubcategories2((prev) => ({
-                  ...prev,
-                  [subcategory.id]: data.subcategories2,
-                }));
-              }
-            })
-            .catch((error) => console.error("Error fetching subcategories2:", error));
-        }
+            .then((data): [number, Subcategory2[]] => [
+              subcategory.id,
+              Array.isArray(data?.subcategories2) ? data.subcategories2 : [],
+            ])
+            .catch((): [number, Subcategory2[]] => [subcategory.id, []])
+        )
+      );
+
+      if (cancelled) return;
+      setSubcategorySubcategories2((prev) => {
+        const next = { ...prev };
+        subcategory2Entries.forEach(([subcategoryId, subcategories2]) => {
+          next[subcategoryId] = subcategories2;
+        });
+        return next;
       });
     }
+
+    async function loadHoveredCategory() {
+      try {
+        if (existingSubcategories) {
+          await loadSubcategory2(existingSubcategories);
+          return;
+        }
+
+        const response = await fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORIES}/${hoveredCategory}`);
+        const data = await response.json();
+        const subcategories = Array.isArray(data?.subcategories) ? data.subcategories : [];
+
+        if (cancelled) return;
+        setCategorySubcategories((prev) => ({
+          ...prev,
+          [hoveredCategory]: subcategories,
+        }));
+
+        await loadSubcategory2(subcategories);
+      } catch (error) {
+        if (!cancelled) {
+          setCategorySubcategories((prev) => ({
+            ...prev,
+            [hoveredCategory]: [],
+          }));
+        }
+      }
+    }
+
+    loadHoveredCategory();
+
+    return () => {
+      cancelled = true;
+    };
   }, [hoveredCategory, categorySubcategories, subcategorySubcategories2]);
 
-  // Set first category as default hovered when categories are loaded
-  useEffect(() => {
-    if (categoryData?.categories?.length > 0 && hoveredCategory === null) {
-      const sortedCategories = categoryData.categories.sort((a: Category, b: Category) => a.id - b.id);
-      setHoveredCategory(sortedCategories[0].id);
-    }
-  }, [categoryData, hoveredCategory]);
+  const hoveredCategoryData = hoveredCategory
+    ? categoriesForNavbar.find((category: Category) => category.id === hoveredCategory)
+    : undefined;
+  const visibleSubcategories = hoveredCategory
+    ? categorySubcategories[hoveredCategory] ?? hoveredCategoryData?.subcategories ?? hoveredCategoryData?.subCategories
+    : undefined;
 
   const handleBrandClick = (brandId: number) => {
     if (brandId) {
@@ -134,9 +215,13 @@ export default function SecondaryNavbar() {
     // Store the selected category in sessionStorage
     sessionStorage.setItem('selectedCategoryId', categoryId.toString());
     sessionStorage.setItem('selectedCategoryName', categoryName);
+    sessionStorage.removeItem('selectedSubcategoryId');
+    sessionStorage.removeItem('selectedSubcategoryName');
+    sessionStorage.removeItem('selectedSubcategory2Id');
+    sessionStorage.removeItem('selectedSubcategory2Name');
 
     // Navigate to shop page
-    router.push("/shop-by-brands");
+    router.push(`/shop-by-brands?category=${categoryId}`);
     setShowCategories(false);
   };
 
@@ -180,10 +265,6 @@ export default function SecondaryNavbar() {
     setShowCategories(false);
   };
 
-  const showCategoryModal = () => {
-    setShowCategories(!showCategories);
-  };
-
   return (
     <div className="border-b bg-white">
       {/* Main container with centered navigation */}
@@ -191,25 +272,39 @@ export default function SecondaryNavbar() {
         <div className="flex items-center justify-center p-3 pt-2 pb-2">
           <div className="flex items-center gap-6">
             <div
-              onMouseEnter={() => setShowCategories(true)}
+              onMouseEnter={() => {
+                setShowCategories(true);
+                if (!hoveredCategory && categoriesForNavbar.length > 0) {
+                  setHoveredCategory(categoriesForNavbar[0].id);
+                }
+              }}
               onMouseLeave={() => setShowCategories(false)}
-              className="flex relative items-center gap-2 border p-2 rounded-lg"
+              className="relative flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2"
             >
               <CategoryIcon />
               <p className="cursor-pointer hover:bg-gray-100 px-1 py-1 text-[14px] not-italic font-normal leading-6 text-gray-600 hover:text-[#E70F0F]">
                 Shop By Category
               </p>
               {showCategories && (
-                <div className="absolute top-full left-0 bg-white z-50 border shadow-md rounded-lg flex w-auto min-w-[320px] sm:min-w-[600px] md:min-w-[700px] lg:min-w-[800px] xl:min-w-[900px] max-w-[95vw] overflow-hidden">
-                  {/* Section 1: Main Categories Part 1 */}
-                  <div className="w-[160px] sm:w-[180px] md:w-[200px] lg:w-[220px] min-w-[140px] bg-gray-50 rounded-l-lg overflow-hidden">
+                <div className="absolute left-1/2 top-full z-50 flex max-h-[70vh] w-[1080px] max-w-[95vw] -translate-x-[22%] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl">
+                  <div className="w-[240px] shrink-0 overflow-y-auto bg-gray-50">
                     <div className="py-2">
-                      {categoryData?.categories?.sort((a: Category, b: Category) => a.id - b.id).map((category: Category) => (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          router.push("/categories");
+                          setShowCategories(false);
+                        }}
+                        className="w-full px-4 py-3 text-left text-[14px] font-semibold text-[#E70F0F] hover:bg-white"
+                      >
+                        All Categories
+                      </button>
+                      {categoriesForNavbar.map((category: Category) => (
                         <div
                           key={category.id}
                           onMouseEnter={() => setHoveredCategory(category.id)}
                           onClick={() => handleCategoryClick(category.id, category.name)}
-                          className={`cursor-pointer px-2 sm:px-3 md:px-4 py-2 sm:py-2.5 md:py-3 text-[12px] sm:text-[13px] md:text-[14px] not-italic font-normal leading-5 sm:leading-6 transition-colors ${hoveredCategory === category.id
+                          className={`cursor-pointer px-4 py-3 text-[14px] not-italic font-medium leading-5 transition-colors ${hoveredCategory === category.id
                               ? 'bg-white text-[#FF0012] border-r-2 border-[#FF0012]'
                               : 'text-[#1C1C2F] hover:bg-white hover:text-[#FF0012]'
                             }`}
@@ -225,20 +320,19 @@ export default function SecondaryNavbar() {
                     </div>
                   </div>
 
-                  {/* Section 2: Subcategories Panel (Only show when category is hovered) */}
                   {hoveredCategory && (
-                    <div className="flex-1 min-w-0 bg-white border-l border-gray-200 overflow-hidden">
-                      <div className="py-2 sm:py-3 md:py-4">
-                        {categorySubcategories[hoveredCategory] ? (
+                    <div className="min-w-0 flex-1 overflow-y-auto border-l border-gray-200 bg-white">
+                      <div className="py-5">
+                        {visibleSubcategories ? (
                           <>
-                            {/* Subcategories Grid - Optimized for all screen sizes */}
-                            <div className="px-2 sm:px-4 md:px-6">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 sm:gap-4 md:gap-8 gap-y-2 sm:gap-y-4 md:gap-y-5">
-                                {categorySubcategories[hoveredCategory].map((subcategory) => {
-                                  const category = categoryData?.categories?.find((cat: Category) => cat.id === hoveredCategory);
+                            <div className="px-6">
+                              {visibleSubcategories.length > 0 ? (
+                              <div className="grid grid-cols-3 gap-x-8 gap-y-6 xl:grid-cols-4">
+                                {visibleSubcategories.map((subcategory) => {
+                                  const category = hoveredCategoryData;
+                                  const subcategory2List = subcategorySubcategories2[subcategory.id] ?? subcategory.subcategories2 ?? subcategory.subCategories2 ?? [];
                                   return (
-                                    <div key={subcategory.id} className="space-y-1 sm:space-y-2 md:space-y-3 min-w-0">
-                                      {/* Subcategory Header - Clickable */}
+                                    <div key={subcategory.id} className="min-w-0 space-y-2">
                                       <div
                                         onClick={() => handleSubcategoryClick(
                                           hoveredCategory,
@@ -248,15 +342,14 @@ export default function SecondaryNavbar() {
                                         )}
                                         className="cursor-pointer px-1 sm:px-2 py-0.5 sm:py-1 transition-colors"
                                       >
-                                        <h3 className="text-[12px] sm:text-[13px] md:text-[14px] font-bold text-[#1C1C2F] hover:text-[#FF0012] transition-colors break-words leading-tight" title={subcategory.name}>
+                                        <h3 className="break-words text-[14px] font-bold leading-tight text-[#1C1C2F] transition-colors hover:text-[#FF0012]" title={subcategory.name}>
                                           {subcategory.name}
                                         </h3>
                                       </div>
 
-                                      {/* Subcategory2 Items - Below Header */}
-                                      <div className="space-y-0.5 sm:space-y-1">
-                                        {subcategorySubcategories2[subcategory.id] && subcategorySubcategories2[subcategory.id].length > 0 && (
-                                          subcategorySubcategories2[subcategory.id].slice(0, 5).map((subcategory2) => (
+                                      <div className="space-y-1">
+                                        {subcategory2List.length > 0 && (
+                                          subcategory2List.map((subcategory2) => (
                                             <div
                                               key={subcategory2.id}
                                               onClick={() => handleSubcategory2Click(
@@ -267,28 +360,27 @@ export default function SecondaryNavbar() {
                                                 subcategory2.id,
                                                 subcategory2.name
                                               )}
-                                              className="cursor-pointer hover:text-[#FF0012] px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] sm:text-[12px] md:text-[13px] not-italic font-normal leading-4 sm:leading-5 text-gray-700 transition-colors break-words"
+                                              className="cursor-pointer break-words px-2 py-0.5 text-[13px] font-normal leading-5 text-gray-600 transition-colors hover:text-[#FF0012]"
                                               title={subcategory2.name}
                                             >
                                               {subcategory2.name}
                                             </div>
                                           ))
                                         )}
-                                        {/* Show "more" indicator if there are more than 5 items */}
-                                        {subcategorySubcategories2[subcategory.id] && subcategorySubcategories2[subcategory.id].length > 5 && (
-                                          <div className="text-[10px] sm:text-[11px] md:text-[12px] text-gray-500 px-1 sm:px-2 py-0.5 sm:py-1">
-                                            +{subcategorySubcategories2[subcategory.id].length - 5} more
-                                          </div>
-                                        )}
                                       </div>
                                     </div>
                                   );
                                 })}
                               </div>
+                              ) : (
+                                <div className="rounded-lg bg-gray-50 p-6 text-sm text-gray-500">
+                                  No subcategories available.
+                                </div>
+                              )}
                             </div>
                           </>
                         ) : (
-                          <div className="px-2 sm:px-4 md:px-6 py-2 text-[12px] sm:text-[13px] md:text-[14px] text-gray-400">
+                          <div className="px-6 py-2 text-[14px] text-gray-400">
                             Loading subcategories...
                           </div>
                         )}

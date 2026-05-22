@@ -3,10 +3,12 @@ export const ApiPaths = {
   SEARCH: "/search",
   BANNERS: "/banners",
   CATEGORIES: "/categories",
+  CATEGORY_HIERARCHY: "/categories/hierarchy",
   CATEGORY: "/category",
   SUBCATEGORY: "/subcategory",
+  SUBCATEGORY2: "/subcategory2",
   SUBCATEGORIES: "/subcategories",
-  SUBCATEGORIES2: "/admin/subcategories2",
+  SUBCATEGORIES2: "/subcategories2",
   FAQS: "/faqs",
   BLOGS: "/blogs",
   USERS: "/users",
@@ -29,7 +31,7 @@ export const ApiPaths = {
   RECENT_VIEWS: "/recentViews",
   COMBO_CATEGORIES: "/admin/combo-categories-with-products",
   COMBO_PRODUCT: "/admin/combo-product",
-  PRODUCTS_BY_CATEGORY: "/admin/products-by-category",
+  PRODUCTS_BY_CATEGORY: "/products-by-category",
 
   // Shipping endpoints
   SHIPPING_TRACK: "/shipping/track",

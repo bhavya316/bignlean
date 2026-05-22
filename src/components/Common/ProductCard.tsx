@@ -35,26 +35,6 @@ type Props = {
   isOffer?: boolean;
   showBestsellerBadge?: boolean;
 };
-const VegIcon = (  ) => (
-  <svg
-       width={15} height={15} fill="#00A000"
-        viewBox="0 0 24 24"
-        xmlns="http://www.w3.org/2000/svg"
-    >
-        <title>Vegetarian Food Icon</title>
-        <path d="M12 2C9.243 2 7 4.243 7 7c0 3.333 3 7 5 9 2-2 5-5.667 5-9 0-2.757-2.243-5-5-5zm0 11.5c-1.127 0-2-.873-2-2h4c0 1.127-.873 2-2 2zm0-11.5C7.373 2 3 6.373 3 11.5S7.373 21 12 21s9-4.373 9-9.5S16.627 2 12 2z" />
-    </svg>
-);
-// const NonVegIcon = (  ) => (
-//   <svg
-//        width={15} height={15} fill="#FF0000"
-//         viewBox="0 0 24 24"
-//         xmlns="http://www.w3.org/2000/svg"
-//     >
-//         <title>Vegetarian Food Icon</title>
-//         <path d="M12 2C9.243 2 7 4.243 7 7c0 3.333 3 7 5 9 2-2 5-5.667 5-9 0-2.757-2.243-5-5-5zm0 11.5c-1.127 0-2-.873-2-2h4c0 1.127-.873 2-2 2zm0-11.5C7.373 2 3 6.373 3 11.5S7.373 21 12 21s9-4.373 9-9.5S16.627 2 12 2z" />
-//     </svg>
-// );
 
 export default function ProductCard({
   productData,
@@ -191,19 +171,10 @@ export default function ProductCard({
               recordProductView(product?.id as number);
               router.push(link);
             }}
-            className="text-black line-clamp-2  not-italic font-medium  cursor-pointer "
+            className="text-black line-clamp-2  not-italic font-bold  cursor-pointer "
           >
             {product?.name}
           </p>
-         <div>
-           <div className="border-1.5  h-fit border-[#00A000] ">
-           <VegIcon />
-           {/* <NonVegIcon /> */}
-          </div>
-          {/* <div className="border-1.5  h-fit border-[#FF0000] ">
-           <NonVegIcon />
-          </div> */}
-         </div>
          </div>
           {!isCombo && (
             <p className="text-gray-600 text-xs">

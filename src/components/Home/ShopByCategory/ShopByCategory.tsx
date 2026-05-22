@@ -4,6 +4,7 @@ import { Categories } from "@/utils/Schemas";
 import ShopCategoryCard from "./ShopCategoryCard";
 import { useMediaQuery } from "react-responsive";
 import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 
 export default function ShopByCategory({
   categoriesData,
@@ -14,6 +15,15 @@ export default function ShopByCategory({
 }) {
   const router = useRouter();
   const isMobile = useMediaQuery({ minWidth: 280, maxWidth: 450 });
+  const visibleCategories = useMemo(() => {
+    const seen = new Set<string>();
+    return (categoriesData || []).filter((category) => {
+      const key = String(category?.name || category?.id).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [categoriesData]);
 
   return (
     <div className="w-[1200px] mx-auto mt-[60px] max-[1200px]:w-full sm:px-4">
@@ -21,52 +31,16 @@ export default function ShopByCategory({
         label="Shop by category"
         showBtn={true}
         btnLabel="Show all"
-        onClick={() => router.push("/shop-by-brands")}
+        onClick={() => router.push("/categories")}
       />
       {isLoading ? (
         <ShopByCategoryContentSkeleton />
       ) : (
         <>
           {isMobile ? (
-        <div className="category-grid">
-          {categoriesData &&
-            categoriesData.length > 0 &&
-            Array.from(
-              { length: Math.ceil(categoriesData.length / 2) },
-              (_, i) => (
-                <div key={i} className="grid grid-cols-2 gap-4">
-                  <div className={`category-card ${categoriesData[i * 2]?.name.toLowerCase().includes('vitamins') ? 'vitamins' : ''}`}>
-                    <div className="category-label">{categoriesData[i * 2]?.name}</div>
-                    <img
-                      src={categoriesData[i * 2]?.imageOn}
-                      alt={categoriesData[i * 2]?.name}
-                      className="max-w-[80%] mx-auto"
-                    />
-                  </div>
-                  {categoriesData[i * 2 + 1] && (
-                    <div className={`category-card ${categoriesData[i * 2 + 1]?.name.toLowerCase().includes('vitamins') ? 'vitamins' : ''}`}>
-                      <div className="category-label">{categoriesData[i * 2 + 1]?.name}</div>
-                      <img
-                        src={categoriesData[i * 2 + 1]?.imageOn}
-                        alt={categoriesData[i * 2 + 1]?.name}
-                        className="max-w-[80%] mx-auto"
-                      />
-                    </div>
-                  )}
-                </div>
-              )
-            )}
-        </div>
-      ) : (
-        <div className="mt-6 relative overflow-hidden">
-          {/* Scrollable Category Grid with exactly 6 cards showing */}
-          <div className="flex overflow-x-auto pb-4 snap-x hide-scrollbar">
-            <div className="flex gap-4">
-              {categoriesData && categoriesData.map((category) => (
-                <div 
-                  key={category?.id} 
-                  className="w-[calc((100%/6)-13.4px)] min-w-[calc((100%/6)-13.4px)] flex-shrink-0 aspect-square snap-start"
-                >
+            <div className="flex gap-4 overflow-x-auto px-4 pb-3 snap-x hide-scrollbar">
+              {visibleCategories?.map((category) => (
+                <div key={category?.id} className="w-[150px] min-w-[150px] aspect-square snap-start">
                   <ShopCategoryCard
                     id={category?.id}
                     image={category.imageOn}
@@ -75,9 +49,27 @@ export default function ShopByCategory({
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      )}
+          ) : (
+            <div className="mt-6 relative overflow-hidden">
+              {/* Scrollable Category Grid with exactly 6 cards showing */}
+              <div className="flex overflow-x-auto pb-4 snap-x hide-scrollbar">
+                <div className="flex gap-4">
+                  {visibleCategories && visibleCategories.map((category) => (
+                    <div
+                      key={category?.id}
+                      className="w-[calc((100%/6)-13.4px)] min-w-[calc((100%/6)-13.4px)] flex-shrink-0 aspect-square snap-start"
+                    >
+                      <ShopCategoryCard
+                        id={category?.id}
+                        image={category.imageOn}
+                        label={category.name}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

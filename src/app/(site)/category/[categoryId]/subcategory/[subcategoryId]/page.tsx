@@ -10,7 +10,7 @@ export default function CategorySubcategoryRedirect({ params }: {
   
   useEffect(() => {
     // Redirect to the proper URL format
-    router.replace(`/shop-by-brands?category=${params.categoryId}`);
+    router.replace(`/shop-by-brands?category=${params.categoryId}&subcategory=${params.subcategoryId}`);
   }, [params.categoryId, params.subcategoryId, router]);
   
   return (

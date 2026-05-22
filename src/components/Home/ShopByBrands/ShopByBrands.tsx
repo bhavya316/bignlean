@@ -18,7 +18,7 @@ export default function ShopByBrands({ brandsData, isLoading = false }: Props) {
   return (
     <div className="w-[1200px] mx-auto mt-[60px] max-[1200px]:w-full flex flex-col gap-[40px] md:mt-[40px] md:gap-[30px] sm:mt-[30px] sm:gap-[20px] sm:px-4">
       <SectionHeader
-        onClick={() => router.push("/shop-by-brands")}
+        onClick={() => router.push("/brands")}
         label="Shop by brands"
         showBtn={true}
         btnLabel="Show all"
@@ -28,10 +28,10 @@ export default function ShopByBrands({ brandsData, isLoading = false }: Props) {
       ) : (
         <>
           {isMobile ? (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="flex gap-4 overflow-x-auto px-4 pb-3 snap-x hide-scrollbar">
               {brandsData &&
                 brandsData.map((brand) => (
-                  <div key={brand.id} className="flex justify-center">
+                  <div key={brand.id} className="w-[116px] min-w-[116px] snap-start">
                     <BrandCard brandData={brand} />
                   </div>
                 ))}

@@ -86,7 +86,7 @@ export default function CartProductCard({
         className="h-[100px] w-[75px] max-sm:min-w-[50px] max-sm:h-[75px] object-contain bg-gray-50 rounded"
       />
       <div>
-        <p className="text-black text-base not-italic font-medium max-[500px]:text-sm">
+        <p className="text-black text-base not-italic font-bold max-[500px]:text-sm">
           {displayProduct?.name}
         </p>
         <p className="text-black text-xs not-italic font-normal opacity-40">

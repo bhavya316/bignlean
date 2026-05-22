@@ -4,6 +4,7 @@ import "swiper/css";
 import "swiper/css/pagination";
 import { Autoplay, Pagination, A11y } from "swiper/modules";
 import Link from "next/link";
+import ResponsiveBannerImage, { getBannerHref } from "./ResponsiveBannerImage";
 
 interface Banner {
   id: number;
@@ -40,20 +41,18 @@ export default function Banner1Section({ banners }: Banner1SectionProps) {
           className="mySwiper w-full max-[500px] relative"
         >
           {banners.map((banner, index) => {
-            const bannerLink = (banner?.link && Array.isArray(banner.link) && banner.link.length > 0) 
-              ? banner.link[0] 
-              : ((typeof banner?.link === 'string') ? banner.link : "#");
+            const bannerLink = getBannerHref(banner?.link);
               
             return (
               <SwiperSlide
                 key={banner.id}
-                className="flex items-center justify-center overflow-hidden cursor-pointer img-change h-[200px] sm:h-[250px] md:h-[300px]"
+                className="flex items-center justify-center overflow-hidden cursor-pointer img-change"
               >
-                <Link href={bannerLink} className="w-full h-full block">
-                  <img
-                    src={banner?.web}
+                <Link href={bannerLink} className="w-full block">
+                  <ResponsiveBannerImage
+                    banner={banner}
                     alt={`Banner 1 Section ${index}`}
-                    className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] object-cover object-center block mx-auto rounded-lg shadow-lg"
+                    className="w-full max-w-[1000px] aspect-[16/9] max-h-[320px] min-h-[140px] object-contain object-center block mx-auto rounded-lg bg-white shadow-lg"
                   />
                 </Link>
               </SwiperSlide>
@@ -65,17 +64,15 @@ export default function Banner1Section({ banners }: Banner1SectionProps) {
   }
 
   // If single banner, show normally
-  const singleBannerLink = (banners[0]?.link && Array.isArray(banners[0].link) && banners[0].link.length > 0) 
-    ? banners[0].link[0] 
-    : ((typeof banners[0]?.link === 'string') ? banners[0].link : "#");
+  const singleBannerLink = getBannerHref(banners[0]?.link);
 
   return (
     <div className="my-8 flex justify-center cursor-pointer">
       <Link href={singleBannerLink} className="w-full max-w-[1000px] block">
-        <img
-          src={banners[0]?.web}
+        <ResponsiveBannerImage
+          banner={banners[0]}
           alt="Banner 1 Section"
-          className="w-full h-[200px] sm:h-[250px] md:h-[300px] object-cover object-center block mx-auto rounded-lg shadow-lg"
+          className="w-full aspect-[16/9] max-h-[320px] min-h-[140px] object-contain object-center block mx-auto rounded-lg bg-white shadow-lg"
         />
       </Link>
     </div>
