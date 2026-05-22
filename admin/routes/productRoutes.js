@@ -18,9 +18,22 @@ router.post(
 router.get(
   "/products",
   [
-    query("catId").notEmpty().withMessage("catId is required"),
-    query("subCatId").notEmpty().withMessage("suCatId is required"),
-    query("brandId").notEmpty().withMessage("brandId is required"),
+    query("catId")
+      .optional()
+      .isInt()
+      .withMessage("catId must be an integer"),
+    query("subCatId")
+      .optional()
+      .isInt()
+      .withMessage("subCatId must be an integer"),
+    query("subCatId2")
+      .optional()
+      .isInt()
+      .withMessage("subCatId2 must be an integer"),
+    query("brandId")
+      .optional()
+      .isInt()
+      .withMessage("brandId must be an integer"),
   ],
   (req, res, next) => {
     const errors = validationResult(req);
@@ -33,6 +46,12 @@ router.get(
 
     productController.getProductsByCategoryAndSubCategory(req, res);
   }
+);
+
+router.get(
+  "/products/:id",
+  param("id").notEmpty().withMessage("Product ID is required"),
+  productController.getProductbyId
 );
 
 router.put(

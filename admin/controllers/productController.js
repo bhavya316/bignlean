@@ -5,6 +5,8 @@ const RecentSearches = require("../../user/controllers/recentSerches");
 const { validationResult } = require("express-validator");
 const Brand = require("../model/brand");
 const Category = require("../model/category");
+const SubCategory = require("../model/subCategory");
+const SubCategory2 = require("../model/subCategory2");
 const Order = require("../../user/model/order")
 const { Op } = require("sequelize");
 
@@ -45,6 +47,51 @@ const applyBrandOriginToProductData = (productData, brandInfo) => {
     brandOriginCountry: originCountry,
     brandOriginCountryCode: originCountryCode,
   };
+};
+
+const getProductExpiryDate = (productData) => {
+  const variants = Array.isArray(productData?.varients) ? productData.varients : [];
+  const variantWithDate = variants.find((variant) => variant?.date || variant?.expiryDate);
+  return variantWithDate?.date || variantWithDate?.expiryDate || productData?.expiryDate || null;
+};
+
+const applyHierarchyToProductData = async (productData) => {
+  const [category, subcategory, subcategory2] = await Promise.all([
+    productData?.catId ? Category.findByPk(productData.catId) : null,
+    productData?.subCatId ? SubCategory.findByPk(productData.subCatId) : null,
+    productData?.subCatId2 ? SubCategory2.findByPk(productData.subCatId2) : null,
+  ]);
+
+  return {
+    ...productData,
+    category: category ? category.toJSON() : null,
+    categoryName: category ? category.name : null,
+    subcategory: subcategory ? subcategory.toJSON() : null,
+    subcategoryName: subcategory ? subcategory.name : null,
+    subcategory2: subcategory2 ? subcategory2.toJSON() : null,
+    subcategory2Name: subcategory2 ? subcategory2.name : null,
+    expiryDate: getProductExpiryDate(productData),
+  };
+};
+
+const validateProductHierarchy = async ({ catId, subCatId, subCatId2 }) => {
+  if (!catId || !subCatId) return null;
+
+  const subcategory = await SubCategory.findByPk(subCatId);
+  if (!subcategory) return "Selected subcategory does not exist";
+  if (String(subcategory.catId) !== String(catId)) {
+    return "Selected subcategory does not belong to selected category";
+  }
+
+  if (subCatId2 !== undefined && subCatId2 !== null && subCatId2 !== "") {
+    const subcategory2 = await SubCategory2.findByPk(subCatId2);
+    if (!subcategory2) return "Selected subcategory 2 does not exist";
+    if (String(subcategory2.subCategoryId) !== String(subCatId)) {
+      return "Selected subcategory 2 does not belong to selected subcategory";
+    }
+  }
+
+  return null;
 };
 
 const applyBrandOriginFallbackToRequest = async (body, currentBrandId = null) => {
@@ -150,6 +197,11 @@ const addProduct = async (req, res) => {
   }
 
   try {
+    const hierarchyError = await validateProductHierarchy(req.body);
+    if (hierarchyError) {
+      return res.status(400).json({ status: false, message: hierarchyError });
+    }
+
     await applyBrandOriginFallbackToRequest(req.body);
     if (!req.body.countryOfOrigin) {
       return res.status(400).json({
@@ -206,14 +258,11 @@ const getProductsByCategoryAndSubCategory = async (req, res) => {
 
   try {
     // Build the where clause dynamically
-    const where = {
-      catId: catId,
-      subCatId: subCatId,
-      brandId: brandId,
-    };
-    if (subCatId2) {
-      where.subCatId2 = subCatId2; // Only include subCatId2 if provided
-    }
+    const where = {};
+    if (catId) where.catId = catId;
+    if (subCatId) where.subCatId = subCatId;
+    if (subCatId2) where.subCatId2 = subCatId2;
+    if (brandId) where.brandId = brandId;
 
     const products = await Product.findAll({
       where,
@@ -243,13 +292,17 @@ const getProductsByCategoryAndSubCategory = async (req, res) => {
 
 // Add this function to productController.js
 const getProductsByCategory = async (req, res) => {
-  const { catId } = req.query;
+  const { catId, subCatId, subCatId2, brandId } = req.query;
 
   try {
+    const where = {};
+    if (catId) where.catId = catId;
+    if (subCatId) where.subCatId = subCatId;
+    if (subCatId2) where.subCatId2 = subCatId2;
+    if (brandId) where.brandId = brandId;
+
     const products = await Product.findAll({
-      where: {
-        catId: catId,
-      },
+      where,
       order: [["createdAt", "DESC"]],
     });
 
@@ -297,7 +350,7 @@ const getProductbyId = async (req, res) => {
     // Fetch Brand Name
     const brandInfo = await Brand.findByPk(product.brandId);
 
-    const productDetails = product.dataValues;
+    const productDetails = await applyHierarchyToProductData(product.dataValues);
     const result = {
       ...applyBrandOriginToProductData(productDetails, brandInfo),
       brandName: brandInfo ? brandInfo.name : null, // Added brandName
@@ -461,6 +514,15 @@ const updateProduct = async (req, res) => {
           message: "Product variants with valid units, stock, mrp, and selling price are required",
         });
       }
+    }
+
+    const hierarchyError = await validateProductHierarchy({
+      catId: req.body.catId !== undefined ? req.body.catId : product.catId,
+      subCatId: req.body.subCatId !== undefined ? req.body.subCatId : product.subCatId,
+      subCatId2: req.body.subCatId2 !== undefined ? req.body.subCatId2 : product.subCatId2,
+    });
+    if (hierarchyError) {
+      return res.status(400).json({ status: false, message: hierarchyError });
     }
 
     await applyBrandOriginFallbackToRequest(req.body, product.brandId);
@@ -1543,8 +1605,10 @@ const getAllProductsPaginated = async (req, res) => {
             : 0;
         const brandInfo = await Brand.findByPk(product.brandId);
 
+        const productWithHierarchy = await applyHierarchyToProductData(product.dataValues);
+
         return {
-          ...applyBrandOriginToProductData(product.dataValues, brandInfo),
+          ...applyBrandOriginToProductData(productWithHierarchy, brandInfo),
           averageRating,
           discountPercentage,
           totalRatings: ratings.length,

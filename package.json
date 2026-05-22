@@ -12,6 +12,7 @@
     "db:migrate:undo:all": "sequelize-cli db:migrate:undo:all",
     "seed:demo": "node seed-demo-data.js",
     "seed:clean": "node seed-clean-test-data.js",
+    "seed:category-hierarchy": "node seed-category-hierarchy.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Deepak Kushwaha",

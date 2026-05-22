@@ -116,9 +116,11 @@ router.post("/upload", uploadSingleFile, (req, res) => {
 
 router.get("/banners", bannerController.getAllBanners);
 router.get("/brands", brandController.getAllBrands);
+router.get("/categories/hierarchy", categoryController.getCategoryHierarchy);
 router.get("/categories", categoryController.getCategories);
 router.get("/plans", planController.getAllPlans);
 router.get("/categories/:categoryId", categoryController.getAllCategories);
+router.get("/category/:id", categoryController.getCategoryById);
 
 router.get(
   "/subcategories/:categoryId",
@@ -126,10 +128,27 @@ router.get(
 );
 
 router.get(
+  "/subcategory/:id",
+  subCategoryController.getSubCategoryById
+);
+
+router.get(
+  "/subcategories2/:subCategoryId",
+  subCategoryController.getSubCategoriesByCategoryId2
+);
+
+router.get(
+  "/subcategory2/:id",
+  subCategoryController.getSubCategory2ById
+);
+
+router.get(
   "/products",
   [
-    query("catId").notEmpty().withMessage("catId is required"),
-    query("subCatId").notEmpty().withMessage("suCatId is required"),
+    query("catId").optional().isInt().withMessage("catId must be an integer"),
+    query("subCatId").optional().isInt().withMessage("subCatId must be an integer"),
+    query("subCatId2").optional().isInt().withMessage("subCatId2 must be an integer"),
+    query("brandId").optional().isInt().withMessage("brandId must be an integer"),
   ],
   (req, res, next) => {
     const errors = validationResult(req);
@@ -141,6 +160,27 @@ router.get(
     }
 
     productController.getProductsByCategoryAndSubCategory(req, res);
+  }
+);
+
+router.get(
+  "/products-by-category",
+  [
+    query("catId").optional().isInt().withMessage("catId must be an integer"),
+    query("subCatId").optional().isInt().withMessage("subCatId must be an integer"),
+    query("subCatId2").optional().isInt().withMessage("subCatId2 must be an integer"),
+    query("brandId").optional().isInt().withMessage("brandId must be an integer"),
+  ],
+  (req, res, next) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res
+        .status(400)
+        .json({ status: false, message: "ERROR", errors: errors.array() });
+    }
+
+    productController.getProductsByCategory(req, res);
   }
 );
 

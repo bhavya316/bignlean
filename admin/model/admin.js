@@ -9,12 +9,10 @@ const Admin = sequelize.define("admin", {
   phone: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
   },
   email: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
     validate: {
       isEmail: true,
     },
@@ -23,6 +21,11 @@ const Admin = sequelize.define("admin", {
     type: DataTypes.STRING,
     allowNull: false,
   },
+}, {
+  indexes: [
+    { name: "admins_phone_unique", unique: true, fields: ["phone"] },
+    { name: "admins_email_unique", unique: true, fields: ["email"] },
+  ],
 });
 
 module.exports = Admin;

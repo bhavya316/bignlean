@@ -5,7 +5,6 @@ const Coupon = sequelize.define("coupons", {
   coupon: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
   },
   discount: {
     type: DataTypes.DECIMAL(10, 2),
@@ -23,6 +22,10 @@ const Coupon = sequelize.define("coupons", {
     type: DataTypes.DATE,
     allowNull: true,
   },
+}, {
+  indexes: [
+    { name: "coupons_coupon_unique", unique: true, fields: ["coupon"] },
+  ],
 });
 
 module.exports = Coupon;

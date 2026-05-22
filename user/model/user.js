@@ -308,7 +308,7 @@ const sequelize = require("../../config/database");
 const User = sequelize.define("users", {
   image: { type: DataTypes.STRING, allowNull: true },
   name: { type: DataTypes.STRING, allowNull: true },
-  phone: { type: DataTypes.STRING, allowNull: false, unique: true },
+  phone: { type: DataTypes.STRING, allowNull: false },
   email: { type: DataTypes.STRING, allowNull: true },
   gender: { type: DataTypes.STRING, allowNull: true },
   bglCash: {
@@ -326,11 +326,18 @@ const User = sequelize.define("users", {
   referCode: { type: DataTypes.STRING, allowNull: false },
   otp: { type: DataTypes.STRING, allowNull: true },
   otpExpiry: { type: DataTypes.DATE, allowNull: true },
-  firebaseUid: { type: DataTypes.STRING, allowNull: true, unique: true },
+  firebaseUid: { type: DataTypes.STRING, allowNull: true },
   isBlocked: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
   // Optional fields, will be ignored if not present in DB
-  googleId: { type: DataTypes.STRING, allowNull: true, unique: true },
-  facebookId: { type: DataTypes.STRING, allowNull: true, unique: true },
+  googleId: { type: DataTypes.STRING, allowNull: true },
+  facebookId: { type: DataTypes.STRING, allowNull: true },
+}, {
+  indexes: [
+    { name: "users_phone_unique", unique: true, fields: ["phone"] },
+    { name: "users_firebase_uid_unique", unique: true, fields: ["firebaseUid"] },
+    { name: "users_google_id_unique", unique: true, fields: ["googleId"] },
+    { name: "users_facebook_id_unique", unique: true, fields: ["facebookId"] },
+  ],
 });
 
 module.exports = User;

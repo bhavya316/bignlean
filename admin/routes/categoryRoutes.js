@@ -22,6 +22,8 @@ router.post(
   }
 );
 
+router.get("/categories/hierarchy", categoryController.getCategoryHierarchy);
+
 router.get("/categories/:categoryId", categoryController.getAllCategories);
 
 

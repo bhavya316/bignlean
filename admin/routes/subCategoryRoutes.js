@@ -29,6 +29,11 @@ router.get(
 );
 
 router.get(
+  "/subcategory/:id",
+  subCategoryController.getSubCategoryById
+);
+
+router.get(
   "/subcategories/:categoryId",
   subCategoryController.getSubCategoriesByCategoryId
 );
@@ -110,6 +115,11 @@ router.post(
 router.get(
   "/subcategories2",
   subCategoryController.getAllSubCategories2
+);
+
+router.get(
+  "/subcategory2/:id",
+  subCategoryController.getSubCategory2ById
 );
 
 router.get(
