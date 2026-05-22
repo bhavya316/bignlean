@@ -601,9 +601,7 @@
   }
 
   function getAdminApiBase() {
-    var host = location.hostname;
-    if (host === "localhost" || host === "127.0.0.1") return "http://localhost:3002";
-    return "https://api.bignlean.com";
+    return window.__BNL_ADMIN_API_BASE__ || "https://api.bignlean.com";
   }
 
   function fetchAdminJson(path, options) {
@@ -1215,7 +1213,7 @@
       selectedSubcategoryParentValue = select.value || "";
     });
 
-    fetchAdminJson("/admin/categories/hierarchy")
+    fetchAdminJson("/categories")
       .then(function (data) {
         var categories = getResponseList(data, "categories", "category").sort(function (a, b) {
           return String(a.name || "").localeCompare(String(b.name || ""));
@@ -1426,7 +1424,7 @@
     function refreshTaxonomyData() {
       adminTaxonomyCache = null;
       return Promise.all([
-        fetchAdminJson("/admin/categories/hierarchy"),
+        fetchAdminJson("/categories"),
         fetchAdminJson("/admin/all-subcategories?limit=1000"),
         fetchAdminJson("/admin/subcategories2?limit=1000")
       ]).then(function (results) {
