@@ -122,10 +122,10 @@ Server/
    ```
 
 5. **Firebase Setup**
-   - Create a Firebase project
-   - Generate service account key
-   - Place the key file as `firebase-service-account.json`
-   - Update `config/firebaseAdmin.js` with your project details
+   - Use Firebase project `bignlean-fbffd`
+   - Generate a service account key
+   - Place the key file as `firebase-service-account.json`, or set the service account values in `.env`
+   - Do not commit service account JSON/private keys
 
 ## ⚙️ Setup & Configuration
 
@@ -141,7 +141,9 @@ DB_NAME=bignlean
 DB_USER=bhavya
 DB_PASSWORD=bhavya123
 TWOFACTOR_API_KEY=your_2factor_api_key
-FIREBASE_PROJECT_ID=your_firebase_project_id
+FIREBASE_PROJECT_ID=bignlean-fbffd
+FIREBASE_DATABASE_URL=https://bignlean-fbffd-default-rtdb.firebaseio.com
+FIREBASE_SERVICE_ACCOUNT_PATH=firebase-service-account.json
 RAZORPAY_KEY_ID=your_razorpay_key
 RAZORPAY_KEY_SECRET=your_razorpay_secret
 ```

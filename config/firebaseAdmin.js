@@ -5,9 +5,9 @@ const logger = require("../utils/logger");
 
 const databaseURL =
   process.env.FIREBASE_DATABASE_URL ||
-  "https://biglean-4acf5-default-rtdb.firebaseio.com";
+  "https://bignlean-fbffd-default-rtdb.firebaseio.com";
 
-const projectId = process.env.FIREBASE_PROJECT_ID || "biglean-4acf5";
+const projectId = process.env.FIREBASE_PROJECT_ID || "bignlean-fbffd";
 
 const loadServiceAccount = () => {
   if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
@@ -16,6 +16,24 @@ const loadServiceAccount = () => {
       parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
     }
     return parsed;
+  }
+
+  if (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    return {
+      type: "service_account",
+      project_id: projectId,
+      private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+      private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      client_email: process.env.FIREBASE_CLIENT_EMAIL,
+      client_id: process.env.FIREBASE_CLIENT_ID,
+      auth_uri: process.env.FIREBASE_AUTH_URI || "https://accounts.google.com/o/oauth2/auth",
+      token_uri: process.env.FIREBASE_TOKEN_URI || "https://oauth2.googleapis.com/token",
+      auth_provider_x509_cert_url:
+        process.env.FIREBASE_AUTH_PROVIDER_CERT_URL ||
+        "https://www.googleapis.com/oauth2/v1/certs",
+      client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
+      universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN || "googleapis.com",
+    };
   }
 
   const serviceAccountPath =

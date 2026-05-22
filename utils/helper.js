@@ -133,6 +133,11 @@ router.get(
 );
 
 router.get(
+  "/subcategories2",
+  subCategoryController.getAllSubCategories2
+);
+
+router.get(
   "/subcategories2/:subCategoryId",
   subCategoryController.getSubCategoriesByCategoryId2
 );

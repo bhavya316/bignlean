@@ -94,6 +94,35 @@ const validateProductHierarchy = async ({ catId, subCatId, subCatId2 }) => {
   return null;
 };
 
+const normalizeQueryList = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (value === undefined || value === null || value === "") return [];
+  return [value];
+};
+
+const getRequestedBrandIds = async (query) => {
+  const requestedBrands = [
+    ...normalizeQueryList(query.brands),
+    ...normalizeQueryList(query["brands[]"]),
+    ...normalizeQueryList(query.brandId),
+  ].map(String).filter(Boolean);
+
+  if (requestedBrands.length === 0) return [];
+
+  const requestedBrandIds = requestedBrands.filter((brand) => /^\d+$/.test(brand));
+  const requestedBrandNames = requestedBrands.filter((brand) => !/^\d+$/.test(brand));
+  const brandRecordsByName = requestedBrandNames.length
+    ? await Brand.findAll({ where: { name: { [Op.in]: requestedBrandNames } } })
+    : [];
+
+  const selectedBrandIds = [
+    ...requestedBrandIds,
+    ...brandRecordsByName.map((brand) => String(brand.id)),
+  ].filter((brand, index, list) => list.indexOf(brand) === index);
+
+  return selectedBrandIds.length > 0 ? selectedBrandIds : ["__NO_BRAND_MATCH__"];
+};
+
 const applyBrandOriginFallbackToRequest = async (body, currentBrandId = null) => {
   const brandId = body.brandId || currentBrandId;
   if (!brandId || body.countryOfOrigin) return;
@@ -254,7 +283,7 @@ const addProduct = async (req, res) => {
 
 
 const getProductsByCategoryAndSubCategory = async (req, res) => {
-  const { catId, subCatId, subCatId2, brandId } = req.query; // Added brandId
+  const { catId, subCatId, subCatId2 } = req.query;
 
   try {
     // Build the where clause dynamically
@@ -262,7 +291,8 @@ const getProductsByCategoryAndSubCategory = async (req, res) => {
     if (catId) where.catId = catId;
     if (subCatId) where.subCatId = subCatId;
     if (subCatId2) where.subCatId2 = subCatId2;
-    if (brandId) where.brandId = brandId;
+    const selectedBrandIds = await getRequestedBrandIds(req.query);
+    if (selectedBrandIds.length > 0) where.brandId = { [Op.in]: selectedBrandIds };
 
     const products = await Product.findAll({
       where,
@@ -292,14 +322,15 @@ const getProductsByCategoryAndSubCategory = async (req, res) => {
 
 // Add this function to productController.js
 const getProductsByCategory = async (req, res) => {
-  const { catId, subCatId, subCatId2, brandId } = req.query;
+  const { catId, subCatId, subCatId2 } = req.query;
 
   try {
     const where = {};
     if (catId) where.catId = catId;
     if (subCatId) where.subCatId = subCatId;
     if (subCatId2) where.subCatId2 = subCatId2;
-    if (brandId) where.brandId = brandId;
+    const selectedBrandIds = await getRequestedBrandIds(req.query);
+    if (selectedBrandIds.length > 0) where.brandId = { [Op.in]: selectedBrandIds };
 
     const products = await Product.findAll({
       where,
@@ -436,11 +467,14 @@ const getProductbyId = async (req, res) => {
     result.totalRating = ratings.length;
 
     const similerProduct = [];
+    const similarWhere = {
+      catId: result.catId,
+      id: { [Op.ne]: id }
+    };
+    if (result.subCatId) similarWhere.subCatId = result.subCatId;
+    if (result.subCatId2) similarWhere.subCatId2 = result.subCatId2;
     const products = await Product.findAll({
-      where: {
-        catId: result.catId,
-        id: { [Op.ne]: id } // Exclude the current product
-      },
+      where: similarWhere,
       order: [["createdAt", "DESC"]],
     });
     for (const item of products) {
@@ -649,7 +683,8 @@ const getAllProducts = async (req, res) => {
           priceRanges
         );
 
-        const catMatch = category === 0 || product.catId === category;
+        const selectedCategoryId = Number(category) || 0;
+        const catMatch = selectedCategoryId === 0 || Number(product.catId) === selectedCategoryId;
         const ratingMatch = minRating === 0 || averageRating >= minRating;
         const discountMatch = checkDiscountPercent(
           parseInt(product.varients[0].mrp),
@@ -879,12 +914,16 @@ const getRelatedProducts = async (req, res) => {
       });
     }
 
-    // Find products with the same category but different ID
+    const relatedWhere = {
+      catId: product.catId,
+      id: { [Op.ne]: productId }
+    };
+    if (product.subCatId) relatedWhere.subCatId = product.subCatId;
+    if (product.subCatId2) relatedWhere.subCatId2 = product.subCatId2;
+
+    // Find products from the same category chain but different ID.
     const relatedProducts = await Product.findAll({
-      where: {
-        catId: product.catId,
-        id: { [Op.ne]: productId } // Not equal to current product
-      },
+      where: relatedWhere,
       limit: 10,
       order: [["createdAt", "DESC"]],
     });
@@ -1514,11 +1553,18 @@ const getBestSellingProductTodayById = async (req, res) => {
     result.todayOrderCount = orderCount;
 
     const similerProduct = [];
+    const similarWhere = {
+      catId: result.catId,
+      id: { [Op.ne]: id }
+    };
+    if (result.subCatId) similarWhere.subCatId = result.subCatId;
+    if (result.subCatId2) similarWhere.subCatId2 = result.subCatId2;
     const products = await Product.findAll({
-      where: { catId: result.catId },
+      where: similarWhere,
       order: [["createdAt", "DESC"]],
     });
     for (const item of products) {
+      if (!hasStock(item)) continue;
       const ratings = await Rating.findAll({
         where: { product: item.id },
         order: [["createdAt", "DESC"]],
