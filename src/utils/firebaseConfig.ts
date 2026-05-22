@@ -1,26 +1,98 @@
-import { initializeApp } from "firebase/app";
-import { 
-  getAuth, 
-  GoogleAuthProvider, 
-  FacebookAuthProvider, 
+import { getApp, getApps, initializeApp } from "firebase/app";
+import {
+  FacebookAuthProvider,
+  getAuth,
+  GoogleAuthProvider,
   signInWithPopup,
-  AuthError 
 } from "firebase/auth";
+import type { Auth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCEBdcprmDMMdcbVDA9IorfuVqSOu85Eoc",
-  authDomain: "biglean-4acf5.firebaseapp.com",
-  databaseURL: "https://biglean-4acf5-default-rtdb.firebaseio.com",
-  projectId: "biglean-4acf5",
-  storageBucket: "biglean-4acf5.appspot.com",
-  messagingSenderId: "903486712545",
-  appId: "1:903486712545:web:a1dd8b044f852e3fff6caf",
-  measurementId: "G-YRQ81RX7QW",
+  apiKey:
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
+    "AIzaSyAJBGWLW6blCxLNUzFaZf9pxwrP36PYKTs",
+  authDomain:
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ||
+    "bignlean-fbffd.firebaseapp.com",
+  databaseURL:
+    process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
+    "https://bignlean-fbffd-default-rtdb.firebaseio.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "bignlean-fbffd",
+  storageBucket:
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    "bignlean-fbffd.firebasestorage.app",
+  messagingSenderId:
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "394356090128",
+  appId:
+    process.env.NEXT_PUBLIC_FIREBASE_APP_ID ||
+    "1:394356090128:web:9b6ae4290fcaa390977195",
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-GB5FME9F4M",
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+const firebaseSetupErrorMessage =
+  "Firebase web app config is missing. Set NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_APP_ID, and NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID from Firebase Console.";
+
+const isFirebaseWebConfigMissing =
+  !firebaseConfig.apiKey ||
+  !firebaseConfig.appId ||
+  !firebaseConfig.messagingSenderId;
+
+let authInitError: unknown = null;
+let auth: Auth | null = null;
+
+const getFirebaseSetupErrorMessage = (error: unknown) => {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "auth/invalid-api-key"
+  ) {
+    return "Firebase web API key is invalid. Set NEXT_PUBLIC_FIREBASE_API_KEY from the Firebase Web App config, not the service account JSON.";
+  }
+
+  return firebaseSetupErrorMessage;
+};
+
+const getFirebaseAuth = (): Auth | null => {
+  if (isFirebaseWebConfigMissing) {
+    authInitError = new Error(firebaseSetupErrorMessage);
+    return null;
+  }
+
+  try {
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    return getAuth(app);
+  } catch (error) {
+    authInitError = error;
+    return null;
+  }
+};
+
+const getFirebaseAuthOrError = () => {
+  const firebaseAuth = auth || getFirebaseAuth();
+
+  if (firebaseAuth) {
+    auth = firebaseAuth;
+  }
+
+  if (!firebaseAuth) {
+    const error = authInitError || new Error(firebaseSetupErrorMessage);
+
+    return {
+      auth: null,
+      error,
+      errorMessage: getFirebaseSetupErrorMessage(error),
+    };
+  }
+
+  return {
+    auth: firebaseAuth,
+    error: null,
+    errorMessage: "",
+  };
+};
+
+auth = getFirebaseAuth();
 
 // Google provider setup
 const googleProvider = new GoogleAuthProvider();
@@ -47,7 +119,17 @@ const isFirebaseAuthError = (error: unknown): error is { code: string } => {
 export const signInWithGoogle = async () => {
   try {
     console.log("Google sign-in starting...");
-    const result = await signInWithPopup(auth, googleProvider);
+    const { auth: firebaseAuth, error, errorMessage } = getFirebaseAuthOrError();
+
+    if (!firebaseAuth) {
+      return {
+        success: false,
+        error,
+        errorMessage,
+      };
+    }
+
+    const result = await signInWithPopup(firebaseAuth, googleProvider);
     console.log("Google sign-in successful");
     const idToken = await result.user.getIdToken();
     
@@ -83,7 +165,17 @@ export const signInWithGoogle = async () => {
 export const signInWithFacebook = async () => {
   try {
     console.log("Facebook sign-in starting...");
-    const result = await signInWithPopup(auth, facebookProvider);
+    const { auth: firebaseAuth, error, errorMessage } = getFirebaseAuthOrError();
+
+    if (!firebaseAuth) {
+      return {
+        success: false,
+        error,
+        errorMessage,
+      };
+    }
+
+    const result = await signInWithPopup(firebaseAuth, facebookProvider);
     console.log("Facebook sign-in successful");
     const idToken = await result.user.getIdToken();
     

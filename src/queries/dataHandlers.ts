@@ -12,6 +12,11 @@ async function getAllCategories() {
   return data;
 }
 
+async function getCategoryHierarchy() {
+  const { data } = await axiosInstance.get(ApiPaths.CATEGORY_HIERARCHY);
+  return data;
+}
+
 async function getAllHomeProducts() {
   const { data } = await axiosInstance.get(ApiPaths.HOME);
   return data;
@@ -48,6 +53,15 @@ export function useGetAllCategories() {
     queryFn: () => getAllCategories(),
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+  });
+}
+
+export function useGetCategoryHierarchy() {
+  return useQuery({
+    queryKey: ["category-hierarchy"],
+    queryFn: () => getCategoryHierarchy(),
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -97,6 +111,7 @@ export function useGetBestSellers() {
 export {
   getAllBrands,
   getAllCategories,
+  getCategoryHierarchy,
   getAllHomeProducts,
   getAllProducts,
   getAllBlogs,

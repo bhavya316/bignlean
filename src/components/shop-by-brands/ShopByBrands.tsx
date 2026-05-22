@@ -48,6 +48,21 @@ export default function ShopByBrandPage() {
   const [selectedSubcategory2Name, setSelectedSubcategory2Name] = useState<string | null>(null);
   const [categoryProducts, setCategoryProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const selectedBrandFilterValues = useMemo(() => {
+    const values: string[] = [];
+    const brandsFromUrl = brandParamKey ? brandParamKey.split("&") : [];
+    brandsFromUrl.forEach((brand) => {
+      if (brand) values.push(String(brand));
+    });
+    if (typeof selectedBrands === "string") {
+      selectedBrands.split("&").forEach((part) => {
+        const [key, value] = part.split("=");
+        if (key === "brands[]" && value) values.push(decodeURIComponent(value));
+      });
+    }
+
+    return values.filter((brand, index, list) => brand && list.indexOf(brand) === index);
+  }, [brandParamKey, selectedBrands]);
 
   useEffect(() => {
     const brandIds = brandParamKey ? brandParamKey.split("&") : [];
@@ -244,6 +259,10 @@ export default function ShopByBrandPage() {
         params.push(`subCatId2=${selectedSubcategory2Id}`);
       }
 
+      selectedBrandFilterValues.forEach((brand) => {
+        params.push(`brands[]=${encodeURIComponent(brand)}`);
+      });
+
       if (params.length === 0) {
         // No filtering needed
         setCategoryProducts([]);
@@ -279,7 +298,7 @@ export default function ShopByBrandPage() {
   // Fetch products when selected filters change
   useEffect(() => {
     fetchProducts();
-  }, [selectedCategoryId, selectedSubcategoryId, selectedSubcategory2Id]);
+  }, [selectedCategoryId, selectedSubcategoryId, selectedSubcategory2Id, selectedBrandFilterValues]);
 
   // Handle category change 
   const handleCategoryChange = (categoryId: number | null, categoryName: string | null) => {
@@ -301,11 +320,37 @@ export default function ShopByBrandPage() {
   // Determine which products to display based on category selection
   const productsToDisplay = useMemo(() => {
     if (selectedCategoryId !== null || selectedSubcategoryId !== null || selectedSubcategory2Id !== null) {
-      // If a category, subcategory, or subcategory2 is selected, always use categoryProducts (even if empty)
-      return categoryProducts;
+      const selectedBrandProductIds = new Set(
+        (allProducts?.products || []).map((product: any) => String(product.id))
+      );
+
+      const matchesSelection = (product: any) => {
+        if (!product) return false;
+        if (selectedCategoryId !== null && Number(product.catId) !== Number(selectedCategoryId)) return false;
+        if (selectedSubcategoryId !== null && Number(product.subCatId) !== Number(selectedSubcategoryId)) return false;
+        if (selectedSubcategory2Id !== null && Number(product.subCatId2) !== Number(selectedSubcategory2Id)) return false;
+        if (selectedBrandFilterValues.length === 0) return true;
+        if (selectedBrandProductIds.has(String(product.id))) return true;
+
+        return selectedBrandFilterValues.some((brand) => {
+          const normalizedBrand = String(brand).toLowerCase();
+          return (
+            String(product.brandId || "") === String(brand) ||
+            String(product.brand?.id || "") === String(brand) ||
+            String(product.brandName || "").toLowerCase() === normalizedBrand ||
+            String(product.brand?.name || "").toLowerCase() === normalizedBrand
+          );
+        });
+      };
+
+      const sourceProducts = categoryProducts.length > 0
+        ? categoryProducts
+        : allProducts?.products || [];
+
+      return sourceProducts.filter(matchesSelection);
     }
     return allProducts?.products || [];
-  }, [selectedCategoryId, selectedSubcategoryId, selectedSubcategory2Id, categoryProducts, allProducts?.products]);
+  }, [selectedCategoryId, selectedSubcategoryId, selectedSubcategory2Id, selectedBrandFilterValues, categoryProducts, allProducts?.products]);
 
   // Calculate paginated products
   const paginatedProducts = useMemo(() => {
@@ -352,6 +397,8 @@ export default function ShopByBrandPage() {
           <FilterBy
             selectedCategoryId={selectedCategoryId}
             selectedCategoryName={selectedCategoryName}
+            selectedSubcategoryId={selectedSubcategoryId}
+            selectedSubcategory2Id={selectedSubcategory2Id}
             displayedProducts={paginatedProducts}
           />
         </div>

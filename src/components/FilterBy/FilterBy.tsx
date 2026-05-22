@@ -1,6 +1,6 @@
 "use client";
 import CustomFilter, { CustomRadioFilter } from "./CustomFilter";
-import { useGetAllBrands, useGetRelatedProducts } from "@/queries/dataHandlers";
+import { useGetAllBrands } from "@/queries/dataHandlers";
 import { useAppContext } from "@/provider/ContextProvider/ContextProvider";
 import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
@@ -34,11 +34,17 @@ const radioFilterDiscount = [
 export default function FilterBy({ 
   selectedCategoryId,
   selectedCategoryName,
-  displayedProducts = [] // Add this new prop
+  selectedSubcategoryId,
+  selectedSubcategory2Id,
+  displayedProducts = [],
+  showRelatedProducts = true,
 }: { 
   selectedCategoryId?: number | null,
   selectedCategoryName?: string | null,
-  displayedProducts?: any[] // Define the type
+  selectedSubcategoryId?: number | null,
+  selectedSubcategory2Id?: number | null,
+  displayedProducts?: any[],
+  showRelatedProducts?: boolean,
 }) {
   const { data: brandsData } = useGetAllBrands();
   const brandsId = brandsData?.brands?.map((brand: any) => brand?.name);
@@ -69,6 +75,30 @@ export default function FilterBy({
     return null;
   }, [selectedBrands]);
 
+  const belongsToCurrentSelection = (product: any) => {
+    if (!product) return false;
+    if (selectedCategoryId && Number(product.catId) !== Number(selectedCategoryId)) return false;
+    if (selectedSubcategoryId && Number(product.subCatId) !== Number(selectedSubcategoryId)) return false;
+    if (selectedSubcategory2Id && Number(product.subCatId2) !== Number(selectedSubcategory2Id)) return false;
+    return true;
+  };
+
+  const belongsToSameCategoryChain = (product: any, sourceProduct: any) => {
+    if (!product || !sourceProduct) return false;
+    if (Number(product.catId) !== Number(sourceProduct.catId)) return false;
+    if (sourceProduct.subCatId && Number(product.subCatId) !== Number(sourceProduct.subCatId)) return false;
+    if (sourceProduct.subCatId2 && Number(product.subCatId2) !== Number(sourceProduct.subCatId2)) return false;
+    return true;
+  };
+
+  const getCategoryProductsUrl = () => {
+    const params = new URLSearchParams();
+    if (selectedCategoryId) params.set("catId", String(selectedCategoryId));
+    if (selectedSubcategoryId) params.set("subCatId", String(selectedSubcategoryId));
+    if (selectedSubcategory2Id) params.set("subCatId2", String(selectedSubcategory2Id));
+    return `${API_CONFIG.BASE_URL}/products-by-category?${params.toString()}`;
+  };
+
   // Function to fetch related products for a specific product ID
   const fetchRelatedProducts = async (productId: number) => {
     try {
@@ -95,23 +125,32 @@ export default function FilterBy({
   
   // Fetch related products based on currently displayed products
   useEffect(() => {
+    if (!showRelatedProducts) {
+      setRelatedProducts([]);
+      setSourceProductName("");
+      setLoadingRelatedProducts(false);
+      return;
+    }
+
     const fetchProductsAndRelated = async () => {
       setLoadingRelatedProducts(true);
+      setRelatedProducts([]);
+      setSourceProductName("");
       try {
         // Get source products - use the displayed products if available
         let sourceProducts: any[] = [];
         
         if (displayedProducts && displayedProducts.length > 0) {
           // Use the displayedProducts as source
-          sourceProducts = displayedProducts.slice(0, 3);
+          sourceProducts = displayedProducts.filter(belongsToCurrentSelection).slice(0, 3);
         } else if (selectedCategoryId) {
           // Fallback to fetching by category if no displayed products
-          const categoryResponse = await fetch(`${API_CONFIG.BASE_URL}/admin/products-by-category?catId=${selectedCategoryId}`);
+          const categoryResponse = await fetch(getCategoryProductsUrl());
           
           if (categoryResponse.ok) {
             const categoryData = await categoryResponse.json();
             if (categoryData.status && Array.isArray(categoryData.products) && categoryData.products.length > 0) {
-              sourceProducts = categoryData.products.slice(0, 3);
+              sourceProducts = categoryData.products.filter(belongsToCurrentSelection).slice(0, 3);
             }
           }
         } else {
@@ -136,9 +175,12 @@ export default function FilterBy({
           console.log(`Fetching related products for product ID: ${productId}`);
           
           const relatedData = await fetchRelatedProducts(productId);
+          const scopedRelatedData = relatedData.filter((product: any) =>
+            belongsToCurrentSelection(product) && belongsToSameCategoryChain(product, sourceProducts[0])
+          );
           
-          if (relatedData.length > 0) {
-            setRelatedProducts(relatedData.slice(0, 3));
+          if (scopedRelatedData.length > 0) {
+            setRelatedProducts(scopedRelatedData.slice(0, 3));
           } else {
             // Fallback to source products if no related products
             setRelatedProducts(sourceProducts.slice(0, 3));
@@ -155,7 +197,7 @@ export default function FilterBy({
     };
     
     fetchProductsAndRelated();
-  }, [displayedProducts, selectedCategoryId]);
+  }, [displayedProducts, selectedCategoryId, selectedSubcategoryId, selectedSubcategory2Id, showRelatedProducts]);
   
   // Handle out of stock checkbox change - keep existing code
   const handleOutOfStockChange = (checked: boolean) => {
@@ -171,15 +213,15 @@ export default function FilterBy({
         let sourceProducts: any[] = [];
         
         if (displayedProducts && displayedProducts.length > 0) {
-          sourceProducts = displayedProducts.slice(0, 3);
+          sourceProducts = displayedProducts.filter(belongsToCurrentSelection).slice(0, 3);
         } else if (selectedCategoryId) {
           // Fallback to category if no displayed products
-          const categoryResponse = await fetch(`${API_CONFIG.BASE_URL}/admin/products-by-category?catId=${selectedCategoryId}`);
+          const categoryResponse = await fetch(getCategoryProductsUrl());
           
           if (categoryResponse.ok) {
             const categoryData = await categoryResponse.json();
             if (categoryData.status && Array.isArray(categoryData.products) && categoryData.products.length > 0) {
-              sourceProducts = categoryData.products.slice(0, 3);
+              sourceProducts = categoryData.products.filter(belongsToCurrentSelection).slice(0, 3);
             }
           }
         } else {
@@ -205,9 +247,12 @@ export default function FilterBy({
             console.log(`Trying related products for product ID: ${productId}`);
             
             const relatedData = await fetchRelatedProducts(productId);
+            const scopedRelatedData = relatedData.filter((product: any) =>
+              belongsToCurrentSelection(product) && belongsToSameCategoryChain(product, sourceProducts[i])
+            );
             
-            if (relatedData.length > 0) {
-              setRelatedProducts(relatedData.slice(0, 3));
+            if (scopedRelatedData.length > 0) {
+              setRelatedProducts(scopedRelatedData.slice(0, 3));
               break; // Stop if we found related products
             }
             
@@ -274,7 +319,7 @@ export default function FilterBy({
           </div>
         </div>
 
-        {/* Related Products section - updated title */}
+        {showRelatedProducts && (
         <div className="border rounded-md mt-2">
           <div className="p-3 border-b">
             <h3 className="text-sm font-medium">
@@ -348,6 +393,7 @@ export default function FilterBy({
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

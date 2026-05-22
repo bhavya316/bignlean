@@ -4,7 +4,7 @@ import CustomPageWrapper from "@/components/Wrappers/CustomPageWrapper";
 import { ApiPaths } from "@/constants";
 import { API_CONFIG } from "@/config/api";
 import { useDispatchContext } from "@/provider/ContextProvider/ContextProvider";
-import { useGetAllCategories } from "@/queries/dataHandlers";
+import { useGetAllCategories, useGetCategoryHierarchy } from "@/queries/dataHandlers";
 import { getMediaUrl } from "@/utils/media";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -12,65 +12,70 @@ import { useEffect, useMemo, useState } from "react";
 export default function CategoriesPage() {
   const router = useRouter();
   const dispatch = useDispatchContext();
-  const { data, isLoading } = useGetAllCategories();
-  const [subcategoriesByCategory, setSubcategoriesByCategory] = useState<Record<number, any[]>>({});
+  const { data: hierarchyData, isLoading: hierarchyLoading } = useGetCategoryHierarchy();
+  const { data: categoryData, isLoading: categoriesLoading } = useGetAllCategories();
   const [subcategories2BySubcategory, setSubcategories2BySubcategory] = useState<Record<number, any[]>>({});
   const categories = useMemo(() => {
     const seen = new Set<string>();
-    return (data?.categories || []).filter((category: any) => {
-      const key = String(category?.name || category?.id).toLowerCase();
+    const hierarchyCategories = Array.isArray(hierarchyData?.categories)
+      ? hierarchyData.categories
+      : Array.isArray(hierarchyData?.data)
+        ? hierarchyData.data
+        : [];
+    const plainCategories = Array.isArray(categoryData?.categories)
+      ? categoryData.categories
+      : Array.isArray(categoryData?.data)
+        ? categoryData.data
+        : [];
+    const sourceCategories = hierarchyCategories.length > 0 ? hierarchyCategories : plainCategories;
+    return sourceCategories.filter((category: any) => {
+      const key = String(category?.id || category?.name);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  }, [data?.categories]);
+  }, [categoryData, hierarchyData]);
 
   useEffect(() => {
-    if (!categories.length) return;
+    const subcategories = categories.flatMap((category: any) => category.subcategories || category.subCategories || []);
+    if (!subcategories.length) return;
 
     let cancelled = false;
+    const missingSubcategory2 = subcategories.filter((subcategory: any) => {
+      const nested = subcategory.subcategories2 || subcategory.subCategories2 || [];
+      return nested.length === 0 && subcategories2BySubcategory[subcategory.id] === undefined;
+    });
 
-    async function loadHierarchy() {
-      try {
-        const subcategoryEntries = await Promise.all(
-          categories.map(async (category: any) => {
-            const response = await fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORIES}/${category.id}`);
-            const result = await response.json();
-            return [category.id, result?.subcategories || []] as [number, any[]];
+    if (!missingSubcategory2.length) return;
+
+    Promise.all(
+      missingSubcategory2.map((subcategory: any) =>
+        fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORIES2}/${subcategory.id}`)
+          .then((response) => response.json())
+          .then((result) => {
+            const subcategories2 = Array.isArray(result?.subcategories2)
+              ? result.subcategories2
+              : Array.isArray(result?.subCategories2)
+                ? result.subCategories2
+                : Array.isArray(result?.data)
+                  ? result.data
+                  : [];
+            return [subcategory.id, subcategories2] as [number, any[]];
           })
-        );
-
-        if (cancelled) return;
-
-        const subcategoryMap = Object.fromEntries(subcategoryEntries) as Record<number, any[]>;
-        setSubcategoriesByCategory(subcategoryMap);
-
-        const allSubcategories = subcategoryEntries.flatMap(([, subcategories]) => subcategories);
-        const subcategory2Entries = await Promise.all(
-          allSubcategories.map(async (subcategory: any) => {
-            const response = await fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORIES2}/${subcategory.id}`);
-            const result = await response.json();
-            return [subcategory.id, result?.subcategories2 || []] as [number, any[]];
-          })
-        );
-
-        if (!cancelled) {
-          setSubcategories2BySubcategory(Object.fromEntries(subcategory2Entries) as Record<number, any[]>);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setSubcategoriesByCategory({});
-          setSubcategories2BySubcategory({});
-        }
-      }
-    }
-
-    loadHierarchy();
+          .catch(() => [subcategory.id, []] as [number, any[]])
+      )
+    ).then((entries) => {
+      if (cancelled) return;
+      setSubcategories2BySubcategory((current) => ({
+        ...current,
+        ...Object.fromEntries(entries),
+      }));
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [categories]);
+  }, [categories, subcategories2BySubcategory]);
 
   const clearBrandSelection = () => {
     dispatch({ type: "SET_SELECTED_BRANDS", payload: null });
@@ -78,11 +83,13 @@ export default function CategoriesPage() {
 
   const openCategory = (category: any) => {
     clearBrandSelection();
+    sessionStorage.setItem("selectedCategoryId", String(category.id));
+    sessionStorage.setItem("selectedCategoryName", category.name || "");
     sessionStorage.removeItem("selectedSubcategoryId");
     sessionStorage.removeItem("selectedSubcategoryName");
     sessionStorage.removeItem("selectedSubcategory2Id");
     sessionStorage.removeItem("selectedSubcategory2Name");
-    router.push(`/shop-by-brands?category=${category.id}`);
+    router.push(`/category/${category.id}`);
   };
 
   const openSubcategory = (category: any, subcategory: any) => {
@@ -93,7 +100,7 @@ export default function CategoriesPage() {
     sessionStorage.setItem("selectedSubcategoryName", subcategory.name || "");
     sessionStorage.removeItem("selectedSubcategory2Id");
     sessionStorage.removeItem("selectedSubcategory2Name");
-    router.push(`/shop-by-brands?category=${category.id}&subcategory=${subcategory.id}`);
+    router.push(`/category/${category.id}/subcategory/${subcategory.id}`);
   };
 
   const openSubcategory2 = (category: any, subcategory: any, subcategory2: any) => {
@@ -104,12 +111,12 @@ export default function CategoriesPage() {
     sessionStorage.setItem("selectedSubcategoryName", subcategory.name || "");
     sessionStorage.setItem("selectedSubcategory2Id", String(subcategory2.id));
     sessionStorage.setItem("selectedSubcategory2Name", subcategory2.name || "");
-    router.push(`/shop-by-brands?category=${category.id}&subcategory=${subcategory.id}&subcategory2=${subcategory2.id}`);
+    router.push(`/category/${category.id}/subcategory/${subcategory.id}/subcategory2/${subcategory2.id}`);
   };
 
   return (
     <CustomPageWrapper heading="Shop by Category" className="flex flex-col gap-6">
-      {isLoading ? (
+      {hierarchyLoading || categoriesLoading ? (
         <div className="grid grid-cols-5 gap-4 max-[1000px]:grid-cols-4 max-[700px]:grid-cols-3 max-[480px]:grid-cols-2">
           {Array.from({ length: 10 }).map((_, index) => (
             <div key={index} className="aspect-square animate-pulse rounded-xl bg-gray-100" />
@@ -137,7 +144,7 @@ export default function CategoriesPage() {
                 />
               </button>
               <div className="mt-3 space-y-2 text-left">
-                {(subcategoriesByCategory[category.id] || []).map((subcategory: any) => (
+                {(category.subcategories || category.subCategories || []).map((subcategory: any) => (
                   <div key={subcategory.id}>
                     <button
                       type="button"
@@ -147,7 +154,10 @@ export default function CategoriesPage() {
                       {subcategory.name}
                     </button>
                     <div className="mt-1 flex flex-wrap gap-1.5">
-                      {(subcategories2BySubcategory[subcategory.id] || []).map((subcategory2: any) => (
+                      {((subcategory.subcategories2 || subcategory.subCategories2 || []).length > 0
+                        ? subcategory.subcategories2 || subcategory.subCategories2 || []
+                        : subcategories2BySubcategory[subcategory.id] || []
+                      ).map((subcategory2: any) => (
                         <button
                           key={subcategory2.id}
                           type="button"

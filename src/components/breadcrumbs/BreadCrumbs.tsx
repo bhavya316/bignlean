@@ -22,6 +22,14 @@ export default function BreadCrumbs({ }: Props) {
     brandId: number;
     catId: number;
   } | null>(null);
+  const [categoryRouteDetails, setCategoryRouteDetails] = useState<{
+    categoryId: string;
+    categoryName: string;
+    subcategoryId?: string;
+    subcategoryName?: string;
+    subcategory2Id?: string;
+    subcategory2Name?: string;
+  } | null>(null);
 
   const paths = (pathname || "").split("/");
 
@@ -91,6 +99,82 @@ export default function BreadCrumbs({ }: Props) {
     }
   }, [pathname, searchParams]);
 
+  useEffect(() => {
+    const match = pathname?.match(/^\/category\/([^/]+)(?:\/subcategory\/([^/]+))?(?:\/subcategory2\/([^/]+))?/);
+    if (!match) {
+      setCategoryRouteDetails(null);
+      return;
+    }
+
+    const [, categoryId, subcategoryId, subcategory2Id] = match;
+    let cancelled = false;
+
+    const getName = (payload: any, key: string) =>
+      payload?.[key]?.name || payload?.data?.name || payload?.result?.name || "";
+
+    const getStored = (key: string) => {
+      try {
+        return sessionStorage.getItem(key) || "";
+      } catch (error) {
+        return "";
+      }
+    };
+
+    setCategoryRouteDetails({
+      categoryId,
+      categoryName: getStored("selectedCategoryName") || `Category #${categoryId}`,
+      subcategoryId,
+      subcategoryName: subcategoryId
+        ? getStored("selectedSubcategoryName") || `Subcategory #${subcategoryId}`
+        : undefined,
+      subcategory2Id,
+      subcategory2Name: subcategory2Id
+        ? getStored("selectedSubcategory2Name") || `Subcategory 2 #${subcategory2Id}`
+        : undefined,
+    });
+
+    Promise.all([
+      fetch(`${API_CONFIG.BASE_URL}${ApiPaths.CATEGORY}/${categoryId}`)
+        .then((res) => res.json())
+        .catch(() => null),
+      subcategoryId
+        ? fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORY}/${subcategoryId}`)
+            .then((res) => res.json())
+            .catch(() => null)
+        : Promise.resolve(null),
+      subcategory2Id
+        ? fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORY2}/${subcategory2Id}`)
+            .then((res) => res.json())
+            .catch(() => null)
+        : Promise.resolve(null),
+    ]).then(([categoryData, subcategoryData, subcategory2Data]) => {
+      if (cancelled) return;
+      setCategoryRouteDetails({
+        categoryId,
+        categoryName:
+          getName(categoryData, "category") ||
+          getStored("selectedCategoryName") ||
+          `Category #${categoryId}`,
+        subcategoryId,
+        subcategoryName: subcategoryId
+          ? getName(subcategoryData, "subcategory") ||
+            getStored("selectedSubcategoryName") ||
+            `Subcategory #${subcategoryId}`
+          : undefined,
+        subcategory2Id,
+        subcategory2Name: subcategory2Id
+          ? getName(subcategory2Data, "subcategory2") ||
+            getStored("selectedSubcategory2Name") ||
+            `Subcategory 2 #${subcategory2Id}`
+          : undefined,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
   function createCrumbs(paths: string[]) {
     const crumbs: string[] = [];
     let path = "";
@@ -129,7 +213,54 @@ export default function BreadCrumbs({ }: Props) {
 
   return (
     <div className="w-full  max-w-[1300px] px-4 sm:px-6 lg:px-16 mx-auto py-2 text-center flex gap-2 justify-start items-center">
-      {productDetails && pathname?.includes("/product/") ? (
+      {categoryRouteDetails ? (
+        <>
+          <Link
+            href="/"
+            className="capitalize text-sm text-[#001942] font-light max-sm:text-[10px]"
+          >
+            Home
+          </Link>
+          <span className="text-[#001942] mx-1">/</span>
+          {categoryRouteDetails.subcategoryId ? (
+            <Link
+              href={`/category/${categoryRouteDetails.categoryId}`}
+              className="capitalize text-sm text-[#001942] font-light max-sm:text-[10px] hover:text-primary transition-colors"
+            >
+              {categoryRouteDetails.categoryName}
+            </Link>
+          ) : (
+            <span className="capitalize text-sm max-sm:text-[10px] text-[#E70F0F] line-clamp-1 text-start">
+              {categoryRouteDetails.categoryName}
+            </span>
+          )}
+          {categoryRouteDetails.subcategoryId && (
+            <>
+              <span className="text-[#001942] mx-1">/</span>
+              {categoryRouteDetails.subcategory2Id ? (
+                <Link
+                  href={`/category/${categoryRouteDetails.categoryId}/subcategory/${categoryRouteDetails.subcategoryId}`}
+                  className="capitalize text-sm text-[#001942] font-light max-sm:text-[10px] hover:text-primary transition-colors"
+                >
+                  {categoryRouteDetails.subcategoryName}
+                </Link>
+              ) : (
+                <span className="capitalize text-sm max-sm:text-[10px] text-[#E70F0F] line-clamp-1 text-start">
+                  {categoryRouteDetails.subcategoryName}
+                </span>
+              )}
+            </>
+          )}
+          {categoryRouteDetails.subcategory2Id && (
+            <>
+              <span className="text-[#001942] mx-1">/</span>
+              <span className="capitalize text-sm max-sm:text-[10px] text-[#E70F0F] line-clamp-1 text-start">
+                {categoryRouteDetails.subcategory2Name}
+              </span>
+            </>
+          )}
+        </>
+      ) : productDetails && pathname?.includes("/product/") ? (
         <>
           <Link
             href="/"
@@ -148,7 +279,7 @@ export default function BreadCrumbs({ }: Props) {
             <>
               <span className="text-[#001942] mx-1">/</span>
               <Link
-                href={`/shop-by-brands?category=${productDetails.catId}`}
+                href={`/category/${productDetails.catId}`}
                 className="capitalize text-sm text-[#001942] font-light max-sm:text-[10px] hover:text-primary transition-colors"
               >
                 {productDetails.categoryName}

@@ -192,7 +192,10 @@ const MobileSideBar = ({
           const subcategories = category.subcategories || category.subCategories || [];
           subcategoryMap[category.id] = subcategories;
           subcategories.forEach((subcategory: Subcategory) => {
-            subcategory2Map[subcategory.id] = subcategory.subcategories2 || subcategory.subCategories2 || [];
+            const subcategories2 = subcategory.subcategories2 || subcategory.subCategories2 || [];
+            if (subcategories2.length > 0) {
+              subcategory2Map[subcategory.id] = subcategories2;
+            }
           });
         });
         setCategorySubcategories((prev: any) => ({ ...prev, ...subcategoryMap }));
@@ -230,10 +233,16 @@ const MobileSideBar = ({
             (subcategory: Subcategory): Promise<[number, Subcategory2[]]> =>
               fetch(`${API_CONFIG.BASE_URL}/subcategories2/${subcategory.id}`)
                 .then((response) => response.json())
-                .then((sub2Data): [number, Subcategory2[]] => [
-                  subcategory.id,
-                  sub2Data.status && sub2Data.subcategories2 ? sub2Data.subcategories2 : [],
-                ])
+                .then((sub2Data): [number, Subcategory2[]] => {
+                  const subcategories2 = Array.isArray(sub2Data?.subcategories2)
+                    ? sub2Data.subcategories2
+                    : Array.isArray(sub2Data?.subCategories2)
+                      ? sub2Data.subCategories2
+                      : Array.isArray(sub2Data?.data)
+                        ? sub2Data.data
+                        : [];
+                  return [subcategory.id, subcategories2];
+                })
                 .catch((): [number, Subcategory2[]] => [subcategory.id, []])
           )
         );
@@ -271,7 +280,7 @@ const MobileSideBar = ({
     sessionStorage.removeItem('selectedSubcategory2Id');
     sessionStorage.removeItem('selectedSubcategory2Name');
     setToggle(false);
-    router.push(`/shop-by-brands?category=${category.id}`);
+    router.push(`/category/${category.id}`);
   };
 
   return (
@@ -335,7 +344,7 @@ const MobileSideBar = ({
               type="button"
               onClick={() => {
                 setToggle(false);
-                router.push("/categories");
+                router.push("/products/categories");
               }}
               className="ml-auto text-[13px] font-semibold text-[#FF0012]"
             >
@@ -370,7 +379,7 @@ const MobileSideBar = ({
                       categorySubcategories[category.id].map((subcategory: Subcategory) => (
                         <div key={subcategory.id} className="py-1">
                           <Link
-                            href={`/shop-by-brands?category=${category.id}&subcategory=${subcategory.id}`}
+                            href={`/category/${category.id}/subcategory/${subcategory.id}`}
                             onClick={() => {
                               clearSelectedBrand();
                               sessionStorage.setItem('selectedCategoryId', category.id.toString());
@@ -389,7 +398,7 @@ const MobileSideBar = ({
                             <div className="ml-3 flex flex-col">
                               {subcategorySubcategories2[subcategory.id].map((subcategory2: Subcategory2) => (
                                 <Link
-                                  href={`/shop-by-brands?category=${category.id}&subcategory=${subcategory.id}&subcategory2=${subcategory2.id}`}
+                                  href={`/category/${category.id}/subcategory/${subcategory.id}/subcategory2/${subcategory2.id}`}
                                   key={subcategory2.id}
                                   onClick={() => {
                                     clearSelectedBrand();

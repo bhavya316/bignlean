@@ -14,12 +14,14 @@ export default function ShopCategoryCard({ image, label, id }: Props) {
   const handleClick = () => {
     dispatch({ type: "SET_SELECTED_BRANDS", payload: null });
     if (typeof window !== "undefined") {
+      sessionStorage.setItem("selectedCategoryId", String(id));
+      sessionStorage.setItem("selectedCategoryName", label || "");
       sessionStorage.removeItem("selectedSubcategoryId");
       sessionStorage.removeItem("selectedSubcategoryName");
       sessionStorage.removeItem("selectedSubcategory2Id");
       sessionStorage.removeItem("selectedSubcategory2Name");
     }
-    router.push(`/shop-by-brands?category=${id}`);
+    router.push(`/category/${id}`);
   };
 
   return (

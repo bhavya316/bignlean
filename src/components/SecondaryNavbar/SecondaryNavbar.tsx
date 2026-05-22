@@ -45,6 +45,43 @@ interface SubcategorySubcategories2Map {
   [subcategoryId: number]: Subcategory2[];
 }
 
+const getSubcategory2ParentId = (subcategory2: any) =>
+  Number(
+    subcategory2?.subCategoryId ||
+    subcategory2?.subcategoryId ||
+    subcategory2?.parentSubCategoryId ||
+    subcategory2?.parentSubcategoryId ||
+    subcategory2?.subCatId ||
+    0
+  );
+
+const getListFromResponse = (payload: any, primaryKey: string, secondaryKey?: string) =>
+  Array.isArray(payload?.[primaryKey])
+    ? payload[primaryKey]
+    : secondaryKey && Array.isArray(payload?.[secondaryKey])
+      ? payload[secondaryKey]
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : [];
+
+const fetchListFromFirstWorkingEndpoint = async (
+  urls: string[],
+  primaryKey: string,
+  secondaryKey?: string
+) => {
+  for (const url of urls) {
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      const list = getListFromResponse(data, primaryKey, secondaryKey);
+      if (list.length > 0) return list;
+    } catch (error) {
+      void error;
+    }
+  }
+  return [];
+};
+
 export default function SecondaryNavbar() {
   const { data: brandsData } = useGetAllBrands();
   const { data: categoryData } = useGetAllCategories();
@@ -87,12 +124,40 @@ export default function SecondaryNavbar() {
           subcategoryMap[category.id] = subcategories;
           subcategories.forEach((subcategory: Subcategory) => {
             const subcategories2 = subcategory.subcategories2 || subcategory.subCategories2 || [];
-            subcategory2Map[subcategory.id] = subcategories2;
+            if (subcategories2.length > 0) {
+              subcategory2Map[subcategory.id] = subcategories2;
+            }
           });
         });
 
         setCategorySubcategories(subcategoryMap);
         setSubcategorySubcategories2(subcategory2Map);
+        fetchListFromFirstWorkingEndpoint(
+          [
+            `${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORIES2}`,
+            `${API_CONFIG.BASE_URL}/admin/subcategories2?limit=1000`,
+          ],
+          "subcategories2",
+          "subCategories2"
+        )
+          .then((allSubcategories2) => {
+            if (cancelled) return;
+            if (!allSubcategories2.length) return;
+
+            setSubcategorySubcategories2((prev) => {
+              const next = { ...prev };
+              allSubcategories2.forEach((subcategory2: any) => {
+                const parentId = getSubcategory2ParentId(subcategory2);
+                if (!parentId) return;
+                if (!next[parentId]) next[parentId] = [];
+                if (!next[parentId].some((item) => Number(item.id) === Number(subcategory2.id))) {
+                  next[parentId].push(subcategory2);
+                }
+              });
+              return next;
+            });
+          })
+          .catch(() => {});
         if (categories.length > 0) {
           setHoveredCategory((current) => current ?? [...categories].sort((a: Category, b: Category) => a.id - b.id)[0].id);
         }
@@ -114,23 +179,20 @@ export default function SecondaryNavbar() {
     if (!hoveredCategory) return;
 
     let cancelled = false;
-    const existingSubcategories = categorySubcategories[hoveredCategory];
+    const hoveredCategoryId = hoveredCategory;
+    const existingSubcategories = categorySubcategories[hoveredCategoryId];
 
     async function loadSubcategory2(subcategories: Subcategory[]) {
-      const missingSubcategories = subcategories.filter(
-        (subcategory) => subcategorySubcategories2[subcategory.id] === undefined
-      );
-      if (missingSubcategories.length === 0) return;
-
       const subcategory2Entries = await Promise.all(
-        missingSubcategories.map((subcategory) =>
-          fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORIES2}/${subcategory.id}`)
-            .then((response) => response.json())
-            .then((data): [number, Subcategory2[]] => [
-              subcategory.id,
-              Array.isArray(data?.subcategories2) ? data.subcategories2 : [],
-            ])
-            .catch((): [number, Subcategory2[]] => [subcategory.id, []])
+        subcategories.map((subcategory) =>
+          fetchListFromFirstWorkingEndpoint(
+            [
+              `${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORIES2}/${subcategory.id}`,
+              `${API_CONFIG.BASE_URL}/admin/subcategories2/${subcategory.id}`,
+            ],
+            "subcategories2",
+            "subCategories2"
+          ).then((subcategories2): [number, Subcategory2[]] => [subcategory.id, subcategories2])
         )
       );
 
@@ -138,7 +200,9 @@ export default function SecondaryNavbar() {
       setSubcategorySubcategories2((prev) => {
         const next = { ...prev };
         subcategory2Entries.forEach(([subcategoryId, subcategories2]) => {
-          next[subcategoryId] = subcategories2;
+          if (subcategories2.length > 0 || next[subcategoryId] === undefined) {
+            next[subcategoryId] = subcategories2;
+          }
         });
         return next;
       });
@@ -151,14 +215,14 @@ export default function SecondaryNavbar() {
           return;
         }
 
-        const response = await fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORIES}/${hoveredCategory}`);
+        const response = await fetch(`${API_CONFIG.BASE_URL}${ApiPaths.SUBCATEGORIES}/${hoveredCategoryId}`);
         const data = await response.json();
-        const subcategories = Array.isArray(data?.subcategories) ? data.subcategories : [];
+        const subcategories = getListFromResponse(data, "subcategories", "subCategories");
 
         if (cancelled) return;
         setCategorySubcategories((prev) => ({
           ...prev,
-          [hoveredCategory]: subcategories,
+          [hoveredCategoryId]: subcategories,
         }));
 
         await loadSubcategory2(subcategories);
@@ -166,7 +230,7 @@ export default function SecondaryNavbar() {
         if (!cancelled) {
           setCategorySubcategories((prev) => ({
             ...prev,
-            [hoveredCategory]: [],
+            [hoveredCategoryId]: [],
           }));
         }
       }
@@ -177,7 +241,7 @@ export default function SecondaryNavbar() {
     return () => {
       cancelled = true;
     };
-  }, [hoveredCategory, categorySubcategories, subcategorySubcategories2]);
+  }, [hoveredCategory, categorySubcategories]);
 
   const hoveredCategoryData = hoveredCategory
     ? categoriesForNavbar.find((category: Category) => category.id === hoveredCategory)
@@ -221,7 +285,7 @@ export default function SecondaryNavbar() {
     sessionStorage.removeItem('selectedSubcategory2Name');
 
     // Navigate to shop page
-    router.push(`/shop-by-brands?category=${categoryId}`);
+    router.push(`/category/${categoryId}`);
     setShowCategories(false);
   };
 
@@ -242,7 +306,7 @@ export default function SecondaryNavbar() {
     sessionStorage.removeItem('selectedSubcategory2Name');
 
     // Navigate to shop page with category and subcategory parameters
-    router.push(`/shop-by-brands?category=${categoryId}&subcategory=${subcategoryId}`);
+    router.push(`/category/${categoryId}/subcategory/${subcategoryId}`);
     setShowCategories(false);
   };
 
@@ -261,7 +325,7 @@ export default function SecondaryNavbar() {
     sessionStorage.setItem('selectedSubcategory2Name', subcategory2Name);
 
     // Navigate to shop page with all parameters
-    router.push(`/shop-by-brands?category=${categoryId}&subcategory=${subcategoryId}&subcategory2=${subcategory2Id}`);
+    router.push(`/category/${categoryId}/subcategory/${subcategoryId}/subcategory2/${subcategory2Id}`);
     setShowCategories(false);
   };
 
@@ -292,7 +356,7 @@ export default function SecondaryNavbar() {
                       <button
                         type="button"
                         onClick={() => {
-                          router.push("/categories");
+                          router.push("/products/categories");
                           setShowCategories(false);
                         }}
                         className="w-full px-4 py-3 text-left text-[14px] font-semibold text-[#E70F0F] hover:bg-white"

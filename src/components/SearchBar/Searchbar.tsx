@@ -186,7 +186,7 @@ export default function Searchbar({
       sessionStorage.removeItem("selectedSubcategoryName");
       sessionStorage.removeItem("selectedSubcategory2Id");
       sessionStorage.removeItem("selectedSubcategory2Name");
-      router.push(`/shop-by-brands?category=${category.id}`);
+      router.push(`/category/${category.id}`);
     } else {
       clearCategorySelection();
       router.push(category?.href || "/shop-by-brands");
