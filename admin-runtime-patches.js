@@ -50,10 +50,17 @@
   var offerDraftProductIds = [];
   var offerDraftProducts = [];
   var comboDraftPayload = null;
+  var selectedSubCat2Value = "";
+  var selectedSubcategoryParentValue = "";
   var comboEditPricesLoaded = false;
   var comboVariantNavigationGuardInstalled = false;
   var webpackRequire = null;
   var lastObservedPath = location.pathname;
+  var adminTaxonomyCache = null;
+  var lastProductTaxonomyHydrationKey = "";
+  var pendingProductTaxonomyHydrationKey = "";
+  var productCacheById = {};
+  var lastProductListProducts = [];
 
   function injectStyle() {
     if (document.getElementById("bnl-admin-runtime-style")) return;
@@ -142,9 +149,57 @@
       ".bnl-offer-builder__product button.is-selected{background:#16a34a;}",
       ".bnl-offer-builder__status{margin-top:10px;font-size:13px;color:#6b7280;}",
       ".bnl-offer-builder__status.is-error{color:#b91c1c;}",
+      ".add_products__content__form__brand_cat .bnl-subcat2-field{margin:0!important;min-width:220px;align-self:end;}",
+      ".bnl-subcat2-field{display:flex;flex-direction:column;gap:8px;margin:12px 0;min-width:220px;}",
+      ".bnl-subcat2-field label{font-size:13px;font-weight:700;color:#111827;}",
+      ".bnl-subcat2-field select{height:40px;border:1px solid #d1d5db;border-radius:8px;background:#fff;padding:0 10px;font-size:14px;outline:none;}",
+      ".bnl-subcat2-field select:focus{border-color:#e70f0f;box-shadow:0 0 0 3px rgba(231,15,15,.08);}",
+      ".bnl-current-product-taxonomy{grid-column:1/-1;margin:0 0 10px;padding:10px 12px;border:1px solid #fee2e2;background:#fff7f7;border-radius:8px;color:#7f1d1d;font-size:13px;font-weight:700;line-height:1.4;}",
+      ".bnl-product-list-expiry{display:block;margin-top:4px;color:#6b7280;font-size:12px;font-weight:600;}",
+      ".bnl-subcat2-manager{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:16px 0;box-shadow:0 10px 24px rgba(15,23,42,.06);}",
+      ".bnl-subcat2-manager h4{margin:0 0 4px;font-size:18px;color:#111827;}",
+      ".bnl-subcat2-manager p{margin:0 0 14px;color:#6b7280;font-size:13px;line-height:1.45;}",
+      ".bnl-subcat2-manager__form{display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) auto;gap:10px;align-items:end;}",
+      ".bnl-subcat2-manager__field{display:flex;flex-direction:column;gap:6px;}",
+      ".bnl-subcat2-manager__field label{font-size:13px;font-weight:700;color:#111827;}",
+      ".bnl-subcat2-manager select,.bnl-subcat2-manager input{height:40px;border:1px solid #d1d5db;border-radius:8px;padding:0 10px;font-size:14px;outline:none;}",
+      ".bnl-subcat2-manager button{height:40px;border:0;border-radius:8px;padding:0 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}",
+      ".bnl-subcat2-manager__primary{background:#e70f0f;color:#fff;}",
+      ".bnl-subcat2-manager__list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:14px;}",
+      ".bnl-subcat2-manager__item{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid #e5e7eb;border-radius:8px;padding:10px;background:#f9fafb;}",
+      ".bnl-subcat2-manager__item strong{display:block;font-size:13px;color:#111827;}",
+      ".bnl-subcat2-manager__item span{display:block;font-size:12px;color:#6b7280;margin-top:3px;}",
+      ".bnl-subcat2-manager__item button{height:32px;background:#fff;color:#b91c1c;border:1px solid #fecaca;}",
+      ".bnl-subcat2-manager__status{margin-top:10px;font-size:13px;color:#6b7280;}",
+      ".bnl-subcat2-manager__status.is-error{color:#b91c1c;}",
+      ".sub_categories__content.bnl-taxonomy-managed>:not([data-bnl-taxonomy-manager]){display:none!important;}",
+      ".bnl-taxonomy-manager{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:16px 0;box-shadow:0 10px 24px rgba(15,23,42,.06);}",
+      ".bnl-taxonomy-manager h4{margin:0 0 4px;font-size:18px;color:#111827;}",
+      ".bnl-taxonomy-manager p{margin:0 0 14px;color:#6b7280;font-size:13px;line-height:1.45;}",
+      ".bnl-taxonomy-manager__grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;}",
+      ".bnl-taxonomy-manager__panel{border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;padding:14px;min-width:0;}",
+      ".bnl-taxonomy-manager__form{display:grid;grid-template-columns:minmax(150px,1fr) minmax(150px,1fr) auto;gap:10px;align-items:end;margin-bottom:12px;}",
+      ".bnl-taxonomy-manager__field{display:flex;flex-direction:column;gap:6px;min-width:0;}",
+      ".bnl-taxonomy-manager__field label,.bnl-subcategory-parent-field label{font-size:13px;font-weight:700;color:#111827;}",
+      ".bnl-taxonomy-manager select,.bnl-taxonomy-manager input,.bnl-subcategory-parent-field select{height:40px;border:1px solid #d1d5db;border-radius:8px;background:#fff;padding:0 10px;font-size:14px;outline:none;min-width:0;}",
+      ".bnl-taxonomy-manager select:focus,.bnl-taxonomy-manager input:focus,.bnl-subcategory-parent-field select:focus{border-color:#e70f0f;box-shadow:0 0 0 3px rgba(231,15,15,.08);}",
+      ".bnl-taxonomy-manager button{height:40px;border:0;border-radius:8px;padding:0 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}",
+      ".bnl-taxonomy-manager__primary{background:#e70f0f;color:#fff;}",
+      ".bnl-taxonomy-manager__secondary{background:#fff;color:#111827;border:1px solid #d1d5db!important;}",
+      ".bnl-taxonomy-manager__danger{background:#fff;color:#b91c1c;border:1px solid #fecaca!important;}",
+      ".bnl-taxonomy-manager__list{display:grid;gap:10px;max-height:520px;overflow:auto;padding-right:2px;}",
+      ".bnl-taxonomy-manager__row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid #e5e7eb;border-radius:8px;background:#fff;padding:10px;}",
+      ".bnl-taxonomy-manager__row-main{display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,1fr);gap:8px;min-width:0;}",
+      ".bnl-taxonomy-manager__row-actions{display:flex;gap:8px;align-items:center;}",
+      ".bnl-taxonomy-manager__status{margin-top:10px;font-size:13px;color:#6b7280;}",
+      ".bnl-taxonomy-manager__status.is-error{color:#b91c1c;}",
+      ".bnl-subcategory-parent-field{display:flex;flex-direction:column;gap:6px;margin:0 0 12px;min-width:220px;}",
       "@media(max-width:680px){.bnl-combo-picker__header,.bnl-combo-price-row,.bnl-combo-preview,.bnl-combo-modal__head,.bnl-combo-modal__foot{grid-template-columns:1fr;display:grid;}.bnl-combo-modal{padding:10px;}.bnl-combo-products{grid-template-columns:1fr;}}",
       "@media(max-width:900px){.bnl-offer-builder__filters{grid-template-columns:1fr 1fr;}.bnl-offer-builder__filters button{width:100%;}}",
       "@media(max-width:680px){.bnl-offer-image-tools,.bnl-offer-builder__filters{grid-template-columns:1fr;}.bnl-offer-logo-upload,.bnl-offer-banner-upload{min-height:140px!important;}.bnl-offer-builder__products{grid-template-columns:1fr;}}",
+      "@media(max-width:760px){.bnl-subcat2-manager__form{grid-template-columns:1fr;}.bnl-subcat2-manager__form button{width:100%;}}",
+      "@media(max-width:1100px){.bnl-taxonomy-manager__grid{grid-template-columns:1fr;}.bnl-taxonomy-manager__form{grid-template-columns:1fr;}.bnl-taxonomy-manager__form button{width:100%;}}",
+      "@media(max-width:720px){.bnl-taxonomy-manager__row{grid-template-columns:1fr;}.bnl-taxonomy-manager__row-main{grid-template-columns:1fr;}.bnl-taxonomy-manager__row-actions{justify-content:flex-end;}}",
       ".add_product_varients__content__items{grid-template-columns:repeat(4,minmax(150px,1fr))!important;align-items:end!important;overflow:visible!important;}",
       ".add_product_varients__content__items__item_desc{min-width:0;align-self:end;}",
       ".add_product_varients__content__items__item_desc:nth-of-type(-n+4) label{min-height:42px;display:flex;flex-direction:column;justify-content:flex-end;}",
@@ -393,6 +448,15 @@
     if (wasProductDraft && !isProductDraft) {
       resetProductDraftState();
     }
+    if ((isProductDraftPath(lastObservedPath) || isComboFormPath(lastObservedPath)) &&
+      !(isProductDraftPath(currentPath) || isComboFormPath(currentPath))) {
+      selectedSubCat2Value = "";
+      lastProductTaxonomyHydrationKey = "";
+      pendingProductTaxonomyHydrationKey = "";
+    }
+    if (lastObservedPath.indexOf("sub_category") !== -1 && currentPath.indexOf("sub_category") === -1) {
+      selectedSubcategoryParentValue = "";
+    }
     if (isComboFormPath(lastObservedPath) && !isComboFormPath(currentPath)) {
       comboDraftPayload = null;
       comboEditPricesLoaded = false;
@@ -536,6 +600,896 @@
     return headers;
   }
 
+  function getAdminApiBase() {
+    var host = location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") return "http://localhost:3002";
+    return "https://api.bignlean.com";
+  }
+
+  function fetchAdminJson(path, options) {
+    var apiBase = getAdminApiBase();
+    var init = options || {};
+    var isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
+    init.headers = Object.assign({}, getAdminAuthHeaders(init.body != null && !isFormData), init.headers || {});
+    return fetch(apiBase + path, init).then(function (response) {
+      return response.json().then(function (data) {
+        if (!response.ok || data.status === false) {
+          throw new Error(data.message || "Request failed.");
+        }
+        return data;
+      });
+    });
+  }
+
+  function getAdminRouteState() {
+    var state = window.history && window.history.state;
+    if (!state) return {};
+    return state.usr || state.state || state;
+  }
+
+  function firstNonEmptyValue() {
+    for (var index = 0; index < arguments.length; index += 1) {
+      var value = arguments[index];
+      if (value !== undefined && value !== null && value !== "") return value;
+    }
+    return "";
+  }
+
+  function objectId(value) {
+    if (!value || typeof value !== "object") return "";
+    return firstNonEmptyValue(value.id, value.value, value._id);
+  }
+
+  function scalarId(value) {
+    if (value === undefined || value === null || typeof value === "object") return "";
+    var normalized = String(value).trim();
+    return /^\d+$/.test(normalized) ? normalized : "";
+  }
+
+  function objectName(value) {
+    if (!value || typeof value !== "object") return typeof value === "string" ? value : "";
+    return firstNonEmptyValue(value.name, value.title, value.label);
+  }
+
+  function normalizeAdminProductTaxonomy(product) {
+    if (!product || typeof product !== "object") return product;
+
+    var brand = product.brand || product.Brand || product.brandInfo || product.brandData;
+    var category = product.category || product.Category || product.categoryInfo || product.categoryData;
+    var subcategory = product.subcategory || product.subCategory || product.SubCategory || product.sub_category || product.subCategoryInfo;
+    var subcategory2 = product.subcategory2 || product.subCategory2 || product.SubCategory2 || product.sub_category2 || product.subCategory2Info;
+
+    var brandId = firstNonEmptyValue(product.brandId, product.brandID, product.brand_id, objectId(brand), scalarId(product.brand));
+    var categoryId = firstNonEmptyValue(product.catId, product.categoryId, product.categoryID, product.category_id, objectId(category), scalarId(product.category));
+    var subcategoryId = firstNonEmptyValue(product.subCatId, product.subCategoryId, product.subcategoryId, product.sub_cat_id, objectId(subcategory), scalarId(product.subcategory));
+    var subcategory2Id = firstNonEmptyValue(
+      product.subCatId2,
+      product.subCat2Id,
+      product.subCategory2Id,
+      product.subcategory2Id,
+      product.sub_cat_id2,
+      objectId(subcategory2),
+      scalarId(product.subcategory2)
+    );
+
+    if (brandId !== "") product.brandId = brandId;
+    if (categoryId !== "") product.catId = categoryId;
+    if (subcategoryId !== "") product.subCatId = subcategoryId;
+    if (subcategory2Id !== "") product.subCatId2 = subcategory2Id;
+
+    product.brandName = firstNonEmptyValue(product.brandName, objectName(brand), typeof product.brand === "string" ? product.brand : "");
+    product.categoryName = firstNonEmptyValue(product.categoryName, objectName(category), typeof product.category === "string" ? product.category : "");
+    product.subcategoryName = firstNonEmptyValue(
+      product.subcategoryName,
+      product.subCategoryName,
+      objectName(subcategory),
+      typeof product.subcategory === "string" ? product.subcategory : ""
+    );
+    product.subcategory2Name = firstNonEmptyValue(
+      product.subcategory2Name,
+      product.subCategory2Name,
+      objectName(subcategory2),
+      typeof product.subcategory2 === "string" ? product.subcategory2 : ""
+    );
+
+    return product;
+  }
+
+  function normalizeSearchText(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function findTaxonomyByName(itemsById, name, predicate) {
+    var normalizedName = normalizeSearchText(name);
+    if (!normalizedName) return null;
+    var ids = Object.keys(itemsById || {});
+    for (var index = 0; index < ids.length; index += 1) {
+      var item = itemsById[ids[index]];
+      if (normalizeSearchText(item && item.name) === normalizedName && (!predicate || predicate(item))) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  function resolveProductTaxonomy(product, taxonomy) {
+    product = normalizeAdminProductTaxonomy(product);
+    if (!product || !taxonomy) return product;
+
+    if (!product.brandId && product.brandName) {
+      var brand = findTaxonomyByName(taxonomy.brandsById, product.brandName);
+      if (brand) product.brandId = brand.id;
+    }
+    if (!product.catId && product.categoryName) {
+      var category = findTaxonomyByName(taxonomy.categoriesById, product.categoryName);
+      if (category) product.catId = category.id;
+    }
+    if (!product.subCatId && product.subcategoryName) {
+      var subcategory = findTaxonomyByName(taxonomy.subcategoriesById, product.subcategoryName, function (item) {
+        return !product.catId || String(item.catId || item.categoryId || "") === String(product.catId);
+      });
+      if (subcategory) product.subCatId = subcategory.id;
+    }
+    if (!product.subCatId2 && product.subcategory2Name) {
+      var subcategory2 = findTaxonomyByName(taxonomy.subcategories2ById, product.subcategory2Name, function (item) {
+        return !product.subCatId || String(item.subCategoryId || item.subcategoryId || "") === String(product.subCatId);
+      });
+      if (subcategory2) product.subCatId2 = subcategory2.id;
+    }
+    if (product.subCatId && !product.catId) {
+      var selectedSubcategory = taxonomy.subcategoriesById[String(product.subCatId)];
+      if (selectedSubcategory) product.catId = selectedSubcategory.catId || selectedSubcategory.categoryId || "";
+    }
+    if (product.subCatId2 && !product.subCatId) {
+      var selectedSubcategory2 = taxonomy.subcategories2ById[String(product.subCatId2)];
+      if (selectedSubcategory2) product.subCatId = selectedSubcategory2.subCategoryId || selectedSubcategory2.subcategoryId || "";
+    }
+    if (product.subCatId && !product.catId) {
+      var parentSubcategory = taxonomy.subcategoriesById[String(product.subCatId)];
+      if (parentSubcategory) product.catId = parentSubcategory.catId || parentSubcategory.categoryId || "";
+    }
+
+    return product;
+  }
+
+  function cacheAdminProducts(products) {
+    if (!Array.isArray(products)) return;
+    lastProductListProducts = products.map(function (product) {
+      return normalizeAdminProductTaxonomy(product);
+    });
+    lastProductListProducts.forEach(function (product) {
+      if (product && product.id != null) productCacheById[String(product.id)] = product;
+    });
+  }
+
+  function getRouteProductData() {
+    var state = getAdminRouteState();
+    var product = state && (state.data || state.product);
+    if (!product && state && state.id && productCacheById[String(state.id)]) {
+      product = productCacheById[String(state.id)];
+    }
+    if (product && state) {
+      if (state.brandId != null && product.brandId == null) product.brandId = state.brandId;
+      if (state.catId != null && product.catId == null) product.catId = state.catId;
+      if (state.subCatId != null && product.subCatId == null) product.subCatId = state.subCatId;
+      if (state.subCatId2 != null && product.subCatId2 == null) product.subCatId2 = state.subCatId2;
+    }
+    return normalizeAdminProductTaxonomy(product) || null;
+  }
+
+  function getCurrentAdminProduct() {
+    try {
+      var routeProduct = getRouteProductData();
+      if (routeProduct) return routeProduct;
+      var require = getWebpackRequire();
+      if (!require) return null;
+      var storeModule = require(90);
+      var store = storeModule && storeModule.Z;
+      var state = store && store.getState && store.getState();
+      return normalizeAdminProductTaxonomy(state && state.ProductVarients && state.ProductVarients.product);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function loadAdminTaxonomy() {
+    if (adminTaxonomyCache) return Promise.resolve(adminTaxonomyCache);
+    return Promise.all([
+      fetchAdminJson("/admin/brands"),
+      fetchAdminJson("/admin/categories/hierarchy")
+    ]).then(function (results) {
+      var brands = results[0].brands || results[0].data || [];
+      var categories = results[1].categories || results[1].data || [];
+      var taxonomy = {
+        brandsById: {},
+        categoriesById: {},
+        subcategoriesById: {},
+        subcategories2ById: {},
+        subcategoriesByCategoryId: {},
+        subcategories2BySubcategoryId: {}
+      };
+      brands.forEach(function (brand) {
+        taxonomy.brandsById[String(brand.id)] = brand;
+      });
+      categories.forEach(function (category) {
+        taxonomy.categoriesById[String(category.id)] = category;
+        (category.subcategories || category.subCategories || []).forEach(function (subcategory) {
+          taxonomy.subcategoriesById[String(subcategory.id)] = subcategory;
+          if (!taxonomy.subcategoriesByCategoryId[String(category.id)]) {
+            taxonomy.subcategoriesByCategoryId[String(category.id)] = [];
+          }
+          taxonomy.subcategoriesByCategoryId[String(category.id)].push(subcategory);
+          (subcategory.subcategories2 || subcategory.subCategories2 || []).forEach(function (subcategory2) {
+            taxonomy.subcategories2ById[String(subcategory2.id)] = subcategory2;
+            if (!taxonomy.subcategories2BySubcategoryId[String(subcategory.id)]) {
+              taxonomy.subcategories2BySubcategoryId[String(subcategory.id)] = [];
+            }
+            taxonomy.subcategories2BySubcategoryId[String(subcategory.id)].push(subcategory2);
+          });
+        });
+      });
+      adminTaxonomyCache = taxonomy;
+      return taxonomy;
+    });
+  }
+
+  function setSelectDisplayText(root, text) {
+    if (!root || !text) return;
+    var display = root.querySelector(".MuiSelect-select") || root.querySelector("[role='button']");
+    if (display) {
+      display.textContent = String(text);
+      display.setAttribute("title", String(text));
+      display.classList.remove("MuiSelect-select");
+      display.classList.add("MuiSelect-select", "MuiSelect-select-custom");
+    }
+  }
+
+  function setAdminSelectValue(labelId, value, labelText) {
+    if (value == null || value === "") return;
+    var label = document.getElementById(labelId);
+    var root = label && label.closest ? label.closest(".MuiFormControl-root") : null;
+    var input = root && root.querySelector("input");
+    if (input) setNativeInputValue(input, value);
+    setSelectDisplayText(root, labelText || value);
+  }
+
+  function isProductOrComboFormPage() {
+    return (/\/products\/add_products\/?$/.test(location.pathname) || isComboFormPath()) &&
+      !!document.getElementById("add_products__content__form__brand_cat__sub_category");
+  }
+
+  function getSubCategory2Value() {
+    var select = document.querySelector("[data-bnl-subcat2-select]");
+    return select && select.value ? select.value : selectedSubCat2Value || "";
+  }
+
+  function setSubCategory2Value(value) {
+    if (value == null || value === "") return;
+    selectedSubCat2Value = String(value);
+    var select = document.querySelector("[data-bnl-subcat2-select]");
+    if (select) {
+      select.value = selectedSubCat2Value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+
+  function applySubCategory2ToPayload(payload) {
+    if (!payload || typeof payload !== "object") return payload;
+    var subCat2 = getSubCategory2Value();
+    if (subCat2) {
+      payload.subCatId2 = Number(subCat2);
+    } else if (document.querySelector("[data-bnl-subcat2-select]")) {
+      payload.subCatId2 = null;
+    }
+    return payload;
+  }
+
+  function applyProductTaxonomyToPayload(payload) {
+    if (!payload || typeof payload !== "object") return payload;
+    var product = getCurrentAdminProduct() || {};
+    var brandId = getComboSelectValue("add_products__content__form__brand_cat__brand") || payload.brandId || product.brandId;
+    var categoryId = getComboSelectValue("add_products__content__form__brand_cat__category") || payload.catId || product.catId;
+    var subcategoryId = getComboSelectValue("add_products__content__form__brand_cat__sub_category") || payload.subCatId || product.subCatId;
+
+    if (brandId !== undefined && brandId !== null && brandId !== "") payload.brandId = Number(brandId);
+    if (categoryId !== undefined && categoryId !== null && categoryId !== "") payload.catId = Number(categoryId);
+    if (subcategoryId !== undefined && subcategoryId !== null && subcategoryId !== "") payload.subCatId = Number(subcategoryId);
+
+    return applySubCategory2ToPayload(payload);
+  }
+
+  function populateSubCategory2Select(select, subcategoryId, selectedValue) {
+    if (!select) return;
+    var normalizedSubcategoryId = Number(subcategoryId);
+    var optionsKey = String(normalizedSubcategoryId > 0 ? normalizedSubcategoryId : "all") + ":" + String(selectedValue || "");
+    if (select.getAttribute("data-bnl-subcat2-options-key") === optionsKey) {
+      if (selectedValue) {
+        select.value = String(selectedValue);
+        selectedSubCat2Value = String(selectedValue);
+      }
+      return;
+    }
+    select.setAttribute("data-bnl-subcat2-options-key", optionsKey);
+    select.disabled = true;
+    select.innerHTML = '<option value="">Select subcategory 2</option>';
+    if (adminTaxonomyCache && normalizedSubcategoryId > 0) {
+      var cachedList = adminTaxonomyCache.subcategories2BySubcategoryId[String(normalizedSubcategoryId)] || [];
+      cachedList.forEach(function (item) {
+        var option = document.createElement("option");
+        option.value = item.id;
+        option.textContent = item.name || ("Subcategory 2 #" + item.id);
+        select.appendChild(option);
+      });
+      select.disabled = false;
+      if (selectedValue) {
+        select.value = String(selectedValue);
+        selectedSubCat2Value = String(selectedValue);
+      }
+      return;
+    }
+    var path = normalizedSubcategoryId > 0
+      ? "/admin/subcategories2/" + encodeURIComponent(normalizedSubcategoryId)
+      : "/admin/subcategories2?limit=1000";
+    fetchAdminJson(path)
+      .then(function (data) {
+        var list = data.subcategories2 || data.data || [];
+        list.forEach(function (item) {
+          var option = document.createElement("option");
+          var prefix = item.categoryName && item.subcategoryName
+            ? item.categoryName + " / " + item.subcategoryName + " / "
+            : item.subcategoryName
+              ? item.subcategoryName + " / "
+              : "";
+          option.value = item.id;
+          option.textContent = prefix + (item.name || ("Subcategory 2 #" + item.id));
+          select.appendChild(option);
+        });
+        select.disabled = false;
+        if (selectedValue) {
+          select.value = String(selectedValue);
+          selectedSubCat2Value = String(selectedValue);
+        }
+      })
+      .catch(function () {
+        select.disabled = false;
+      });
+  }
+
+  function syncProductSubcategory2Field(wrapper) {
+    var select = wrapper && wrapper.querySelector("[data-bnl-subcat2-select]");
+    if (!select) return;
+    var product = getCurrentAdminProduct();
+    var subcategoryId = getComboSelectValue("add_products__content__form__brand_cat__sub_category");
+    if (!subcategoryId && product && product.subCatId) subcategoryId = product.subCatId;
+    var previousSubcategoryId = wrapper.getAttribute("data-bnl-subcat2-parent") || "";
+    if (String(subcategoryId || "") === String(previousSubcategoryId)) return;
+    if (previousSubcategoryId) selectedSubCat2Value = "";
+    wrapper.setAttribute("data-bnl-subcat2-parent", subcategoryId || "");
+    var numericSubcategoryId = Number(subcategoryId);
+    var selectedValue = selectedSubCat2Value || (
+      product && product.subCatId2 && (!numericSubcategoryId || String(product.subCatId || "") === String(numericSubcategoryId))
+        ? product.subCatId2
+        : ""
+    );
+    populateSubCategory2Select(select, subcategoryId, selectedValue);
+  }
+
+  function installProductSubcategory2Field() {
+    if (!isProductOrComboFormPage()) return;
+    var existing = document.querySelector("[data-bnl-subcat2-field]");
+    if (existing) {
+      syncProductSubcategory2Field(existing);
+      return;
+    }
+    var subcategoryRoot = document.getElementById("add_products__content__form__brand_cat__sub_category");
+    subcategoryRoot = subcategoryRoot && subcategoryRoot.closest ? subcategoryRoot.closest(".MuiFormControl-root") : null;
+    if (!subcategoryRoot) return;
+
+    var wrapper = document.createElement("div");
+    wrapper.className = "MuiFormControl-root bnl-subcat2-field";
+    wrapper.setAttribute("data-bnl-subcat2-field", "true");
+    wrapper.innerHTML = '<select id="bnl-product-subcat2" data-bnl-subcat2-select aria-label="Subcategory 2" disabled><option value="">Select subcategory 2</option></select>';
+    subcategoryRoot.parentNode.insertBefore(wrapper, subcategoryRoot.nextSibling);
+
+    var select = wrapper.querySelector("select");
+    select.addEventListener("change", function () {
+      selectedSubCat2Value = select.value || "";
+    });
+    var subcategoryInput = subcategoryRoot.querySelector("input");
+    if (subcategoryInput) {
+      ["input", "change"].forEach(function (eventName) {
+        subcategoryInput.addEventListener(eventName, function () {
+          window.setTimeout(function () { syncProductSubcategory2Field(wrapper); }, 0);
+        });
+      });
+    }
+    subcategoryRoot.addEventListener("click", function () {
+      window.setTimeout(function () { syncProductSubcategory2Field(wrapper); }, 250);
+    });
+
+    syncProductSubcategory2Field(wrapper);
+    window.setTimeout(function () { syncProductSubcategory2Field(wrapper); }, 250);
+    window.setTimeout(function () { syncProductSubcategory2Field(wrapper); }, 900);
+  }
+
+  function upsertCurrentProductTaxonomy(product, taxonomy) {
+    var host = document.querySelector(".add_products__content__form__brand_cat");
+    if (!host || !product || isComboFormPath()) return;
+    var banner = host.querySelector("[data-bnl-current-product-taxonomy]");
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.className = "bnl-current-product-taxonomy";
+      banner.setAttribute("data-bnl-current-product-taxonomy", "true");
+      host.insertBefore(banner, host.firstChild);
+    }
+    var brand = taxonomy.brandsById[String(product.brandId)];
+    var category = taxonomy.categoriesById[String(product.catId)];
+    var subcategory = taxonomy.subcategoriesById[String(product.subCatId)];
+    var subcategory2 = taxonomy.subcategories2ById[String(product.subCatId2)];
+    banner.textContent = [
+      "Selected hierarchy: ",
+      brand ? brand.name : product.brandName || "Brand",
+      " / ",
+      category ? category.name : product.categoryName || "Category",
+      " / ",
+      subcategory ? subcategory.name : product.subcategoryName || "Subcategory",
+      product.subCatId2 ? " / " + (subcategory2 ? subcategory2.name : product.subcategory2Name || "Subcategory 2") : ""
+    ].join("");
+  }
+
+  function hydrateProductEditCategoryFields() {
+    if (!isProductOrComboFormPage() || isComboFormPath()) return;
+    var product = getCurrentAdminProduct();
+    if (!product || !product.id) return;
+    var hydrationKey = [
+      location.pathname,
+      product.id,
+      product.brandId || "",
+      product.catId || "",
+      product.subCatId || "",
+      product.subCatId2 || ""
+    ].join(":");
+    if (hydrationKey === lastProductTaxonomyHydrationKey || hydrationKey === pendingProductTaxonomyHydrationKey) return;
+    pendingProductTaxonomyHydrationKey = hydrationKey;
+
+    loadAdminTaxonomy().then(function (taxonomy) {
+      product = resolveProductTaxonomy(product, taxonomy);
+      var brand = taxonomy.brandsById[String(product.brandId)];
+      var category = taxonomy.categoriesById[String(product.catId)];
+      var subcategory = taxonomy.subcategoriesById[String(product.subCatId)];
+      var subcategory2 = taxonomy.subcategories2ById[String(product.subCatId2)];
+
+      setAdminSelectValue("add_products__content__form__brand_cat__brand", product.brandId, brand ? brand.name : product.brandName);
+      setAdminSelectValue("add_products__content__form__brand_cat__category", product.catId, category ? category.name : product.categoryName);
+      setAdminSelectValue("add_products__content__form__brand_cat__sub_category", product.subCatId, subcategory ? subcategory.name : product.subcategoryName);
+
+      if (product.subCatId2) {
+        selectedSubCat2Value = String(product.subCatId2);
+        var field = document.querySelector("[data-bnl-subcat2-field]");
+        var select = field && field.querySelector("[data-bnl-subcat2-select]");
+        if (select) {
+          populateSubCategory2Select(select, product.subCatId, product.subCatId2);
+          window.setTimeout(function () {
+            select.value = String(product.subCatId2);
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+          }, 250);
+        }
+      }
+
+      upsertCurrentProductTaxonomy(product, taxonomy);
+      lastProductTaxonomyHydrationKey = hydrationKey;
+    }).catch(function () {}).then(function () {
+      if (pendingProductTaxonomyHydrationKey === hydrationKey) {
+        pendingProductTaxonomyHydrationKey = "";
+      }
+    });
+  }
+
+  function formatAdminDate(value) {
+    if (!value) return "";
+    var date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return [
+      String(date.getDate()).padStart(2, "0"),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      date.getFullYear()
+    ].join("-");
+  }
+
+  function getProductExpiry(product) {
+    if (!product) return "";
+    var variants = Array.isArray(product.varients) ? product.varients : [];
+    var variant = variants.find(function (item) { return item && (item.date || item.expiryDate); });
+    return formatAdminDate((variant && (variant.date || variant.expiryDate)) || product.expiryDate);
+  }
+
+  function installProductListExpiryFallback() {
+    var table = document.querySelector(".product_list__content__table__table");
+    if (!table || !lastProductListProducts.length) return;
+    var rows = Array.prototype.slice.call(table.querySelectorAll("tr")).slice(1);
+    rows.forEach(function (row, index) {
+      var product = lastProductListProducts[index];
+      var expiry = getProductExpiry(product);
+      if (!expiry) return;
+      var cells = row.querySelectorAll("td");
+      var expiryCell = cells[4];
+      if (expiryCell && (!expiryCell.textContent.trim() || expiryCell.textContent.trim() === "N/A" || expiryCell.textContent.trim() === "-")) {
+        expiryCell.textContent = expiry;
+      }
+      var productInfo = row.querySelector(".product__info");
+      if (productInfo && !productInfo.querySelector("[data-bnl-product-expiry]")) {
+        var badge = document.createElement("small");
+        badge.className = "bnl-product-list-expiry";
+        badge.setAttribute("data-bnl-product-expiry", "true");
+        badge.textContent = "Expiry: " + expiry;
+        productInfo.appendChild(badge);
+      }
+    });
+  }
+
+  function removeSubcategory2Manager() {
+    document.querySelectorAll("[data-bnl-taxonomy-manager]").forEach(function (node) {
+      if (node && node.parentNode) node.parentNode.removeChild(node);
+    });
+    document.querySelectorAll("[data-bnl-subcat2-manager]").forEach(function (node) {
+      if (node && node.parentNode) node.parentNode.removeChild(node);
+    });
+    document.querySelectorAll(".sub_categories__content.bnl-taxonomy-managed").forEach(function (node) {
+      node.classList.remove("bnl-taxonomy-managed");
+    });
+  }
+
+  function isSubcategoryListingPage() {
+    if (/\/combo\//i.test(location.pathname)) return false;
+    if (document.querySelector(".add_new_sub_category")) return false;
+    return !!document.querySelector(".sub_categories__content");
+  }
+
+  function getResponseList(payload, pluralKey, singleKey) {
+    if (!payload || typeof payload !== "object") return [];
+    if (Array.isArray(payload[pluralKey])) return payload[pluralKey];
+    if (payload.data && Array.isArray(payload.data[pluralKey])) return payload.data[pluralKey];
+    if (Array.isArray(payload.data)) return payload.data;
+    if (payload.result && Array.isArray(payload.result[pluralKey])) return payload.result[pluralKey];
+    if (singleKey && payload[singleKey]) return [payload[singleKey]];
+    return [];
+  }
+
+  function getSubcategoryCategoryId(item) {
+    return firstNonEmptyValue(item && item.catId, item && item.categoryId, item && item.category && item.category.id);
+  }
+
+  function getSubcategory2ParentId(item) {
+    return firstNonEmptyValue(item && item.subCategoryId, item && item.subcategoryId, item && item.subCatId, item && item.subcategory && item.subcategory.id);
+  }
+
+  function getSubcategoryParentValue() {
+    var select = document.querySelector("[data-bnl-subcategory-parent-select]");
+    if (select && select.value) return select.value;
+    if (selectedSubcategoryParentValue) return selectedSubcategoryParentValue;
+    var state = getAdminRouteState();
+    var data = state && (state.data || state.subcategory);
+    return firstNonEmptyValue(
+      data && data.catId,
+      data && data.categoryId,
+      state && state.catId,
+      state && state.categoryId
+    );
+  }
+
+  function installSubcategoryParentField() {
+    var page = document.querySelector(".add_new_sub_category");
+    if (!page || /\/combo\//i.test(location.pathname) || /combo sub category/i.test(page.textContent || "")) {
+      document.querySelectorAll("[data-bnl-subcategory-parent-field]").forEach(function (node) {
+        if (node && node.parentNode) node.parentNode.removeChild(node);
+      });
+      return;
+    }
+
+    var host = page.querySelector(".add_new_sub_category__content__sub_category_name");
+    if (!host) return;
+    var existing = host.querySelector("[data-bnl-subcategory-parent-field]");
+    if (existing) return;
+
+    var state = getAdminRouteState();
+    var data = state && (state.data || state.subcategory);
+    selectedSubcategoryParentValue = String(firstNonEmptyValue(
+      data && data.catId,
+      data && data.categoryId,
+      state && state.catId,
+      state && state.categoryId,
+      selectedSubcategoryParentValue
+    ));
+
+    var wrapper = document.createElement("div");
+    wrapper.className = "bnl-subcategory-parent-field";
+    wrapper.setAttribute("data-bnl-subcategory-parent-field", "true");
+    wrapper.innerHTML = '<label for="bnl-subcategory-parent-category">Parent category</label><select id="bnl-subcategory-parent-category" data-bnl-subcategory-parent-select><option value="">Select parent category</option></select>';
+
+    var nameField = host.querySelector(".add_new_sub_category__content__sub_category_name__input");
+    host.insertBefore(wrapper, nameField || host.firstChild);
+
+    var select = wrapper.querySelector("select");
+    select.value = selectedSubcategoryParentValue || "";
+    select.addEventListener("change", function () {
+      selectedSubcategoryParentValue = select.value || "";
+    });
+
+    fetchAdminJson("/admin/categories/hierarchy")
+      .then(function (data) {
+        var categories = getResponseList(data, "categories", "category").sort(function (a, b) {
+          return String(a.name || "").localeCompare(String(b.name || ""));
+        });
+        select.innerHTML = '<option value="">Select parent category</option>';
+        categories.forEach(function (category) {
+          var option = document.createElement("option");
+          option.value = category.id;
+          option.textContent = category.name || ("Category #" + category.id);
+          select.appendChild(option);
+        });
+        if (selectedSubcategoryParentValue) select.value = selectedSubcategoryParentValue;
+      })
+      .catch(function () {});
+  }
+
+  function installSubcategory2Manager() {
+    if (!isSubcategoryListingPage()) {
+      removeSubcategory2Manager();
+      return;
+    }
+    var host = document.querySelector(".sub_categories__content");
+    if (!host || host.querySelector("[data-bnl-taxonomy-manager]")) return;
+    host.classList.add("bnl-taxonomy-managed");
+
+    var manager = document.createElement("div");
+    manager.className = "bnl-taxonomy-manager";
+    manager.setAttribute("data-bnl-taxonomy-manager", "true");
+    manager.innerHTML = [
+      "<h4>Category structure</h4>",
+      "<p>Manage the category tree used by product forms and the storefront navigation.</p>",
+      '<div class="bnl-taxonomy-manager__grid">',
+      '<section class="bnl-taxonomy-manager__panel">',
+      "<h4>Subcategories</h4>",
+      "<p>Each subcategory must belong to one category.</p>",
+      '<div class="bnl-taxonomy-manager__form">',
+      '<div class="bnl-taxonomy-manager__field"><label>Parent category</label><select data-bnl-tax-subcategory-parent-create><option value="">Select parent category</option></select></div>',
+      '<div class="bnl-taxonomy-manager__field"><label>Subcategory name</label><input data-bnl-tax-subcategory-name-create placeholder="Enter subcategory name" /></div>',
+      '<button type="button" class="bnl-taxonomy-manager__primary" data-bnl-tax-add-subcategory>Add</button>',
+      "</div>",
+      '<div class="bnl-taxonomy-manager__list" data-bnl-tax-subcategory-list></div>',
+      "</section>",
+      '<section class="bnl-taxonomy-manager__panel">',
+      "<h4>Subcategory 2</h4>",
+      "<p>Each subcategory 2 must belong to one subcategory.</p>",
+      '<div class="bnl-taxonomy-manager__form">',
+      '<div class="bnl-taxonomy-manager__field"><label>Parent subcategory</label><select data-bnl-tax-subcategory2-parent-create><option value="">Select parent subcategory</option></select></div>',
+      '<div class="bnl-taxonomy-manager__field"><label>Subcategory 2 name</label><input data-bnl-tax-subcategory2-name-create placeholder="Enter subcategory 2 name" /></div>',
+      '<button type="button" class="bnl-taxonomy-manager__primary" data-bnl-tax-add-subcategory2>Add</button>',
+      "</div>",
+      '<div class="bnl-taxonomy-manager__list" data-bnl-tax-subcategory2-list></div>',
+      "</section>",
+      "</div>",
+      '<div class="bnl-taxonomy-manager__status" data-bnl-taxonomy-status>Loading category structure...</div>'
+    ].join("");
+    host.insertBefore(manager, host.firstChild);
+
+    var subcategoryParentCreate = manager.querySelector("[data-bnl-tax-subcategory-parent-create]");
+    var subcategoryNameCreate = manager.querySelector("[data-bnl-tax-subcategory-name-create]");
+    var subcategory2ParentCreate = manager.querySelector("[data-bnl-tax-subcategory2-parent-create]");
+    var subcategory2NameCreate = manager.querySelector("[data-bnl-tax-subcategory2-name-create]");
+    var addSubcategoryButton = manager.querySelector("[data-bnl-tax-add-subcategory]");
+    var addSubcategory2Button = manager.querySelector("[data-bnl-tax-add-subcategory2]");
+    var subcategoryListNode = manager.querySelector("[data-bnl-tax-subcategory-list]");
+    var subcategory2ListNode = manager.querySelector("[data-bnl-tax-subcategory2-list]");
+    var status = manager.querySelector("[data-bnl-taxonomy-status]");
+    var categories = [];
+    var subcategories = [];
+    var subcategories2 = [];
+
+    function setStatus(message, isError) {
+      status.textContent = message || "";
+      status.classList.toggle("is-error", !!isError);
+    }
+
+    function categoryName(categoryId) {
+      var category = categories.find(function (item) { return String(item.id) === String(categoryId); });
+      return category ? category.name || ("Category #" + category.id) : "No parent";
+    }
+
+    function subcategoryName(subcategoryId) {
+      var subcategory = subcategories.find(function (item) { return String(item.id) === String(subcategoryId); });
+      if (!subcategory) return "No parent";
+      var parentName = subcategory.categoryName || categoryName(getSubcategoryCategoryId(subcategory));
+      return parentName && parentName !== "No parent"
+        ? parentName + " / " + (subcategory.name || ("Subcategory #" + subcategory.id))
+        : subcategory.name || ("Subcategory #" + subcategory.id);
+    }
+
+    function populateCategorySelect(select, selectedValue) {
+      if (!select) return;
+      select.innerHTML = '<option value="">Select parent category</option>';
+      categories.forEach(function (category) {
+        var option = document.createElement("option");
+        option.value = category.id;
+        option.textContent = category.name || ("Category #" + category.id);
+        select.appendChild(option);
+      });
+      if (selectedValue !== undefined && selectedValue !== null) select.value = String(selectedValue);
+    }
+
+    function populateSubcategorySelect(select, selectedValue) {
+      if (!select) return;
+      select.innerHTML = '<option value="">Select parent subcategory</option>';
+      subcategories.forEach(function (subcategory) {
+        var option = document.createElement("option");
+        option.value = subcategory.id;
+        option.textContent = subcategoryName(subcategory.id);
+        select.appendChild(option);
+      });
+      if (selectedValue !== undefined && selectedValue !== null) select.value = String(selectedValue);
+    }
+
+    function renderSubcategories() {
+      subcategoryListNode.innerHTML = "";
+      if (!subcategories.length) {
+        subcategoryListNode.innerHTML = '<div class="bnl-taxonomy-manager__row"><span>No subcategories yet.</span></div>';
+        return;
+      }
+      subcategories.forEach(function (item) {
+        var row = document.createElement("div");
+        row.className = "bnl-taxonomy-manager__row";
+        row.innerHTML = [
+          '<div class="bnl-taxonomy-manager__row-main">',
+          '<input data-bnl-tax-row-subcategory-name value="' + escapeHtml(item.name || "") + '" placeholder="Subcategory name" />',
+          '<select data-bnl-tax-row-subcategory-parent></select>',
+          "</div>",
+          '<div class="bnl-taxonomy-manager__row-actions">',
+          '<button type="button" class="bnl-taxonomy-manager__secondary" data-bnl-tax-save-subcategory>Save</button>',
+          '<button type="button" class="bnl-taxonomy-manager__danger" data-bnl-tax-delete-subcategory>Delete</button>',
+          "</div>"
+        ].join("");
+        var parentSelect = row.querySelector("[data-bnl-tax-row-subcategory-parent]");
+        populateCategorySelect(parentSelect, getSubcategoryCategoryId(item));
+        row.querySelector("[data-bnl-tax-save-subcategory]").addEventListener("click", function () {
+          var name = row.querySelector("[data-bnl-tax-row-subcategory-name]").value.trim();
+          var parentId = parentSelect.value;
+          if (!name || !parentId) {
+            setStatus("Select a parent category and enter a subcategory name.", true);
+            return;
+          }
+          setStatus("Saving subcategory...", false);
+          fetchAdminJson("/admin/subcategories", {
+            method: "PUT",
+            body: JSON.stringify({ id: item.id, name: name, catId: Number(parentId) })
+          }).then(refreshTaxonomyData).catch(function (error) {
+            setStatus(error.message || "Unable to update subcategory.", true);
+          });
+        });
+        row.querySelector("[data-bnl-tax-delete-subcategory]").addEventListener("click", function () {
+          if (!window.confirm("Delete this subcategory?")) return;
+          setStatus("Deleting subcategory...", false);
+          fetchAdminJson("/admin/subcategories?id=" + encodeURIComponent(item.id), { method: "DELETE" })
+            .then(refreshTaxonomyData)
+            .catch(function (error) { setStatus(error.message || "Unable to delete subcategory.", true); });
+        });
+        subcategoryListNode.appendChild(row);
+      });
+    }
+
+    function renderSubcategories2() {
+      subcategory2ListNode.innerHTML = "";
+      if (!subcategories2.length) {
+        subcategory2ListNode.innerHTML = '<div class="bnl-taxonomy-manager__row"><span>No subcategory 2 entries yet.</span></div>';
+        return;
+      }
+      subcategories2.forEach(function (item) {
+        var row = document.createElement("div");
+        row.className = "bnl-taxonomy-manager__row";
+        row.innerHTML = [
+          '<div class="bnl-taxonomy-manager__row-main">',
+          '<input data-bnl-tax-row-subcategory2-name value="' + escapeHtml(item.name || "") + '" placeholder="Subcategory 2 name" />',
+          '<select data-bnl-tax-row-subcategory2-parent></select>',
+          "</div>",
+          '<div class="bnl-taxonomy-manager__row-actions">',
+          '<button type="button" class="bnl-taxonomy-manager__secondary" data-bnl-tax-save-subcategory2>Save</button>',
+          '<button type="button" class="bnl-taxonomy-manager__danger" data-bnl-tax-delete-subcategory2>Delete</button>',
+          "</div>"
+        ].join("");
+        var parentSelect = row.querySelector("[data-bnl-tax-row-subcategory2-parent]");
+        populateSubcategorySelect(parentSelect, getSubcategory2ParentId(item));
+        row.querySelector("[data-bnl-tax-save-subcategory2]").addEventListener("click", function () {
+          var name = row.querySelector("[data-bnl-tax-row-subcategory2-name]").value.trim();
+          var parentId = parentSelect.value;
+          if (!name || !parentId) {
+            setStatus("Select a parent subcategory and enter a subcategory 2 name.", true);
+            return;
+          }
+          setStatus("Saving subcategory 2...", false);
+          fetchAdminJson("/admin/subcategories2", {
+            method: "PUT",
+            body: JSON.stringify({ id: item.id, name: name, subCategoryId: Number(parentId) })
+          }).then(refreshTaxonomyData).catch(function (error) {
+            setStatus(error.message || "Unable to update subcategory 2.", true);
+          });
+        });
+        row.querySelector("[data-bnl-tax-delete-subcategory2]").addEventListener("click", function () {
+          if (!window.confirm("Delete this subcategory 2?")) return;
+          setStatus("Deleting subcategory 2...", false);
+          fetchAdminJson("/admin/subcategories2?id=" + encodeURIComponent(item.id), { method: "DELETE" })
+            .then(refreshTaxonomyData)
+            .catch(function (error) { setStatus(error.message || "Unable to delete subcategory 2.", true); });
+        });
+        subcategory2ListNode.appendChild(row);
+      });
+    }
+
+    function refreshTaxonomyData() {
+      adminTaxonomyCache = null;
+      return Promise.all([
+        fetchAdminJson("/admin/categories/hierarchy"),
+        fetchAdminJson("/admin/all-subcategories?limit=1000"),
+        fetchAdminJson("/admin/subcategories2?limit=1000")
+      ]).then(function (results) {
+        categories = getResponseList(results[0], "categories", "category").sort(function (a, b) {
+          return String(a.name || "").localeCompare(String(b.name || ""));
+        });
+        subcategories = getResponseList(results[1], "subcategories", "subcategory").sort(function (a, b) {
+          return String(categoryName(getSubcategoryCategoryId(a)) + " " + (a.name || "")).localeCompare(String(categoryName(getSubcategoryCategoryId(b)) + " " + (b.name || "")));
+        });
+        subcategories2 = getResponseList(results[2], "subcategories2", "subcategory2").sort(function (a, b) {
+          return String(subcategoryName(getSubcategory2ParentId(a)) + " " + (a.name || "")).localeCompare(String(subcategoryName(getSubcategory2ParentId(b)) + " " + (b.name || "")));
+        });
+        populateCategorySelect(subcategoryParentCreate, subcategoryParentCreate.value);
+        populateSubcategorySelect(subcategory2ParentCreate, subcategory2ParentCreate.value);
+        renderSubcategories();
+        renderSubcategories2();
+        setStatus("Loaded " + categories.length + " categories, " + subcategories.length + " subcategories, and " + subcategories2.length + " subcategory 2 entries.", false);
+      }).catch(function (error) {
+        setStatus(error.message || "Unable to load category structure.", true);
+      });
+    }
+
+    addSubcategoryButton.addEventListener("click", function () {
+      var name = subcategoryNameCreate.value.trim();
+      var parentId = subcategoryParentCreate.value;
+      if (!name || !parentId) {
+        setStatus("Select a parent category and enter a subcategory name.", true);
+        return;
+      }
+      setStatus("Saving subcategory...", false);
+      fetchAdminJson("/admin/subcategories", {
+        method: "POST",
+        body: JSON.stringify({ name: name, catId: Number(parentId) })
+      }).then(function () {
+        subcategoryNameCreate.value = "";
+        return refreshTaxonomyData();
+      }).catch(function (error) {
+        setStatus(error.message || "Unable to add subcategory.", true);
+      });
+    });
+
+    addSubcategory2Button.addEventListener("click", function () {
+      var name = subcategory2NameCreate.value.trim();
+      var parentId = subcategory2ParentCreate.value;
+      if (!name || !parentId) {
+        setStatus("Select a parent subcategory and enter a subcategory 2 name.", true);
+        return;
+      }
+      setStatus("Saving subcategory 2...", false);
+      fetchAdminJson("/admin/subcategories2", {
+        method: "POST",
+        body: JSON.stringify({ name: name, subCategoryId: Number(parentId) })
+      }).then(function () {
+        subcategory2NameCreate.value = "";
+        return refreshTaxonomyData();
+      }).catch(function (error) {
+        setStatus(error.message || "Unable to add subcategory 2.", true);
+      });
+    });
+
+    refreshTaxonomyData();
+  }
+
   function isOfferAddPath(pathname) {
     return /\/add_new_offer\/?$/.test(pathname || location.pathname);
   }
@@ -548,7 +1502,7 @@
   function uploadOfferImageFile(file) {
     var formData = new FormData();
     formData.append("file", file);
-    return fetch("http://localhost:3002/upload", {
+    return fetch(getAdminApiBase() + "/upload", {
       method: "POST",
       headers: getAdminAuthHeaders(false),
       body: formData
@@ -749,7 +1703,7 @@
     if (subcategorySelect && subcategorySelect.value) params.set("subCatId", subcategorySelect.value);
 
     setOfferBuilderStatus(builder, "Loading products...", false);
-    fetch("http://localhost:3002/admin/all-products?" + params.toString(), {
+    fetch(getAdminApiBase() + "/admin/all-products?" + params.toString(), {
       headers: getAdminAuthHeaders(false)
     })
       .then(function (response) { return response.json(); })
@@ -768,7 +1722,7 @@
     var categorySelect = builder.querySelector("[data-bnl-offer-category]");
     if (!categorySelect) return;
     categorySelect.innerHTML = '<option value="">All categories</option>';
-    fetch("http://localhost:3002/categories", {
+    fetch(getAdminApiBase() + "/categories", {
       headers: getAdminAuthHeaders(false)
     })
       .then(function (response) { return response.json(); })
@@ -793,7 +1747,7 @@
     subcategorySelect.disabled = !categoryId;
     if (!categoryId) return;
 
-    fetch("http://localhost:3002/subcategories/" + encodeURIComponent(categoryId), {
+    fetch(getAdminApiBase() + "/subcategories/" + encodeURIComponent(categoryId), {
       headers: getAdminAuthHeaders(false)
     })
       .then(function (response) { return response.json(); })
@@ -893,11 +1847,7 @@
   }
 
   function setComboSelectValue(labelId, value) {
-    if (value == null || value === "") return;
-    var label = document.getElementById(labelId);
-    var root = label && label.closest ? label.closest(".MuiFormControl-root") : null;
-    var input = root && root.querySelector("input");
-    if (input) setNativeInputValue(input, value);
+    setAdminSelectValue(labelId, value);
   }
 
   function escapeHtml(value) {
@@ -1020,6 +1970,7 @@
     setComboSelectValue("add_products__content__form__brand_cat__category", data.catId);
     setComboSelectValue("add_products__content__form__brand_cat__sub_category", data.subCatId);
     setComboSelectValue("add_products__content__form__brand_cat__combo_category", comboCatId);
+    setSubCategory2Value(data.subCatId2);
     updateComboPreviewCard(section, comboDraftPayload);
   }
 
@@ -1223,7 +2174,7 @@
   }
 
   function openComboProductPicker(section) {
-    var apiBase = "http://localhost:3002";
+    var apiBase = getAdminApiBase();
     var selected = [];
     var products = [];
     var loading = false;
@@ -1534,7 +2485,7 @@
       button.textContent = isAccept ? "Accepting..." : "Rejecting...";
 
       fetch(
-        "http://localhost:3002/" + (isAccept ? "order/accept/" : "admin/order/reject/") + encodeURIComponent(orderId),
+        getAdminApiBase() + "/" + (isAccept ? "order/accept/" : "admin/order/reject/") + encodeURIComponent(orderId),
         { method: isAccept ? "PUT" : "DELETE" }
       )
         .then(function (response) {
@@ -2018,8 +2969,14 @@
             offerDraftProductIds = [];
             offerDraftProducts = [];
           }
-          if (String(this.__bnlUrl || "").indexOf("/brands") === -1) return;
+          var responseUrl = String(this.__bnlUrl || "");
           var data = JSON.parse(this.responseText || "{}");
+          if (responseUrl.indexOf("/all-products") !== -1) {
+            cacheAdminProducts(normalizeProductsResponse(data));
+          } else if (/\/products\/\d+/.test(responseUrl)) {
+            cacheAdminProducts([data.product || data.result || data.data].filter(Boolean));
+          }
+          if (responseUrl.indexOf("/brands") === -1) return;
           var list = Array.isArray(data.brands) ? data.brands : data.brand ? [data.brand] : [];
           list.forEach(function (brand) {
             if (brand && brand.name && brand.originCountry) {
@@ -2040,11 +2997,22 @@
             }
             body = JSON.stringify(payload);
           }
+          if (
+            isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/subcategories") &&
+            String(this.__bnlUrl || "").indexOf("/subcategories2") === -1
+          ) {
+            var parentCategoryId = getSubcategoryParentValue();
+            if (parentCategoryId) {
+              payload.catId = Number(parentCategoryId);
+              payload.categoryId = Number(parentCategoryId);
+              body = JSON.stringify(payload);
+            }
+          }
           if (isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/combo-products") && String(this.__bnlUrl || "").indexOf("/combo-products/preview") === -1) {
-            body = JSON.stringify(mergeComboDraftIntoPayload(payload));
+            body = JSON.stringify(mergeComboDraftIntoPayload(applyProductTaxonomyToPayload(payload)));
           }
           if (isComboFormPath() && isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/products")) {
-            body = JSON.stringify(stripComboVariantsFromPayload(payload));
+            body = JSON.stringify(stripComboVariantsFromPayload(applyProductTaxonomyToPayload(payload)));
           }
           if (isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/offers")) {
             if (payload.image && !payload.logo) payload.logo = payload.image;
@@ -2063,7 +3031,7 @@
             this.__bnlShouldClearOfferBanner = true;
           }
           if (!isComboFormPath() && isJsonMutation(this.__bnlMethod, this.__bnlUrl, "/products") && Array.isArray(payload.varients)) {
-            body = JSON.stringify(normalizeProductVariants(payload));
+            body = JSON.stringify(normalizeProductVariants(applyProductTaxonomyToPayload(payload)));
             this.__bnlShouldClearFlavorDrafts = true;
           }
         } catch (error) {}
@@ -2074,7 +3042,6 @@
 
   function loadComboEditPrices(section) {
     if (comboEditPricesLoaded) return;
-    comboEditPricesLoaded = true;
     try {
       if (!isComboFormPage()) return;
       var nameInput = document.querySelector('.add_products__content__form input#name[name="name"]');
@@ -2091,7 +3058,7 @@
 
       var comboMrp = product.mrp || product.sellingPrice || 0;
       var comboPrice = product.sellingPrice || product.price || product.mrp || 0;
-      if (Number(comboMrp) <= 0 && Number(comboPrice) <= 0) return;
+      comboEditPricesLoaded = true;
 
       comboDraftPayload = {
         mrp: comboMrp,
@@ -2103,13 +3070,26 @@
         brandId: product.brandId,
         catId: product.catId,
         subCatId: product.subCatId,
-        comboCatId: product.comboCatId,
-        comboCategoryId: product.comboCatId,
+        subCatId2: product.subCatId2,
+        comboCatId: product.comboCatId || product.comboCategoryId,
+        comboCategoryId: product.comboCategoryId || product.comboCatId,
         products: product.products || product.selectedProductIds || [],
         selectedProductIds: product.selectedProductIds || product.products || [],
         varients: []
       };
       writeComboPriceInputs(section, comboDraftPayload);
+      setComboSelectValue("add_products__content__form__brand_cat__brand", product.brandId);
+      setComboSelectValue("add_products__content__form__brand_cat__category", product.catId);
+      setComboSelectValue("add_products__content__form__brand_cat__sub_category", product.subCatId);
+      setComboSelectValue("add_products__content__form__brand_cat__combo_category", product.comboCatId || product.comboCategoryId);
+      setSubCategory2Value(product.subCatId2);
+      window.setTimeout(function () {
+        setComboSelectValue("add_products__content__form__brand_cat__brand", product.brandId);
+        setComboSelectValue("add_products__content__form__brand_cat__category", product.catId);
+        setComboSelectValue("add_products__content__form__brand_cat__sub_category", product.subCatId);
+        setComboSelectValue("add_products__content__form__brand_cat__combo_category", product.comboCatId || product.comboCategoryId);
+        setSubCategory2Value(product.subCatId2);
+      }, 250);
       updateComboPreviewCard(section, comboDraftPayload);
     } catch (error) {}
   }
@@ -2169,6 +3149,11 @@
       installBrandCountryField();
       installBlogToolbar();
       installFlavorPanels();
+      installProductSubcategory2Field();
+      hydrateProductEditCategoryFields();
+      installProductListExpiryFallback();
+      installSubcategory2Manager();
+      installSubcategoryParentField();
       installProductDraftGuard();
       cleanupProductDraftOnRouteChange();
       installComboProductPicker();
@@ -2212,7 +3197,7 @@
     document.head.appendChild(faqStyle);
 
     // Get API base URL
-    var apiBase = "http://localhost:3002";
+    var apiBase = getAdminApiBase();
     var headings = [];
     var editingFaqId = null;
 
