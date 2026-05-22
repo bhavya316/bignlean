@@ -149,11 +149,16 @@
       ".bnl-offer-builder__product button.is-selected{background:#16a34a;}",
       ".bnl-offer-builder__status{margin-top:10px;font-size:13px;color:#6b7280;}",
       ".bnl-offer-builder__status.is-error{color:#b91c1c;}",
-      ".add_products__content__form__brand_cat .bnl-subcat2-field{margin:0!important;min-width:220px;align-self:end;}",
-      ".bnl-subcat2-field{display:flex;flex-direction:column;gap:8px;margin:12px 0;min-width:220px;}",
-      ".bnl-subcat2-field label{font-size:13px;font-weight:700;color:#111827;}",
-      ".bnl-subcat2-field select{height:40px;border:1px solid #d1d5db;border-radius:8px;background:#fff;padding:0 10px;font-size:14px;outline:none;}",
-      ".bnl-subcat2-field select:focus{border-color:#e70f0f;box-shadow:0 0 0 3px rgba(231,15,15,.08);}",
+      ".add_products__content__form__brand_cat .bnl-subcat2-field{margin:0!important;min-width:220px;align-self:center;position:relative!important;}",
+      ".bnl-subcat2-field{display:inline-flex!important;flex-direction:column!important;position:relative!important;min-width:220px;}",
+      ".bnl-subcat2-field label{position:absolute!important;left:8px!important;top:-8px!important;background-color:#ffffff!important;padding:0 6px!important;font-size:12px!important;font-weight:500!important;color:rgba(0,0,0,0.54)!important;z-index:2!important;pointer-events:none!important;font-family:inherit!important;}",
+      ".bnl-subcat2-field select{height:40px!important;position:relative!important;z-index:1!important;border:1px solid rgba(0,0,0,0.23)!important;border-radius:4px!important;background-color:#ffffff!important;padding:8px 32px 8px 12px!important;font-size:14px!important;outline:none!important;font-family:inherit!important;color:rgba(0,0,0,0.87)!important;appearance:none!important;-webkit-appearance:none!important;-moz-appearance:none!important;background-image:url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path fill='rgba(0,0,0,0.54)' d='M7 10l5 5 5-5z'/></svg>\")!important;background-repeat:no-repeat!important;background-position:right 8px center!important;cursor:pointer!important;}",
+      ".bnl-subcat2-field select:focus{border-color:#e70f0f!important;box-shadow:0 0 0 1px #e70f0f!important;}",
+      ".bnl-subcat2-field select:disabled{background-color:#f5f5f5!important;color:rgba(0,0,0,0.38)!important;cursor:not-allowed!important;}",
+      ".MuiOutlinedInput-root{z-index:1!important;}",
+      ".MuiOutlinedInput-notchedOutline{z-index:-1!important;}",
+      ".MuiInputLabel-outlined.MuiInputLabel-shrink{background-color:#ffffff!important;padding:0 6px!important;margin-left:-4px!important;z-index:2!important;transform:translate(14px, -6px) scale(0.75)!important;}",
+      ".MuiPaper-root.MuiMenu-paper,.MuiPopover-paper,.MuiMenu-list{background-color:#ffffff!important;}",
       ".bnl-current-product-taxonomy{grid-column:1/-1;margin:0 0 10px;padding:10px 12px;border:1px solid #fee2e2;background:#fff7f7;border-radius:8px;color:#7f1d1d;font-size:13px;font-weight:700;line-height:1.4;}",
       ".bnl-product-list-expiry{display:block;margin-top:4px;color:#6b7280;font-size:12px;font-weight:600;}",
       ".bnl-subcat2-manager{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:16px 0;box-shadow:0 10px 24px rgba(15,23,42,.06);}",
@@ -571,29 +576,94 @@
   function getAdminAuthHeaders(json) {
     var headers = json ? { "Content-Type": "application/json" } : {};
     var token = "";
+
+    function findJwtToken(val) {
+      if (!val || typeof val !== "string") return "";
+      var trimmed = val.trim();
+      if (/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(trimmed) || /^Bearer\s+/i.test(trimmed)) {
+        return trimmed;
+      }
+      try {
+        var parsed = JSON.parse(val);
+        if (parsed && typeof parsed === "object") {
+          var keys = Object.keys(parsed);
+          for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            var v = parsed[k];
+            var res = "";
+            if (typeof v === "string") {
+              res = findJwtToken(v);
+            } else if (v && typeof v === "object") {
+              res = findJwtToken(JSON.stringify(v));
+            }
+            if (res) return res;
+          }
+        }
+      } catch (e) {}
+      return "";
+    }
+
     var stores = [];
     try {
       stores.push(window.localStorage);
       stores.push(window.sessionStorage);
     } catch (error) {}
+
     stores.some(function (store) {
       if (!store) return false;
-      return ["token", "authToken", "adminToken", "accessToken", "firebaseToken", "idToken", "user"].some(function (key) {
-        var raw = store.getItem(key);
-        if (!raw) return false;
-        if (/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(raw) || /^Bearer\s+/i.test(raw)) {
-          token = raw;
+      var found = ["token", "authToken", "adminToken", "accessToken", "firebaseToken", "idToken", "user", "persist:root"].some(function (key) {
+        var val = store.getItem(key);
+        var t = findJwtToken(val);
+        if (t) {
+          token = t;
           return true;
         }
-        try {
-          var parsed = JSON.parse(raw);
-          token = parsed.token || parsed.authToken || parsed.accessToken || parsed.idToken || parsed.firebaseToken || "";
-          return !!token;
-        } catch (error) {
-          return false;
-        }
+        return false;
       });
+      if (found) return true;
+
+      for (var i = 0; i < store.length; i++) {
+        var key = store.key(i);
+        var t = findJwtToken(store.getItem(key));
+        if (t) {
+          token = t;
+          return true;
+        }
+      }
+      return false;
     });
+
+    if (!token) {
+      try {
+        var require = getWebpackRequire();
+        if (require) {
+          var modulesToTry = [90, 89, 91, 92, 95, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110];
+          modulesToTry.some(function (moduleId) {
+            try {
+              var storeModule = require(moduleId);
+              var store = storeModule && storeModule.Z;
+              var state = store && store.getState && store.getState();
+              if (state) {
+                var keys = Object.keys(state);
+                return keys.some(function (k) {
+                  var subState = state[k];
+                  if (subState && typeof subState === "object") {
+                    var t = subState.token || subState.accessToken || subState.jwt;
+                    if (t && typeof t === "string") {
+                      token = t;
+                      return true;
+                    }
+                  }
+                  return false;
+                });
+              }
+            } catch (e) {}
+            return false;
+          });
+        }
+      } catch (e) {}
+    }
+
     if (token) {
       headers.Authorization = /^Bearer\s+/i.test(token) ? token : "Bearer " + token;
     }
@@ -791,13 +861,19 @@
   }
 
   function loadAdminTaxonomy() {
-    if (adminTaxonomyCache) return Promise.resolve(adminTaxonomyCache);
+    if (adminTaxonomyCache && Object.keys(adminTaxonomyCache.categoriesById).length > 0) {
+      return Promise.resolve(adminTaxonomyCache);
+    }
     return Promise.all([
       fetchAdminJson("/admin/brands"),
-      fetchAdminJson("/admin/categories/hierarchy")
+      fetchAdminJson("/categories"),
+      fetchAdminJson("/admin/all-subcategories?limit=1000"),
+      fetchAdminJson("/admin/subcategories2?limit=1000")
     ]).then(function (results) {
       var brands = results[0].brands || results[0].data || [];
       var categories = results[1].categories || results[1].data || [];
+      var subcategories = results[2].subcategories || results[2].subCategories || results[2].data || [];
+      var subcategories2 = results[3].subcategories2 || results[3].subCategories2 || results[3].data || [];
       var taxonomy = {
         brandsById: {},
         categoriesById: {},
@@ -811,44 +887,88 @@
       });
       categories.forEach(function (category) {
         taxonomy.categoriesById[String(category.id)] = category;
-        (category.subcategories || category.subCategories || []).forEach(function (subcategory) {
-          taxonomy.subcategoriesById[String(subcategory.id)] = subcategory;
-          if (!taxonomy.subcategoriesByCategoryId[String(category.id)]) {
-            taxonomy.subcategoriesByCategoryId[String(category.id)] = [];
+      });
+      subcategories.forEach(function (subcategory) {
+        var parentCategoryId = firstNonEmptyValue(
+          subcategory.catId,
+          subcategory.categoryId,
+          subcategory.parentCategoryId,
+          subcategory.parentCatId
+        );
+        taxonomy.subcategoriesById[String(subcategory.id)] = subcategory;
+        if (parentCategoryId !== "") {
+          if (!taxonomy.subcategoriesByCategoryId[String(parentCategoryId)]) {
+            taxonomy.subcategoriesByCategoryId[String(parentCategoryId)] = [];
           }
-          taxonomy.subcategoriesByCategoryId[String(category.id)].push(subcategory);
-          (subcategory.subcategories2 || subcategory.subCategories2 || []).forEach(function (subcategory2) {
-            taxonomy.subcategories2ById[String(subcategory2.id)] = subcategory2;
-            if (!taxonomy.subcategories2BySubcategoryId[String(subcategory.id)]) {
-              taxonomy.subcategories2BySubcategoryId[String(subcategory.id)] = [];
-            }
-            taxonomy.subcategories2BySubcategoryId[String(subcategory.id)].push(subcategory2);
-          });
-        });
+          taxonomy.subcategoriesByCategoryId[String(parentCategoryId)].push(subcategory);
+        }
+      });
+      subcategories2.forEach(function (subcategory2) {
+        var parentSubcategoryId = firstNonEmptyValue(
+          subcategory2.subCategoryId,
+          subcategory2.subcategoryId,
+          subcategory2.parentSubCategoryId,
+          subcategory2.parentSubcategoryId,
+          subcategory2.subCatId
+        );
+        taxonomy.subcategories2ById[String(subcategory2.id)] = subcategory2;
+        if (parentSubcategoryId !== "") {
+          if (!taxonomy.subcategories2BySubcategoryId[String(parentSubcategoryId)]) {
+            taxonomy.subcategories2BySubcategoryId[String(parentSubcategoryId)] = [];
+          }
+          taxonomy.subcategories2BySubcategoryId[String(parentSubcategoryId)].push(subcategory2);
+        }
       });
       adminTaxonomyCache = taxonomy;
       return taxonomy;
     });
   }
 
+  function findFirstTextNode(node) {
+    if (!node) return null;
+    if (node.nodeType === 3) return node; // Node.TEXT_NODE
+    for (var i = 0; i < node.childNodes.length; i++) {
+      var found = findFirstTextNode(node.childNodes[i]);
+      if (found) return found;
+    }
+    return null;
+  }
+
   function setSelectDisplayText(root, text) {
-    if (!root || !text) return;
+    if (!root) return;
     var display = root.querySelector(".MuiSelect-select") || root.querySelector("[role='button']");
     if (display) {
-      display.textContent = String(text);
-      display.setAttribute("title", String(text));
-      display.classList.remove("MuiSelect-select");
-      display.classList.add("MuiSelect-select", "MuiSelect-select-custom");
+      var txt = String(text != null ? text : "");
+      if (!txt) return;
+      var textNode = findFirstTextNode(display);
+      if (textNode) {
+        textNode.nodeValue = txt;
+      } else {
+        display.appendChild(document.createTextNode(txt));
+      }
+      display.setAttribute("title", txt);
+      display.classList.add("MuiSelect-select-custom");
     }
   }
 
   function setAdminSelectValue(labelId, value, labelText) {
-    if (value == null || value === "") return;
     var label = document.getElementById(labelId);
+    if (label) {
+      if (value != null && value !== "") {
+        label.classList.add("MuiInputLabel-shrink");
+        label.setAttribute("data-shrink", "true");
+      } else {
+        label.classList.remove("MuiInputLabel-shrink");
+        label.removeAttribute("data-shrink");
+      }
+    }
+    if (value == null || value === "") return;
     var root = label && label.closest ? label.closest(".MuiFormControl-root") : null;
     var input = root && root.querySelector("input");
     if (input) setNativeInputValue(input, value);
-    setSelectDisplayText(root, labelText || value);
+    if (labelText && String(labelText) !== String(value)) {
+      setSelectDisplayText(root, labelText);
+    }
   }
 
   function isProductOrComboFormPage() {
@@ -986,7 +1106,12 @@
     var wrapper = document.createElement("div");
     wrapper.className = "MuiFormControl-root bnl-subcat2-field";
     wrapper.setAttribute("data-bnl-subcat2-field", "true");
-    wrapper.innerHTML = '<select id="bnl-product-subcat2" data-bnl-subcat2-select aria-label="Subcategory 2" disabled><option value="">Select subcategory 2</option></select>';
+    wrapper.innerHTML = [
+      '<label id="bnl-product-subcat2-label" for="bnl-product-subcat2">Sub Category 2</label>',
+      '<select id="bnl-product-subcat2" data-bnl-subcat2-select aria-label="Subcategory 2" disabled>',
+      '<option value="">Select subcategory 2</option>',
+      '</select>'
+    ].join("");
     subcategoryRoot.parentNode.insertBefore(wrapper, subcategoryRoot.nextSibling);
 
     var select = wrapper.querySelector("select");
