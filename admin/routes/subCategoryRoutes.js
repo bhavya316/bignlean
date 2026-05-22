@@ -9,6 +9,8 @@ router.post(
     body("name").notEmpty().withMessage("Name is required"),
     body("catId").optional({ checkFalsy: true }).isInt().withMessage("Category ID must be a number"),
     body("categoryId").optional({ checkFalsy: true }).isInt().withMessage("Category ID must be a number"),
+    body("parentCategoryId").optional({ checkFalsy: true }).isInt().withMessage("Category ID must be a number"),
+    body("parentCatId").optional({ checkFalsy: true }).isInt().withMessage("Category ID must be a number"),
   ],
   (req, res, next) => {
     const errors = validationResult(req);
@@ -66,12 +68,20 @@ router.put(
     body("name").optional().isString().withMessage("Name must be a string"),
     body("catId").optional({ checkFalsy: true }).isInt().withMessage("Category ID must be a number"),
     body("categoryId").optional({ checkFalsy: true }).isInt().withMessage("Category ID must be a number"),
+    body("parentCategoryId").optional({ checkFalsy: true }).isInt().withMessage("Category ID must be a number"),
+    body("parentCatId").optional({ checkFalsy: true }).isInt().withMessage("Category ID must be a number"),
   ],
   (req, res, next) => {
     const errors = validationResult(req);
 
     // Check if at least one field (name or catId) is provided for update
-    if (!req.body.name && req.body.catId === undefined && req.body.categoryId === undefined) {
+    if (
+      !req.body.name &&
+      req.body.catId === undefined &&
+      req.body.categoryId === undefined &&
+      req.body.parentCategoryId === undefined &&
+      req.body.parentCatId === undefined
+    ) {
       return res
         .status(400)
         .json({ status: false, message: "At least one field (name or category ID) must be provided for update" });
@@ -95,6 +105,8 @@ router.post(
     body("name").notEmpty().withMessage("Name is required"),
     body("subCategoryId").optional({ checkFalsy: true }).isInt().withMessage("SubCategory ID must be a number"),
     body("subcategoryId").optional({ checkFalsy: true }).isInt().withMessage("SubCategory ID must be a number"),
+    body("parentSubCategoryId").optional({ checkFalsy: true }).isInt().withMessage("SubCategory ID must be a number"),
+    body("parentSubcategoryId").optional({ checkFalsy: true }).isInt().withMessage("SubCategory ID must be a number"),
     body("subCatId").optional({ checkFalsy: true }).isInt().withMessage("SubCategory ID must be a number"),
   ],
   (req, res, next) => {
@@ -150,6 +162,8 @@ router.put(
     body("name").optional().isString().withMessage("Name must be a string"),
     body("subCategoryId").optional({ checkFalsy: true }).isInt().withMessage("SubCategory ID must be a number"),
     body("subcategoryId").optional({ checkFalsy: true }).isInt().withMessage("SubCategory ID must be a number"),
+    body("parentSubCategoryId").optional({ checkFalsy: true }).isInt().withMessage("SubCategory ID must be a number"),
+    body("parentSubcategoryId").optional({ checkFalsy: true }).isInt().withMessage("SubCategory ID must be a number"),
     body("subCatId").optional({ checkFalsy: true }).isInt().withMessage("SubCategory ID must be a number"),
   ],
   (req, res, next) => {
@@ -160,6 +174,8 @@ router.put(
       !req.body.name &&
       req.body.subCategoryId === undefined &&
       req.body.subcategoryId === undefined &&
+      req.body.parentSubCategoryId === undefined &&
+      req.body.parentSubcategoryId === undefined &&
       req.body.subCatId === undefined
     ) {
       return res

@@ -8,7 +8,7 @@ const toNullableInt = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const firstDefined = (...values) => values.find((value) => value !== undefined);
+const firstPresent = (...values) => values.find((value) => value !== undefined && value !== null && value !== "");
 
 const toPlain = (item) => (item && typeof item.toJSON === "function" ? item.toJSON() : item);
 
@@ -63,6 +63,7 @@ const attachCategoryDetails = async (subcategories) => {
       ...subcategory,
       category,
       categoryId: subcategory.catId,
+      parentCategoryId: subcategory.catId,
       categoryName: category ? category.name : null,
     };
   });
@@ -92,9 +93,12 @@ const attachSubCategory2Details = async (subcategories2) => {
       ...subcategory2,
       subcategory,
       subcategoryId: subcategory2.subCategoryId,
+      parentSubCategoryId: subcategory2.subCategoryId,
       subcategoryName: subcategory ? subcategory.name : null,
       category,
+      catId: subcategory ? subcategory.catId : null,
       categoryId: subcategory ? subcategory.catId : null,
+      parentCategoryId: subcategory ? subcategory.catId : null,
       categoryName: category ? category.name : null,
     };
   });
@@ -103,7 +107,13 @@ const attachSubCategory2Details = async (subcategories2) => {
 const createSubCategory = async (req, res) => {
   try {
     const { name } = req.body;
-    const categoryId = firstDefined(req.body.catId, req.body.categoryId, req.body.category);
+    const categoryId = firstPresent(
+      req.body.catId,
+      req.body.categoryId,
+      req.body.parentCategoryId,
+      req.body.parentCatId,
+      req.body.category
+    );
     const linkedCategoryId = await requireCategory(categoryId);
     const subcategoryData = {
       name: String(name || "").trim(),
@@ -187,7 +197,13 @@ const deleteSubCategory = async (req, res) => {
 
 const updateSubCategory = async (req, res) => {
   const { name } = req.body;
-  const categoryId = firstDefined(req.body.catId, req.body.categoryId, req.body.category);
+  const categoryId = firstPresent(
+    req.body.catId,
+    req.body.categoryId,
+    req.body.parentCategoryId,
+    req.body.parentCatId,
+    req.body.category
+  );
   const id = req.body.id || req.params.id || req.query.id;
 
   try {
@@ -267,9 +283,11 @@ const getAllSubCategories = async (req, res) => {
 const createSubCategory2 = async (req, res) => {
   try {
     const { name } = req.body;
-    const parentSubCategoryId = firstDefined(
+    const parentSubCategoryId = firstPresent(
       req.body.subCategoryId,
       req.body.subcategoryId,
+      req.body.parentSubCategoryId,
+      req.body.parentSubcategoryId,
       req.body.subCatId,
       req.body.parentId
     );
@@ -399,9 +417,11 @@ const deleteSubCategory2 = async (req, res) => {
 
 const updateSubCategory2 = async (req, res) => {
   const { name } = req.body;
-  const parentSubCategoryId = firstDefined(
+  const parentSubCategoryId = firstPresent(
     req.body.subCategoryId,
     req.body.subcategoryId,
+    req.body.parentSubCategoryId,
+    req.body.parentSubcategoryId,
     req.body.subCatId,
     req.body.parentId
   );

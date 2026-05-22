@@ -76,34 +76,60 @@ const getCategoryHierarchy = async (req, res) => {
       SubCategory2.findAll({ order: [["createdAt", "DESC"]] }),
     ]);
 
-    const subcategory2BySubcategory = subcategories2.reduce((acc, item) => {
-      const subcategory2 = item.toJSON();
-      const key = subcategory2.subCategoryId;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(subcategory2);
+    const categoryRows = categories.map((item) => item.toJSON());
+    const categoryById = categoryRows.reduce((acc, category) => {
+      acc[category.id] = category;
       return acc;
     }, {});
 
-    const subcategoryByCategory = subcategories.reduce((acc, item) => {
-      const subcategory = item.toJSON();
+    const subcategoryRows = subcategories.map((item) => item.toJSON());
+    const subcategoryById = subcategoryRows.reduce((acc, subcategory) => {
+      acc[subcategory.id] = subcategory;
+      return acc;
+    }, {});
+
+    const subcategory2BySubcategory = subcategories2.reduce((acc, item) => {
+      const subcategory2 = item.toJSON();
+      const parentSubcategory = subcategoryById[subcategory2.subCategoryId] || null;
+      const parentCategory = parentSubcategory ? categoryById[parentSubcategory.catId] || null : null;
+      const key = subcategory2.subCategoryId;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push({
+        ...subcategory2,
+        subcategory: parentSubcategory,
+        subcategoryId: subcategory2.subCategoryId,
+        parentSubCategoryId: subcategory2.subCategoryId,
+        subcategoryName: parentSubcategory ? parentSubcategory.name : null,
+        category: parentCategory,
+        catId: parentSubcategory ? parentSubcategory.catId : null,
+        categoryId: parentSubcategory ? parentSubcategory.catId : null,
+        parentCategoryId: parentSubcategory ? parentSubcategory.catId : null,
+        categoryName: parentCategory ? parentCategory.name : null,
+      });
+      return acc;
+    }, {});
+
+    const subcategoryByCategory = subcategoryRows.reduce((acc, subcategory) => {
+      const parentCategory = categoryById[subcategory.catId] || null;
       const key = subcategory.catId;
       if (!acc[key]) acc[key] = [];
       acc[key].push({
         ...subcategory,
+        category: parentCategory,
+        categoryId: subcategory.catId,
+        parentCategoryId: subcategory.catId,
+        categoryName: parentCategory ? parentCategory.name : null,
         subcategories2: subcategory2BySubcategory[subcategory.id] || [],
         subCategories2: subcategory2BySubcategory[subcategory.id] || [],
       });
       return acc;
     }, {});
 
-    const hierarchy = categories.map((item) => {
-      const category = item.toJSON();
-      return {
-        ...category,
-        subcategories: subcategoryByCategory[category.id] || [],
-        subCategories: subcategoryByCategory[category.id] || [],
-      };
-    });
+    const hierarchy = categoryRows.map((category) => ({
+      ...category,
+      subcategories: subcategoryByCategory[category.id] || [],
+      subCategories: subcategoryByCategory[category.id] || [],
+    }));
 
     res.status(200).json({ status: true, message: "OK", categories: hierarchy, data: hierarchy });
   } catch (error) {
