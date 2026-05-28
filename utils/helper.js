@@ -32,7 +32,20 @@ const createHttpError = require("./httpError");
 // });
 
 const uploadDir = path.join(__dirname, "..", "uploads");
-const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".pdf"]);
+const allowedExtensions = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".svg",
+  ".bmp",
+  ".tif",
+  ".tiff",
+  ".ico",
+  ".avif",
+  ".pdf",
+]);
 const blockedExtensions = new Set([
   ".bat",
   ".cmd",
@@ -50,8 +63,17 @@ const blockedExtensions = new Set([
 ]);
 const allowedMimeTypes = new Set([
   "image/jpeg",
+  "image/jpg",
   "image/png",
+  "image/gif",
   "image/webp",
+  "image/svg+xml",
+  "image/bmp",
+  "image/x-ms-bmp",
+  "image/tiff",
+  "image/x-icon",
+  "image/vnd.microsoft.icon",
+  "image/avif",
   "application/pdf",
 ]);
 
@@ -76,7 +98,7 @@ const fileFilter = (req, file, cb) => {
   }
 
   if (!allowedExtensions.has(extension) || !allowedMimeTypes.has(file.mimetype)) {
-    return cb(createHttpError(400, "Only JPEG, PNG, WEBP, and PDF uploads are allowed"));
+    return cb(createHttpError(400, "Only image and PDF uploads are allowed"));
   }
 
   cb(null, true);
@@ -86,7 +108,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024,
+    fileSize: 15 * 1024 * 1024,
   },
 });
 
@@ -95,7 +117,7 @@ const uploadSingleFile = (req, res, next) => {
     if (!error) return next();
 
     if (error.code === "LIMIT_FILE_SIZE") {
-      return next(createHttpError(400, "File size must be 5MB or less"));
+      return next(createHttpError(400, "File size must be 15MB or less"));
     }
 
     next(error);

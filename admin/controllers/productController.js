@@ -177,6 +177,14 @@ const normalizeVariant = (variant, index) => {
 const normalizeVariants = (variants) =>
   Array.isArray(variants) ? variants.map(normalizeVariant) : variants;
 
+const normalizeNullableJsonList = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  if (!Array.isArray(value)) return value;
+
+  const cleanList = value.filter((item) => item !== undefined && item !== null && item !== "");
+  return cleanList.length > 0 ? cleanList : null;
+};
+
 const hasSellableVariant = (variants) => {
   if (!Array.isArray(variants) || variants.length === 0) return false;
 
@@ -205,6 +213,8 @@ const addProduct = async (req, res) => {
   let { name, catId, subCatId, brandId, images, varients, details, countryOfOrigin, isVeg } = req.body;
   varients = normalizeVariants(varients);
   req.body.varients = varients;
+  req.body.certificates = normalizeNullableJsonList(req.body.certificates);
+  req.body.supplements = normalizeNullableJsonList(req.body.supplements);
 
   if (isVeg === 'true' || isVeg === true) isVeg = true;
   else if (isVeg === 'false' || isVeg === false) isVeg = false;
@@ -548,6 +558,14 @@ const updateProduct = async (req, res) => {
           message: "Product variants with valid units, stock, mrp, and selling price are required",
         });
       }
+    }
+
+    if (req.body.certificates !== undefined) {
+      req.body.certificates = normalizeNullableJsonList(req.body.certificates);
+    }
+
+    if (req.body.supplements !== undefined) {
+      req.body.supplements = normalizeNullableJsonList(req.body.supplements);
     }
 
     const hierarchyError = await validateProductHierarchy({

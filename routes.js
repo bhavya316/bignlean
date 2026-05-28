@@ -7,7 +7,26 @@ const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = new Set([
+  "https://admin.bignlean.com",
+  "https://bignlean.com",
+  "https://www.bignlean.com",
+]);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (
+      !origin ||
+      allowedOrigins.has(origin) ||
+      /^https:\/\/([a-z0-9-]+\.)*bignlean\.com$/i.test(origin) ||
+      /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin)
+    ) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true,
+}));
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
