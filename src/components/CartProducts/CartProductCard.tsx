@@ -83,10 +83,10 @@ export default function CartProductCard({
       <img
         src={getFirstMediaUrl(displayProduct?.images)}
         alt="product"
-        className="h-[100px] w-[75px] max-sm:min-w-[50px] max-sm:h-[75px] object-contain bg-gray-50 rounded"
+        className="h-[100px] w-[75px] max-sm:min-w-[50px] max-sm:h-[75px] object-contain mix-blend-multiply"
       />
       <div>
-        <p className="text-black text-base not-italic font-bold max-[500px]:text-sm">
+        <p className="text-black text-base not-italic font-semibold max-[500px]:text-sm">
           {displayProduct?.name}
         </p>
         <p className="text-black text-xs not-italic font-normal opacity-40">
@@ -95,15 +95,15 @@ export default function CartProductCard({
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           {savings > 0 && (
             <p className="text-black text-xs not-italic font-normal line-through opacity-40">
-              ₹{marketPrice.toFixed(0)}
+              ₹{marketPrice.toFixed(0)}/-
             </p>
           )}
           <p className="text-black text-sm not-italic font-bold">
-            ₹{sellingPrice.toFixed(0)}
+            ₹{sellingPrice.toFixed(0)}/-
           </p>
           {savings > 0 && (
             <p className="text-green-500 text-sm not-italic font-medium">
-              Save ₹{savings.toFixed(0)}
+              Save ₹{savings.toFixed(0)}/-
             </p>
           )}
         </div>

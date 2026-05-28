@@ -10,14 +10,16 @@ export default function DetailCard({
   information: any;
   supplements: any;
 }) {
+  const safeDetails = Array.isArray(details) ? details : [];
+
   return (
     <div>
       <h2 className="text-black text-base not-italic font-bold mb-3">
         Details
       </h2>
       <div className="border-[1px] p-4 rounded-lg border-gray-300">
-        <div className="flex flex-col gap-8">
-          {details?.map((detail: any, index: number) => (
+        <div className="flex flex-col gap-5">
+          {safeDetails.map((detail: any, index: number) => (
             <div key={index}>
               <h3 className="text-black text-lg not-italic font-bold mb-3">
                 {detail?.heading}
@@ -36,13 +38,19 @@ export default function DetailCard({
 }
 
 const SuplimemntsCard = ({ supplements }: { supplements: any }) => {
+  const safeSupplements = Array.isArray(supplements)
+    ? supplements.filter(Boolean)
+    : [];
+
+  if (safeSupplements.length === 0) return null;
+
   return (
     <div>
       <h3 className="text-black text-lg not-italic font-bold mb-3">
         Supplements
       </h3>
       <div className="flex items-center flex-wrap gap-5">
-        {supplements?.map((item: any, index: number) => (
+        {safeSupplements.map((item: any, index: number) => (
           <div key={index} className="w-[150px] ">
             <img src={item} alt="supliment" className="w-full max-h-[150px] object-contain" />
           </div>
@@ -53,13 +61,19 @@ const SuplimemntsCard = ({ supplements }: { supplements: any }) => {
 };
 
 const InformationCard = ({ information }: { information: any }) => {
+  const safeInformation = Array.isArray(information)
+    ? information.filter((info: any) => info?.title || Array.isArray(info?.table))
+    : [];
+
+  if (safeInformation.length === 0) return null;
+
   return (
     <div>
       <h3 className="text-black text-lg not-italic font-bold mb-3">
         Information
       </h3>
       <div className="custom-grid3">
-        {information?.map((info: any, index: number) => (
+        {safeInformation.map((info: any, index: number) => (
           <InfoCard key={index} info={info} />
         ))}
       </div>

@@ -13,7 +13,7 @@ const FooterButtons = [
     activeIcon: <ActiveCategoryIcon />,
     inActiveicon: <CategoryIcon />,
     isActive: false,
-    route: "/products/categories",
+    route: "/categories",
   },
   {
     activeIcon: <WishlistIcon />,

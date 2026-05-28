@@ -31,7 +31,7 @@ export default function ShopByCategory({
         label="Shop by category"
         showBtn={true}
         btnLabel="Show all"
-        onClick={() => router.push("/products/categories")}
+        onClick={() => router.push("/categories")}
       />
       {isLoading ? (
         <ShopByCategoryContentSkeleton />

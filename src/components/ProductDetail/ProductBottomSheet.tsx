@@ -103,7 +103,7 @@ export default function ProductBottomSheet({
           </span>{" "}
           ₹{(
             Number(selectedVariantPricing?.sellingPrice || 0) * quantity
-          ).toFixed(0)}
+          ).toFixed(0)}/-
         </p>
       </div>
       <div className="flex items-center gap-2">

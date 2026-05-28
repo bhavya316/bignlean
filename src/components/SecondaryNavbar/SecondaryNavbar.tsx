@@ -356,7 +356,7 @@ export default function SecondaryNavbar() {
                       <button
                         type="button"
                         onClick={() => {
-                          router.push("/products/categories");
+                          router.push("/categories");
                           setShowCategories(false);
                         }}
                         className="w-full px-4 py-3 text-left text-[14px] font-semibold text-[#E70F0F] hover:bg-white"

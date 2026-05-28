@@ -1,4 +1,4 @@
-import { CoinSmIcon, Info2Icon, InfoIcon } from "@/Icons";
+import { CoinSmIcon, Info2Icon } from "@/Icons";
 import { useGEtPinCodeAvailability } from "@/queries/Product";
 import Link from "next/link";
 import { ChangeEvent, useEffect, useState } from "react";
@@ -8,12 +8,10 @@ export default function ProductDelivery({
   price,
   countryOfOrigin,
   countryCode,
-  brandImportInfo,
 }: {
   price: number;
   countryOfOrigin?: string;
   countryCode?: string;
-  brandImportInfo?: { heading?: string; body?: string } | null;
 }) {
   return (
     <div className="w-[85%] max-lg:w-full max-[450px]:w-full">
@@ -23,7 +21,6 @@ export default function ProductDelivery({
       <PinCodeCard price={price} />
       {/* <BigLeanCashCard /> */}
       <OriginCard country={countryOfOrigin || "India"} countryCode={countryCode} />
-      <BrandAuthorizedImportCard brandImportInfo={brandImportInfo} />
       {/* <MembershipCard /> */}
     </div>
   );
@@ -138,36 +135,30 @@ const OriginCard = ({
           Origin: {country}
         </p>
       </div>
-      <div className="w-[1px] h-[60px] bg-gray-200"></div>
-      <div className="flex flex-col gap-2 items-center text-center max-w-[92px]">
-        <p className="text-black text-xs not-italic font-semibold leading-5">
-          Brand Authorized Import
-        </p>
-      </div>
     </div>
   );
 };
 
-const BrandAuthorizedImportCard = ({
+export const SellerInfoCard = ({
   brandImportInfo,
 }: {
   brandImportInfo?: { heading?: string; body?: string } | null;
 }) => {
-  const heading = brandImportInfo?.heading || "";
-  const body = brandImportInfo?.body || "";
+  const heading = brandImportInfo?.heading?.trim() || "";
+  const body = brandImportInfo?.body?.trim() || "";
+  const rawText = /brand authorized import/i.test(heading) ? body : body || heading;
+  const bodyText = rawText.replace(/brand authorized import:?/gi, "").trim();
 
-  if (!heading && !body) return null;
+  if (!bodyText) return null;
 
   return (
-    <div className="rounded-lg bg-white p-4 mt-5 border border-gray-100 shadow-sm">
-      <p className="text-black text-sm not-italic font-bold">
-        {heading || "Brand Authorized Import"}
+    <div className="rounded-lg border border-gray-300 p-4">
+      <h2 className="text-black text-base not-italic font-bold mb-3">
+        Seller Information
+      </h2>
+      <p className="text-gray-600 text-sm not-italic font-normal leading-6">
+        {bodyText}
       </p>
-      {body && (
-        <p className="mt-2 text-gray-600 text-sm not-italic font-normal leading-6">
-          {body}
-        </p>
-      )}
     </div>
   );
 };

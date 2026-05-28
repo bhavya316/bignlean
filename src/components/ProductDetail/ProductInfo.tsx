@@ -324,7 +324,7 @@ const PriceCard = ({
       <div className="flex items-center gap-2">
         {discountPercent > 0 && (
           <p className="text-black text-base not-italic font-normal line-through opacity-30">
-            ₹{marketPrice.toFixed(0)}
+            ₹{marketPrice.toFixed(0)}/-
           </p>
         )}
         {discountPercent > 0 && (
@@ -334,7 +334,7 @@ const PriceCard = ({
         )}
       </div>
       <p className="text-gradient text-2xl not-italic font-bold">
-        ₹{sellingPrice.toFixed(0)}
+        ₹{sellingPrice.toFixed(0)}/-
       </p>
       <p className="text-black text-xs not-italic font-normal">
         Inclusive of all taxes

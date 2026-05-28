@@ -9,6 +9,7 @@ import DetailCard from "./DetailCard";
 import OverviewCard from "./OverviewCard";
 import ProductCertificate from "./ProductCertificate";
 import ReviewCard from "./ReviewCard";
+import { SellerInfoCard } from "../ProductDetail/ProductDelivery";
 // import SimilarProducts from "../ProductDetail/SimilarProducts";
 import { SectionHeader, SliderWrapper } from "@/components";
 // import { Categories } from "@/utils/Schemas";
@@ -19,7 +20,6 @@ import {
   BestsellerIcon,
   StarIcon,
   ThunderIcon,
-  TrashIcon,
   WhishlistIcon,
 } from "@/Icons";
 import WishlistIconWhite from "@/Icons/WishlistIconWhite";
@@ -183,7 +183,7 @@ export function SimilarProductCard({
             alt={product?.name || "Product"}
             width={200}
             height={140}
-            className="object-contain object-center w-auto h-[140px] cursor-pointer"
+            className="object-contain object-center w-auto h-[140px] cursor-pointer mix-blend-multiply"
             onClick={() => router.push(link)}
             unoptimized={true}
           />
@@ -192,7 +192,7 @@ export function SimilarProductCard({
           <div className="flex justify-between mt-2 ">
             <p
               onClick={() => router.push(link)}
-              className="text-black line-clamp-2  not-italic font-bold  cursor-pointer"
+              className="text-black line-clamp-2  not-italic font-semibold  cursor-pointer"
             >
               {product?.name}
             </p>
@@ -211,11 +211,11 @@ export function SimilarProductCard({
           <div>
             {discountPercent > 0 && (
               <p className="text-black text-xs not-italic font-medium line-through opacity-40">
-                ₹ {marketPrice.toFixed(0)}
+                ₹ {marketPrice.toFixed(0)}/-
               </p>
             )}
             <p className="text-black text-base not-italic font-bold">
-              ₹ {sellingPrice.toFixed(0)}
+              ₹ {sellingPrice.toFixed(0)}/-
             </p>
           </div>
           {product?.isBestSeller && (
@@ -284,9 +284,9 @@ export default function ProductFooter({
 
   return (
     <>
-      <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-5">
        
-<div className="p-3">
+<div className="p-2">
 <div className="p-2 flex items-center w-[700px] max-[700px]:w-full max-[700px]:flex-wrap rounded-lg bg-gray-100 shadow-sm">
   {tabs.map((tab) => (
     <button
@@ -304,8 +304,8 @@ export default function ProductFooter({
       <p
         className={
           activeTab === tab
-            ? "p-3 text-[#E70F0F] bg-white rounded-lg shadow-sm"
-            : "p-3 border-3 border-transparent rounded-xl text-gray-600"
+            ? "p-2 text-[#E70F0F] bg-white rounded-lg shadow-sm"
+            : "p-2 border-3 border-transparent rounded-xl text-gray-600"
         }
       >
         {tab}
@@ -331,6 +331,8 @@ export default function ProductFooter({
             supplements={product?.supplements}
           />
         </div>
+
+        <SellerInfoCard brandImportInfo={product?.brand} />
 
         {/* Certificate Section */}
         <div ref={certificateRef}>

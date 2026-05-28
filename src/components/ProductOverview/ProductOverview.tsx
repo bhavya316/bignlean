@@ -17,17 +17,17 @@ const ImageViewer = ({ images }: any) => {
             src={getMediaUrl(image)}
             alt={`Thumbnail ${index}`}
             onClick={() => setSelectedImage(image)}
-            className={`cursor-pointer w-20 h-20 max-sm:mb-1 aspect-square rounded-xl object-contain ${
-              image === selectedImage ? "ring-1 ring-black ring-offset-2 " : ""
+            className={`cursor-pointer w-20 h-20 max-sm:mb-1 aspect-square object-contain mix-blend-multiply ${
+              image === selectedImage ? "ring-1 ring-black " : ""
             }`}
           />
         ))}
       </div>
-      <div className="w-[80%] max-lg:w-full max-lg:shadow-none max-h-[475px] max-lg:max-h-[350px] shadow-md border rounded-xl overflow-hidden pointer-events-none relative ">
+      <div className="w-[80%] max-lg:w-full max-h-[475px] max-lg:max-h-[350px] pointer-events-none relative ">
         <img
           src={getMediaUrl(selectedImage)}
           alt="Selected"
-          className="w-full h-full object-contain "
+          className="w-full h-full object-contain mix-blend-multiply"
         />
       </div>
     </div>

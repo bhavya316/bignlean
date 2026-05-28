@@ -190,10 +190,10 @@ const ProductDetailCard = ({
             <img
               src={getFirstMediaUrl(product?.images, "/assets/product.png")}
               alt={product?.name || "product"}
-              className="h-[86px] w-[86px] object-contain rounded bg-gray-50 max-[600px]:h-[58px] max-[600px]:w-[58px]"
+              className="h-[86px] w-[86px] object-contain mix-blend-multiply max-[600px]:h-[58px] max-[600px]:w-[58px]"
             />
             <div className="flex flex-col gap-1">
-              <p className="text-black text-base not-italic font-medium max-[1000px]:text-sm">
+              <p className="text-black text-base not-italic font-semibold max-[1000px]:text-sm">
                 {product?.name}
               </p>
               <p className="text-black text-sm not-italic font-normal opacity-40">

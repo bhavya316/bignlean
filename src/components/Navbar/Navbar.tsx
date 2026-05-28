@@ -344,7 +344,7 @@ const MobileSideBar = ({
               type="button"
               onClick={() => {
                 setToggle(false);
-                router.push("/products/categories");
+                router.push("/categories");
               }}
               className="ml-auto text-[13px] font-semibold text-[#FF0012]"
             >

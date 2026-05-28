@@ -327,10 +327,10 @@ export default function Searchbar({
                       <img
                         src={product.images[0]}
                         alt={product.name}
-                        className="w-10 h-10 object-cover rounded-md"
+                        className="w-10 h-10 object-contain mix-blend-multiply"
                       />
                     )}
-                    <span className="text-sm font-medium">{product.name}</span>
+                    <span className="text-sm font-semibold">{product.name}</span>
                   </button>
                 ))
               ) : (
@@ -370,13 +370,13 @@ export default function Searchbar({
                     <img
                       src={product.images[0]}
                       alt={product.name}
-                      className="w-10 h-10 object-cover rounded-md"
+                      className="w-10 h-10 object-contain mix-blend-multiply"
                     />
                   )}
                   <div>
-                    <p className="text-sm font-medium">{product.name}</p>
+                    <p className="text-sm font-semibold">{product.name}</p>
                     {product.varients?.[0] && (
-                      <p className="text-xs text-green-600">₹{product.varients[0].sellingPrice}</p>
+                      <p className="text-xs text-green-600">₹{product.varients[0].sellingPrice}/-</p>
                     )}
                   </div>
                 </div>

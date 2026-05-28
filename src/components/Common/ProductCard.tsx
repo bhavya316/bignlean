@@ -150,7 +150,7 @@ export default function ProductCard({
             alt={product?.name || "Product"}
             width={200}
             height={140}
-            className="h-[140px] w-full max-w-[200px] cursor-pointer object-contain object-center"
+            className="h-[140px] w-full max-w-[200px] cursor-pointer object-contain object-center mix-blend-multiply"
             onClick={() => {
               recordProductView(product?.id as number);
               router.push(link);
@@ -171,7 +171,7 @@ export default function ProductCard({
               recordProductView(product?.id as number);
               router.push(link);
             }}
-            className="text-black line-clamp-2  not-italic font-bold  cursor-pointer "
+            className="text-black line-clamp-2  not-italic font-semibold  cursor-pointer "
           >
             {product?.name}
           </p>
@@ -187,11 +187,11 @@ export default function ProductCard({
           <div>
             {discountPercent > 0 && (
               <p className="text-black text-xs not-italic font-medium line-through opacity-40">
-                ₹ {marketPrice.toFixed(0)}
+                ₹ {marketPrice.toFixed(0)}/-
               </p>
             )}
             <p className="text-black text-base not-italic font-bold">
-              ₹ {sellingPrice.toFixed(0)}
+              ₹ {sellingPrice.toFixed(0)}/-
             </p>
           </div>
           {(showBestsellerBadge || product?.isBestSeller) && (

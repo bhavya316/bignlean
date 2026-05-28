@@ -174,7 +174,7 @@ export const ProductsCompareInfo = ({
                     />
                   </div>
                   <div className="text-xs">
-                    <p className="line-clamp-2">{product?.name}</p>
+                    <p className="line-clamp-2 font-semibold">{product?.name}</p>
                     <p className="font-light text-gray-500">
                       {getOptionLabel(product?.varients?.[0]?.units)}-
                       {getFirstFlavorLabel(product?.varients?.[0])}

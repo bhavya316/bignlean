@@ -94,10 +94,10 @@ export default function ProductReviewForm({
           <img
             src={product.images?.[0]}
             alt="product"
-            className="w-20 h-24 rounded object-contain"
+            className="w-20 h-24 object-contain mix-blend-multiply"
           />
           <div>
-            <p className="text-black text-sm not-italic font-medium">
+            <p className="text-black text-sm not-italic font-semibold">
               {product.name}
             </p>
             <RatingForm label="rate" title="Rate" setFormData={setFormData} />

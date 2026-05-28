@@ -37,10 +37,10 @@ export default function SuggestedProductCard({
       <img
         src={getFirstMediaUrl(product?.images)}
         alt={product?.name || "product"}
-        className="w-[100px] h-[100px] object-contain bg-gray-50 rounded-md flex-shrink-0"
+        className="w-[100px] h-[100px] object-contain mix-blend-multiply flex-shrink-0"
       />
       <div className="flex-1 min-w-0">
-        <p className="text-black line-clamp-2 text-sm not-italic font-bold mb-1 overflow-hidden">
+        <p className="text-black line-clamp-2 text-sm not-italic font-semibold mb-1 overflow-hidden">
           {product?.name || product?.brand?.heading || product?.brand?.body || 'Product'}
         </p>
         <p className="text-gray-600 text-xs not-italic font-normal mb-2">
@@ -49,15 +49,15 @@ export default function SuggestedProductCard({
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           {savings > 0 && (
             <p className="text-gray-500 text-xs not-italic font-normal line-through">
-              ₹{marketPrice.toFixed(0)}
+              ₹{marketPrice.toFixed(0)}/-
             </p>
           )}
           <p className="text-black text-sm not-italic font-bold">
-            ₹{sellingPrice.toFixed(0)}
+            ₹{sellingPrice.toFixed(0)}/-
           </p>
           {savings > 0 && (
             <p className="text-green-600 text-xs not-italic font-medium bg-green-50 px-1 py-0.5 rounded">
-              Save ₹{savings.toFixed(0)}
+              Save ₹{savings.toFixed(0)}/-
             </p>
           )}
         </div>

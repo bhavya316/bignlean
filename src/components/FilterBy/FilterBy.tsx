@@ -342,14 +342,14 @@ export default function FilterBy({
                     key={index}
                   >  
                     <div className="flex gap-2 items-center hover:bg-gray-50 p-1 rounded">
-                      <div className="w-16 h-16 relative bg-gray-100 rounded-md flex-shrink-0 overflow-hidden">
+                      <div className="w-16 h-16 relative flex-shrink-0">
                         {product.images && product.images[0] ? (
                           <Image
                             src={product.images[0]}
                             alt={product.name || 'Product'}
                             fill
                             sizes="64px"
-                            className="object-contain p-1"
+                            className="object-contain mix-blend-multiply"
                           />
                         ) : product.thumbnail ? (
                           <Image
@@ -357,7 +357,7 @@ export default function FilterBy({
                             alt={product.name || 'Product'}
                             fill
                             sizes="64px"
-                            className="object-contain p-1"
+                            className="object-contain mix-blend-multiply"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -366,9 +366,11 @@ export default function FilterBy({
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs line-clamp-2">{product.name}</p>
+                        <p className="text-xs line-clamp-2 font-semibold">{product.name}</p>
                         <p className="text-xs font-semibold mt-1">
-                          ₹{product.varients?.[0]?.sellingPrice || product.price || "N/A"}
+                          {product.varients?.[0]?.sellingPrice || product.price
+                            ? `₹${product.varients?.[0]?.sellingPrice || product.price}/-`
+                            : "N/A"}
                         </p>
                       </div>
                     </div>
