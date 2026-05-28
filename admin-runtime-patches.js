@@ -671,7 +671,7 @@
   }
 
   function getAdminApiBase() {
-    return window.__BNL_ADMIN_API_BASE__ || "https://api.bignlean.com";
+    return window.__BNL_ADMIN_API_BASE__ || "http://localhost:3002";
   }
 
   function fetchAdminJson(path, options) {
@@ -687,6 +687,101 @@
         return data;
       });
     });
+  }
+
+  function refreshAdminUploadHints() {
+    document.querySelectorAll("small").forEach(function (node) {
+      var text = node.textContent || "";
+      if (/Max\s+5MB/i.test(text) && /image|banner|logo/i.test(text)) {
+        node.textContent = text.replace(/Max\s+5MB/gi, "Max 15MB");
+      }
+    });
+  }
+
+  function installAdminImageUploadCompatibility() {
+    if (window.__bnlAdminImageUploadCompatibility) {
+      refreshAdminUploadHints();
+      return;
+    }
+    window.__bnlAdminImageUploadCompatibility = true;
+
+    var clientLimitBytes = (5 * 1024 * 1024) - 1;
+
+    try {
+      var blobSizeDescriptor = typeof Blob !== "undefined" && Object.getOwnPropertyDescriptor(Blob.prototype, "size");
+      if (blobSizeDescriptor && blobSizeDescriptor.get && blobSizeDescriptor.configurable !== false) {
+        Object.defineProperty(Blob.prototype, "size", {
+          configurable: true,
+          enumerable: blobSizeDescriptor.enumerable,
+          get: function () {
+            var actualSize = blobSizeDescriptor.get.call(this);
+            var isImageFile = typeof File !== "undefined" && this instanceof File && /^image\//i.test(this.type || "");
+            return isImageFile && actualSize > clientLimitBytes ? clientLimitBytes : actualSize;
+          }
+        });
+      }
+    } catch (error) {}
+
+    try {
+      var NativeImage = window.Image;
+      var imagePrototype = typeof HTMLImageElement !== "undefined" ? HTMLImageElement.prototype : null;
+      var widthDescriptor = imagePrototype && Object.getOwnPropertyDescriptor(imagePrototype, "width");
+      var heightDescriptor = imagePrototype && Object.getOwnPropertyDescriptor(imagePrototype, "height");
+
+      if (typeof NativeImage === "function" && !NativeImage.__bnlUploadValidationPatched) {
+        function isUploadValidationImage(image) {
+          return image && image.__bnlUploadValidationImage && /^blob:/i.test(String(image.currentSrc || image.src || ""));
+        }
+
+        function capDimension(value) {
+          var number = Number(value);
+          if (!Number.isFinite(number) || number <= 0) return value;
+          return Math.min(number, 400);
+        }
+
+        function readDimension(image, descriptor, fallbackKey) {
+          var value = descriptor && descriptor.get ? descriptor.get.call(image) : image[fallbackKey] || 0;
+          return isUploadValidationImage(image) ? capDimension(value) : value;
+        }
+
+        function writeDimension(image, descriptor, value, attributeName) {
+          if (descriptor && descriptor.set) {
+            descriptor.set.call(image, value);
+          } else {
+            image.setAttribute(attributeName, value);
+          }
+        }
+
+        function proxyDimension(image, prop, descriptor, fallbackKey) {
+          Object.defineProperty(image, prop, {
+            configurable: true,
+            enumerable: true,
+            get: function () {
+              return readDimension(image, descriptor, fallbackKey);
+            },
+            set: function (value) {
+              writeDimension(image, descriptor, value, prop);
+            }
+          });
+        }
+
+        var PatchedImage = function (width, height) {
+          var image = new NativeImage(width, height);
+          image.__bnlUploadValidationImage = true;
+          proxyDimension(image, "width", widthDescriptor, "naturalWidth");
+          proxyDimension(image, "height", heightDescriptor, "naturalHeight");
+          return image;
+        };
+
+        PatchedImage.prototype = NativeImage.prototype;
+        if (Object.setPrototypeOf) Object.setPrototypeOf(PatchedImage, NativeImage);
+        PatchedImage.__bnlUploadValidationPatched = true;
+        window.Image = PatchedImage;
+      }
+    } catch (error) {}
+
+    refreshAdminUploadHints();
+    window.setTimeout(refreshAdminUploadHints, 250);
   }
 
   function getAdminRouteState() {
@@ -971,6 +1066,11 @@
     }
   }
 
+  function getProductFormControl(labelId) {
+    var label = document.getElementById(labelId);
+    return label && label.closest ? label.closest(".MuiFormControl-root") : null;
+  }
+
   function isProductOrComboFormPage() {
     return (/\/products\/add_products\/?$/.test(location.pathname) || isComboFormPath()) &&
       !!document.getElementById("add_products__content__form__brand_cat__sub_category");
@@ -1008,12 +1108,177 @@
     var brandId = getComboSelectValue("add_products__content__form__brand_cat__brand") || payload.brandId || product.brandId;
     var categoryId = getComboSelectValue("add_products__content__form__brand_cat__category") || payload.catId || product.catId;
     var subcategoryId = getComboSelectValue("add_products__content__form__brand_cat__sub_category") || payload.subCatId || product.subCatId;
+    var subcategory2Id = getSubCategory2Value();
+
+    if (adminTaxonomyCache && categoryId && subcategoryId && !isSubcategoryAllowedForCategory(subcategoryId, categoryId, adminTaxonomyCache)) {
+      subcategoryId = "";
+      delete payload.subCatId;
+    }
+
+    if (adminTaxonomyCache && subcategoryId && subcategory2Id && !isSubcategory2AllowedForSubcategory(subcategory2Id, subcategoryId, adminTaxonomyCache)) {
+      clearProductSubcategory2Value();
+    }
 
     if (brandId !== undefined && brandId !== null && brandId !== "") payload.brandId = Number(brandId);
     if (categoryId !== undefined && categoryId !== null && categoryId !== "") payload.catId = Number(categoryId);
     if (subcategoryId !== undefined && subcategoryId !== null && subcategoryId !== "") payload.subCatId = Number(subcategoryId);
 
     return applySubCategory2ToPayload(payload);
+  }
+
+  function taxonomyItemIdSet(items) {
+    var set = {};
+    (items || []).forEach(function (item) {
+      if (item && item.id != null) set[String(item.id)] = true;
+    });
+    return set;
+  }
+
+  function isSubcategoryAllowedForCategory(subcategoryId, categoryId, taxonomy) {
+    if (!subcategoryId || !categoryId || !taxonomy) return false;
+    var subcategory = taxonomy.subcategoriesById[String(subcategoryId)];
+    if (!subcategory) return false;
+    return String(getSubcategoryCategoryId(subcategory)) === String(categoryId);
+  }
+
+  function isSubcategory2AllowedForSubcategory(subcategory2Id, subcategoryId, taxonomy) {
+    if (!subcategory2Id || !subcategoryId || !taxonomy) return false;
+    var subcategory2 = taxonomy.subcategories2ById[String(subcategory2Id)];
+    if (!subcategory2) return false;
+    return String(getSubcategory2ParentId(subcategory2)) === String(subcategoryId);
+  }
+
+  function clearProductSubcategory2Value() {
+    selectedSubCat2Value = "";
+    var select = document.querySelector("[data-bnl-subcat2-select]");
+    if (select) {
+      select.value = "";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+
+  function ensureProductFormTaxonomyParents(taxonomy) {
+    if (!isProductOrComboFormPage() || !taxonomy) return;
+    var categoryId = getComboSelectValue("add_products__content__form__brand_cat__category");
+    var subcategoryId = getComboSelectValue("add_products__content__form__brand_cat__sub_category");
+
+    if (categoryId && subcategoryId && !isSubcategoryAllowedForCategory(subcategoryId, categoryId, taxonomy)) {
+      subcategoryId = "";
+      clearProductSubcategory2Value();
+    }
+
+    var subcategory2Id = getSubCategory2Value();
+    if (!subcategoryId && subcategory2Id) {
+      clearProductSubcategory2Value();
+      subcategory2Id = "";
+    }
+
+    if (subcategoryId && subcategory2Id && !isSubcategory2AllowedForSubcategory(subcategory2Id, subcategoryId, taxonomy)) {
+      clearProductSubcategory2Value();
+    }
+
+    var subcategory2Field = document.querySelector("[data-bnl-subcat2-field]");
+    if (subcategory2Field) {
+      var select = subcategory2Field.querySelector("[data-bnl-subcat2-select]");
+      if (subcategoryId) {
+        syncProductSubcategory2Field(subcategory2Field);
+      } else {
+        populateSubCategory2Select(select, "", "");
+      }
+    }
+  }
+
+  function filterOpenProductTaxonomyMenu(taxonomy) {
+    var activeType = window.__bnlActiveProductTaxonomySelect || "";
+    if (activeType !== "subcategory" && activeType !== "subcategory2") return;
+    if (!taxonomy) return;
+
+    var categoryId = getComboSelectValue("add_products__content__form__brand_cat__category");
+    var subcategoryId = getComboSelectValue("add_products__content__form__brand_cat__sub_category");
+    var allowedIds = {};
+
+    if (activeType === "subcategory") {
+      allowedIds = categoryId
+        ? taxonomyItemIdSet(taxonomy.subcategoriesByCategoryId[String(categoryId)] || [])
+        : {};
+    } else {
+      allowedIds = subcategoryId
+        ? taxonomyItemIdSet(taxonomy.subcategories2BySubcategoryId[String(subcategoryId)] || [])
+        : {};
+    }
+
+    Array.prototype.slice.call(document.querySelectorAll(".MuiMenu-list, [role='listbox']")).forEach(function (list) {
+      Array.prototype.slice.call(list.querySelectorAll("[role='option'], li[data-value]")).forEach(function (item) {
+        var value = item.getAttribute("data-value");
+        if (value == null) value = item.getAttribute("value");
+        if (value == null || value === "") {
+          item.style.display = "";
+          item.removeAttribute("aria-hidden");
+          return;
+        }
+        var visible = !!allowedIds[String(value)];
+        item.style.display = visible ? "" : "none";
+        if (visible) {
+          item.removeAttribute("aria-hidden");
+        } else {
+          item.setAttribute("aria-hidden", "true");
+        }
+      });
+    });
+  }
+
+  function installProductTaxonomyParentFilters() {
+    if (!isProductOrComboFormPage()) return;
+    var brandRoot = getProductFormControl("add_products__content__form__brand_cat__brand");
+    var categoryRoot = getProductFormControl("add_products__content__form__brand_cat__category");
+    var subcategoryRoot = getProductFormControl("add_products__content__form__brand_cat__sub_category");
+
+    function scheduleFilter(activeType) {
+      window.__bnlActiveProductTaxonomySelect = activeType || "";
+      loadAdminTaxonomy().then(function (taxonomy) {
+        ensureProductFormTaxonomyParents(taxonomy);
+        filterOpenProductTaxonomyMenu(taxonomy);
+        window.setTimeout(function () { filterOpenProductTaxonomyMenu(taxonomy); }, 50);
+        window.setTimeout(function () { filterOpenProductTaxonomyMenu(taxonomy); }, 200);
+      }).catch(function () {});
+      if (activeType) {
+        window.clearTimeout(window.__bnlActiveProductTaxonomySelectTimer);
+        window.__bnlActiveProductTaxonomySelectTimer = window.setTimeout(function () {
+          if (window.__bnlActiveProductTaxonomySelect === activeType) {
+            window.__bnlActiveProductTaxonomySelect = "";
+          }
+        }, 2500);
+      }
+    }
+
+    function watchControl(root, activeType, onChange) {
+      if (!root || root.getAttribute("data-bnl-taxonomy-filter-bound") === activeType) return;
+      root.setAttribute("data-bnl-taxonomy-filter-bound", activeType);
+      root.addEventListener("mousedown", function () { scheduleFilter(activeType); }, true);
+      root.addEventListener("click", function () { scheduleFilter(activeType); }, true);
+      var input = root.querySelector("input");
+      if (input) {
+        ["input", "change"].forEach(function (eventName) {
+          input.addEventListener(eventName, function () {
+            if (onChange) onChange();
+            scheduleFilter("");
+          });
+        });
+      }
+    }
+
+    watchControl(brandRoot, "", null);
+    watchControl(categoryRoot, "", function () {
+      clearProductSubcategory2Value();
+    });
+    watchControl(subcategoryRoot, "subcategory", function () {
+      clearProductSubcategory2Value();
+    });
+
+    loadAdminTaxonomy().then(function (taxonomy) {
+      ensureProductFormTaxonomyParents(taxonomy);
+      filterOpenProductTaxonomyMenu(taxonomy);
+    }).catch(function () {});
   }
 
   function populateSubCategory2Select(select, subcategoryId, selectedValue) {
@@ -1030,6 +1295,10 @@
     select.setAttribute("data-bnl-subcat2-options-key", optionsKey);
     select.disabled = true;
     select.innerHTML = '<option value="">Select subcategory 2</option>';
+    if (!(normalizedSubcategoryId > 0)) {
+      selectedSubCat2Value = "";
+      return;
+    }
     if (adminTaxonomyCache && normalizedSubcategoryId > 0) {
       var cachedList = adminTaxonomyCache.subcategories2BySubcategoryId[String(normalizedSubcategoryId)] || [];
       cachedList.forEach(function (item) {
@@ -1045,9 +1314,7 @@
       }
       return;
     }
-    var path = normalizedSubcategoryId > 0
-      ? "/admin/subcategories2/" + encodeURIComponent(normalizedSubcategoryId)
-      : "/admin/subcategories2?limit=1000";
+    var path = "/admin/subcategories2/" + encodeURIComponent(normalizedSubcategoryId);
     fetchAdminJson(path)
       .then(function (data) {
         var list = data.subcategories2 || data.data || [];
@@ -1107,7 +1374,6 @@
     wrapper.className = "MuiFormControl-root bnl-subcat2-field";
     wrapper.setAttribute("data-bnl-subcat2-field", "true");
     wrapper.innerHTML = [
-      '<label id="bnl-product-subcat2-label" for="bnl-product-subcat2">Sub Category 2</label>',
       '<select id="bnl-product-subcat2" data-bnl-subcat2-select aria-label="Subcategory 2" disabled>',
       '<option value="">Select subcategory 2</option>',
       '</select>'
@@ -3269,10 +3535,12 @@
     window.__bnlTickRunning = true;
     try {
       injectStyle();
+      installAdminImageUploadCompatibility();
       installBrandCountryField();
       installBlogToolbar();
       installFlavorPanels();
       installProductSubcategory2Field();
+      installProductTaxonomyParentFilters();
       hydrateProductEditCategoryFields();
       installProductListExpiryFallback();
       installSubcategory2Manager();
