@@ -61,6 +61,8 @@
   var pendingProductTaxonomyHydrationKey = "";
   var productCacheById = {};
   var lastProductListProducts = [];
+  var adminFlashSaleValue = null;
+  var adminFlashSaleKey = "";
 
   function injectStyle() {
     if (document.getElementById("bnl-admin-runtime-style")) return;
@@ -456,6 +458,8 @@
     if ((isProductDraftPath(lastObservedPath) || isComboFormPath(lastObservedPath)) &&
       !(isProductDraftPath(currentPath) || isComboFormPath(currentPath))) {
       selectedSubCat2Value = "";
+      adminFlashSaleValue = null;
+      adminFlashSaleKey = "";
       lastProductTaxonomyHydrationKey = "";
       pendingProductTaxonomyHydrationKey = "";
     }
@@ -671,7 +675,7 @@
   }
 
   function getAdminApiBase() {
-    return window.__BNL_ADMIN_API_BASE__ || "http://localhost:3002";
+    return window.__BNL_ADMIN_API_BASE__ || "https://api.bignlean.com";
   }
 
   function fetchAdminJson(path, options) {
@@ -955,6 +959,105 @@
     }
   }
 
+  function normalizeAdminBoolean(value) {
+    if (value === true || value === 1) return true;
+    if (value === false || value === 0) return false;
+    if (value === undefined || value === null || value === "") return null;
+    var normalized = String(value).trim().toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on") return true;
+    if (normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off") return false;
+    return null;
+  }
+
+  function getAdminFlashSaleKey() {
+    var product = getCurrentAdminProduct() || {};
+    return [location.pathname, isComboFormPath() ? "combo" : "product", product.id || ""].join(":");
+  }
+
+  function getAdminFlashSaleSection() {
+    return document.querySelector(".add_products__content__form__flash_sale");
+  }
+
+  function getAdminFlashSaleCheckbox(section) {
+    section = section || getAdminFlashSaleSection();
+    return section && section.querySelector("input[type='checkbox']");
+  }
+
+  function readAdminFlashSaleCheckbox() {
+    var checkbox = getAdminFlashSaleCheckbox();
+    return checkbox ? !!checkbox.checked : null;
+  }
+
+  function readAdminFlashSaleInitialValue() {
+    var product = getCurrentAdminProduct();
+    var productValue = normalizeAdminBoolean(product && product.isOnFlashSale);
+    if (productValue !== null) return productValue;
+    var checkboxValue = readAdminFlashSaleCheckbox();
+    return checkboxValue !== null ? checkboxValue : false;
+  }
+
+  function syncAdminFlashSaleVisual(section, value) {
+    section = section || getAdminFlashSaleSection();
+    if (!section) return;
+    var checked = !!value;
+    var checkbox = getAdminFlashSaleCheckbox(section);
+    if (checkbox && checkbox.checked !== checked) checkbox.checked = checked;
+
+    Array.prototype.slice.call(section.querySelectorAll("label")).some(function (label) {
+      var textNode = findFirstTextNode(label);
+      if (!textNode || !/^\s*(On|Off)\s*$/i.test(textNode.nodeValue || "")) return false;
+      textNode.nodeValue = checked ? "On" : "Off";
+      return true;
+    });
+  }
+
+  function updateAdminFlashSaleValue(value) {
+    var normalized = normalizeAdminBoolean(value);
+    adminFlashSaleValue = normalized === null ? false : normalized;
+    syncAdminFlashSaleVisual(null, adminFlashSaleValue);
+  }
+
+  function installAdminFlashSaleState() {
+    if (!isProductOrComboFormPage()) return;
+    var section = getAdminFlashSaleSection();
+    var checkbox = getAdminFlashSaleCheckbox(section);
+    if (!section || !checkbox) return;
+
+    var key = getAdminFlashSaleKey();
+    if (adminFlashSaleKey !== key || adminFlashSaleValue === null) {
+      adminFlashSaleKey = key;
+      adminFlashSaleValue = readAdminFlashSaleInitialValue();
+    }
+
+    syncAdminFlashSaleVisual(section, adminFlashSaleValue);
+
+    if (checkbox.getAttribute("data-bnl-flash-sale-bound") === "true") return;
+    checkbox.setAttribute("data-bnl-flash-sale-bound", "true");
+    ["change", "input", "click"].forEach(function (eventName) {
+      checkbox.addEventListener(eventName, function () {
+        window.setTimeout(function () {
+          updateAdminFlashSaleValue(checkbox.checked);
+        }, 0);
+      }, false);
+    });
+  }
+
+  function applyAdminFlashSaleToPayload(payload) {
+    if (!payload || typeof payload !== "object") return payload;
+    if (isProductOrComboFormPage()) {
+      var checkboxValue = readAdminFlashSaleCheckbox();
+      if (checkboxValue !== null) adminFlashSaleValue = checkboxValue;
+      if (adminFlashSaleValue === null) adminFlashSaleValue = readAdminFlashSaleInitialValue();
+      payload.isOnFlashSale = !!adminFlashSaleValue;
+    } else if (isVariantDraftPath() && adminFlashSaleValue !== null) {
+      payload.isOnFlashSale = !!adminFlashSaleValue;
+    } else if (payload.isOnFlashSale !== undefined) {
+      var normalized = normalizeAdminBoolean(payload.isOnFlashSale);
+      if (normalized !== null) payload.isOnFlashSale = normalized;
+    }
+    return payload;
+  }
+
   function loadAdminTaxonomy() {
     if (adminTaxonomyCache && Object.keys(adminTaxonomyCache.categoriesById).length > 0) {
       return Promise.resolve(adminTaxonomyCache);
@@ -1123,7 +1226,7 @@
     if (categoryId !== undefined && categoryId !== null && categoryId !== "") payload.catId = Number(categoryId);
     if (subcategoryId !== undefined && subcategoryId !== null && subcategoryId !== "") payload.subCatId = Number(subcategoryId);
 
-    return applySubCategory2ToPayload(payload);
+    return applyAdminFlashSaleToPayload(applySubCategory2ToPayload(payload));
   }
 
   function taxonomyItemIdSet(items) {
@@ -2880,7 +2983,11 @@
         .then(function (response) {
           return response.json().then(function (data) {
             if (!response.ok || !data.status) {
-              throw new Error(data.message || (isAccept ? "Failed to accept order" : "Failed to reject order"));
+              var errorMessage = data.message || (isAccept ? "Failed to accept order" : "Failed to reject order");
+              if (data.shippingError) {
+                errorMessage += "\nReason: " + data.shippingError;
+              }
+              throw new Error(errorMessage);
             }
             return data;
           });
@@ -2918,6 +3025,50 @@
     return "Rs. " + amount.toFixed(2);
   }
 
+  function getOrderShippingAddress(order) {
+    return (
+      (order && (order.shippingAddress || order.shippedToAddress || order.deliveryAddress)) ||
+      (order && order.address) ||
+      {}
+    );
+  }
+
+  function formatOrderAddress(address) {
+    return [
+      address.name,
+      address.phone,
+      address.flat,
+      address.landmark,
+      address.city,
+      address.state,
+      address.pincode,
+    ].filter(Boolean).join(", ");
+  }
+
+  function normalizeOrderPaymentMethod(value) {
+    var rawValue = String(value || "").trim();
+    var normalized = rawValue.toLowerCase().replace(/[\s_-]+/g, "");
+    if (normalized === "cod" || normalized === "cashondelivery") return "COD";
+    if (normalized === "razorpay" || normalized === "razor") return "RazorPay";
+    return rawValue;
+  }
+
+  function getOrderPaymentLabel(order) {
+    if (order && order.paymentLabel) return order.paymentLabel;
+    var method = normalizeOrderPaymentMethod(order && order.paymentMethod);
+    if (method === "COD") return "Cash On Delivery";
+    if (method === "RazorPay") return "Razorpay";
+    return method || "N/A";
+  }
+
+  function getOrderPaymentStatus(order) {
+    if (order && order.paymentStatus) return order.paymentStatus;
+    var method = normalizeOrderPaymentMethod(order && order.paymentMethod);
+    if (method === "COD") return "COD";
+    if (order && order.transactionId) return "Payment Confirmed";
+    return method ? "Payment Pending" : "N/A";
+  }
+
   function getOrderLineItems(order) {
     var products = Array.isArray(order && order.product) ? order.product : [];
     return products.map(function (product, index) {
@@ -2944,9 +3095,10 @@
   }
 
   function buildOrderDetailsHtml(order) {
-    var address = order.address || {};
+    var address = getOrderShippingAddress(order);
     var user = order.user || {};
     var items = getOrderLineItems(order);
+    var paymentLabel = getOrderPaymentLabel(order);
     var shipping = Number(order.shippingCharge || order.shiping || 0);
     var subtotal = Number(order.subtotalAmount || order.totalAmount || order.amount || 0);
     var couponDiscount = Number(order.couponDiscount || 0);
@@ -2988,7 +3140,7 @@
       "<div><strong>Order ID:</strong> ", escapeHtml(order.orderID || order.id || "N/A"), "</div>",
       "<div><strong>Status:</strong> ", escapeHtml(order.status || "N/A"), "</div>",
       "<div><strong>Tracking ID:</strong> ", escapeHtml(order.trackingID || "N/A"), "</div>",
-      "<div><strong>Payment:</strong> ", escapeHtml(order.paymentMethod || "N/A"), "</div>",
+      "<div><strong>Payment:</strong> ", escapeHtml(paymentLabel), "</div>",
       "<div><strong>Customer:</strong> ", escapeHtml(user.name || address.name || "N/A"), "</div>",
       "<div><strong>Email:</strong> ", escapeHtml(user.email || "N/A"), "</div>",
       "<div style=\"grid-column:1/-1\"><strong>Address:</strong> ", escapeHtml(addressText || "N/A"), "</div>",
@@ -3105,9 +3257,10 @@
   }
 
   function buildOrderDetailsPdf(order) {
-    var address = order.address || {};
+    var address = getOrderShippingAddress(order);
     var user = order.user || {};
     var items = getOrderLineItems(order);
+    var paymentLabel = getOrderPaymentLabel(order);
     var shipping = Number(order.shippingCharge || order.shiping || 0);
     var subtotal = Number(order.subtotalAmount || order.totalAmount || order.amount || 0);
     var couponDiscount = Number(order.couponDiscount || 0);
@@ -3173,7 +3326,7 @@
     addText("Order ID: " + (order.orderID || order.id || "N/A"), { bold: true });
     addText("Status: " + (order.status || "N/A"));
     addText("Tracking ID: " + (order.trackingID || "N/A"));
-    addText("Payment: " + (order.paymentMethod || "N/A"));
+    addText("Payment: " + paymentLabel);
     addText("Customer: " + (user.name || address.name || "N/A"));
     addText("Email: " + (user.email || "N/A"));
     addText("Address: " + (addressText || "N/A"), { maxLength: 86 });
@@ -3300,12 +3453,43 @@
     });
   }
 
+  function setOrderCardParagraph(card, text) {
+    if (!card || !text) return;
+    var paragraph = card.querySelector("p:not([data-bnl-order-phone])") || card.querySelector("p");
+    if (paragraph) paragraph.textContent = text;
+  }
+
+  function enhanceOrderDetailPaymentAndAddress() {
+    var order = getCurrentOrder();
+    if (!order || !document.querySelector(".orders_detail")) return;
+
+    var cards = document.querySelectorAll(".orders_detail__content__cards__customer");
+    if (cards && cards.length >= 3) {
+      var shippingAddressText = formatOrderAddress(getOrderShippingAddress(order));
+      setOrderCardParagraph(cards[1], shippingAddressText || "N/A");
+      setOrderCardParagraph(cards[2], getOrderPaymentLabel(order));
+    }
+
+    var paymentStatus = getOrderPaymentStatus(order);
+    var totalRows = document.querySelectorAll(
+      ".orders_detail__content__product_summary__table__total_tax__total_calculation > div"
+    );
+    Array.prototype.forEach.call(totalRows, function (row) {
+      var spans = row.querySelectorAll("span");
+      if (spans.length < 2) return;
+      if (/payment\s*status/i.test(spans[0].textContent || "")) {
+        spans[1].textContent = paymentStatus;
+      }
+    });
+  }
+
   function enhanceOrderDetailContact() {
     var order = getCurrentOrder();
     if (!order || !document.querySelector(".orders_detail")) return;
 
+    var address = getOrderShippingAddress(order);
     var phone =
-      (order.address && order.address.phone) ||
+      (address && address.phone) ||
       (order.user && order.user.phone) ||
       "";
     if (!phone) return;
@@ -3536,6 +3720,7 @@
     try {
       injectStyle();
       installAdminImageUploadCompatibility();
+      installAdminFlashSaleState();
       installBrandCountryField();
       installBlogToolbar();
       installFlavorPanels();
@@ -3554,6 +3739,7 @@
       hideComboVariantControls();
       fixComboConfig();
       fixComboNavButton();
+      enhanceOrderDetailPaymentAndAddress();
       enhanceOrderDetailContact();
       installOrderDetailsDownload();
       normalizeCancelledOrderActions();
