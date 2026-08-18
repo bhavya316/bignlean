@@ -30,7 +30,7 @@ export default function BrandCard({ brandData, onClick }: Props) {
       className="h-full w-full  aspect-square flex items-center justify-center p-3 rounded-xl bg-gray-200 cursor-pointer"
     >
       <Image
-        src={getMediaUrl(brandData?.image || brandData?.logo, "/assets/product.png")}
+        src={getMediaUrl(brandData?.image || brandData?.logo, "/assets/logo.png")}
         alt={brandData?.name || "Brand"}
         width={200}
         height={200}

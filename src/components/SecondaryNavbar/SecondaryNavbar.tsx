@@ -531,7 +531,7 @@ export default function SecondaryNavbar() {
                         >
                           <div className="aspect-[16/10] bg-white p-2">
                             <img
-                              src={getMediaUrl(offer.image, "/assets/product.png")}
+                              src={getMediaUrl(offer.image, "/assets/logo.png")}
                               alt={offer.name}
                               className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]"
                             />

@@ -68,14 +68,14 @@ export default function CategoriesPage() {
                 onClick={() => openCategory(category)}
                 className="flex flex-1 flex-col items-center justify-center"
               >
-                <p className="mb-3 line-clamp-2 min-h-[40px] text-sm font-bold text-black group-hover:text-[#E70F0F]">
-                  {category.name}
-                </p>
                 <img
-                  src={getMediaUrl(category.imageOn || category.image || category.imageOff, "/assets/product.png")}
+                  src={getMediaUrl(category.imageOff, "/assets/logo.png")}
                   alt={category.name || "Category"}
                   className="h-[110px] w-full object-contain mix-blend-multiply"
                 />
+                <p className="mt-3 line-clamp-2 min-h-[40px] text-sm font-bold text-black group-hover:text-[#E70F0F]">
+                  {category.name}
+                </p>
               </button>
             </article>
           ))}

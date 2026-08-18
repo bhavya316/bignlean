@@ -28,15 +28,6 @@ const featureList = [
 export default function page() {
   return (
     <CustomPageWrapper heading="Authenticity">
-      <h2 className="text-black text-2xl not-italic font-semibold leading-9">
-        Authenticity Of the Product
-      </h2>
-      <p className="text-black text-base not-italic font-normal leading-6 mb-[53px]">
-        MuscleBlaze is one of the best selling brands in India. When it comes to
-        healthy, top quality and reasonable supplements. From whey protein, mass
-        gainers, BCAA's to raw whey protein, MuscleBlaze has everything to
-        complement your fitness
-      </p>
       <h2 className="text-black text-2xl not-italic font-medium mb-8">
         Brand Collaboration
       </h2>

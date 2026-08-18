@@ -13,6 +13,20 @@ const nextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: '/aboutus',
+        destination: '/',
+        permanent: true,
+      },
+      {
+        source: '/about-us',
+        destination: '/',
+        permanent: true,
+      },
+    ];
+  },
   images: {
     unoptimized: true,
     remotePatterns: [

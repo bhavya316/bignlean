@@ -31,6 +31,7 @@ export default function SliderWrapper({
   children,
   slidePerView,
   showBtns = false,
+  ...props
 }: Props) {
   return (
     <Swiper
@@ -39,7 +40,7 @@ export default function SliderWrapper({
       freeMode={true}
       modules={[FreeMode]}
       className="mySwiper mx-auto w-full relative"
-      wrapperClass="flex gap-4"
+      {...props}
     >
       {showBtns && (
         <>

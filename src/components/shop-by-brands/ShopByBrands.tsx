@@ -408,14 +408,14 @@ export default function ShopByBrandPage() {
               bannersData={
                 activeSelectedBrands && !activeSelectedBrands?.includes("&")
                   ? [{
-                      id: 1,
-                      web: allProducts?.brandDetails?.banner || allProducts?.brandDetails?.image,
-                      tab: allProducts?.brandDetails?.banner || allProducts?.brandDetails?.image,
-                      phone: allProducts?.brandDetails?.banner || allProducts?.brandDetails?.image,
-                      link: "#",
-                      createdAt: "",
-                      updatedAt: "",
-                    }]
+                    id: 1,
+                    web: allProducts?.brandDetails?.banner || allProducts?.brandDetails?.image,
+                    tab: allProducts?.brandDetails?.banner || allProducts?.brandDetails?.image,
+                    phone: allProducts?.brandDetails?.banner || allProducts?.brandDetails?.image,
+                    link: "#",
+                    createdAt: "",
+                    updatedAt: "",
+                  }]
                   : bannersData?.banner || []
               }
               className="!w-full max-w-[1000px]"
@@ -509,7 +509,6 @@ export default function ShopByBrandPage() {
             />
           )}
 
-          <EndFooter />
         </div>
       </div>
     </CustomPageWrapper>
@@ -677,51 +676,6 @@ export const Products = ({
   );
 };
 
-// EndFooter component remains unchanged
-const EndFooter = () => {
-  return (
-    <div className="border-[2px] border-gray-300 p-4 rounded-lg flex flex-col gap-5">
-      <p className="text-black text-base not-italic font-medium">
-        As a leading brand in the science nutrition space, MuscleTech® has a
-        rich history of partnering with top-ranked researchers to sponsor
-        scientific research and novel discovery. We have always been interested
-        in developing scientifically-backed products and working with top
-        scientists to further our understanding of key ingredients that benefit
-        countless athletes, fitness enthusiasts, and bodybuilders.
-      </p>
-      <p className="text-black text-base not-italic font-medium">
-        Study: Burke DG, MacLean PG, Walker RA, Dewar PJ, Smith-Palmer T.
-        Analysis of creatine and creatinine in urine by capillary
-        electrophoresis. J Chromatogr B Biomed Sci Appl. 1999;732(2):479-85.
-      </p>
-      <p className="text-black text-base not-italic font-medium">
-        Key Finding: Creatine is found in the urine of subjects ingesting
-        creatine monohydrate as an ergogenic aid. Significant amount of creatine
-        is excreted after ingestion. It can also be seen that with a higher
-        dose, a larger absolute amount of creatine is retained, even though the
-        fraction of the dose excreted is larger.
-      </p>
-    </div>
-  );
-};
-
-// BrandInfo component remains unchanged
-const BrandInfo = () => {
-  return (
-    <div className="flex flex-col items-start">
-      <h2 className="text-black text-2xl not-italic font-bold leading-9 mb-2">
-        MuscleTech
-      </h2>
-      <p className="text-black text-sm not-italic font-medium leading-5 mb-3">
-        MuscleBlaze is one of the best selling brands in India. When it comes to
-        healthy, top quality and reasonable supplements. From whey protein, mass
-        gainers, BCAA's to raw whey protein, MuscleBlaze has everything to
-        complement your fitness
-      </p>
-      <OutlinedButton label="Read More" />
-    </div>
-  );
-};
 
 // ExpandableDescription component remains unchanged
 const ExpandableDescription = ({ description }: { description?: string }) => {

@@ -78,8 +78,13 @@ export default function SuggestedProductCard({
                   queryClient.invalidateQueries({ queryKey: ["cart"] });
                   toast.success("Product added to cart!");
                 },
-                onError: (error) => {
-                  toast.error("Failed to add product. Please try again.");
+                onError: (error: any) => {
+                  toast.dismiss();
+                  if (error.response?.data?.message) {
+                    toast.error(error.response.data.message);
+                  } else {
+                    toast.error("Product is out of stock or failed to load. Please try again.");
+                  }
                   console.error("Add to cart error:", error);
                 },
               }

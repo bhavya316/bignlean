@@ -38,7 +38,7 @@ export default function BrandsPage() {
               className="group flex aspect-square flex-col items-center justify-center rounded-xl bg-white p-4 text-center shadow-sm transition hover:-translate-y-1 hover:shadow-md"
             >
               <img
-                src={getMediaUrl(brand.image || brand.logo, "/assets/product.png")}
+                src={getMediaUrl(brand.image || brand.logo, "/assets/logo.png")}
                 alt={brand.name || "Brand"}
                 className="h-[70%] w-full object-contain mix-blend-multiply"
               />

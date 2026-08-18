@@ -44,6 +44,9 @@ export async function placeOrder(payload: {
   transactionId: string | null;
   bglCash: number;
   couponCode?: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
 }) {
   return axiosInstance({
     method: "POST",
@@ -62,6 +65,9 @@ export function usePlaceOrder() {
       transactionId: string | null;
       bglCash: number;
       couponCode?: string;
+      razorpayOrderId?: string;
+      razorpayPaymentId?: string;
+      razorpaySignature?: string;
     }) => placeOrder(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["order"] });

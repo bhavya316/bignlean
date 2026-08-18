@@ -35,7 +35,7 @@ export default function HomeCarosoul({
           clickable: true,
         }}
         modules={[Autoplay, Pagination, A11y]}
-        className="mySwiper w-full max-[500px] relative overflow-hidden"
+        className="mySwiper w-full relative overflow-hidden"
       >
         {/* <PrevButton />
         <NextButton /> */}
@@ -53,7 +53,7 @@ export default function HomeCarosoul({
                   <ResponsiveBannerImage
                     banner={banner}
                     alt="carousel banner"
-                    className="w-full max-w-[1000px] aspect-[16/9] max-h-[320px] min-h-[140px] object-contain object-center block mx-auto rounded-lg bg-white shadow-lg"
+                    className="w-full h-auto block mx-auto rounded-lg"
                   />
                 </Link>
               </SwiperSlide>

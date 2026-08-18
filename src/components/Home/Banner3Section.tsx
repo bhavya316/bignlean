@@ -38,7 +38,7 @@ export default function Banner3Section({ banners }: Banner3SectionProps) {
             clickable: true,
           }}
           modules={[Autoplay, Pagination, A11y]}
-          className="mySwiper w-full max-[500px] relative"
+          className="mySwiper w-full relative"
         >
           {banners.map((banner, index) => {
             const bannerLink = getBannerHref(banner?.link);
@@ -52,7 +52,7 @@ export default function Banner3Section({ banners }: Banner3SectionProps) {
                   <ResponsiveBannerImage
                     banner={banner}
                     alt={`Banner 3 Section ${index}`}
-                    className="w-full max-w-[1000px] aspect-[16/9] max-h-[320px] min-h-[140px] object-contain object-center block mx-auto rounded-lg bg-white shadow-lg"
+                    className="w-full h-auto block mx-auto rounded-lg"
                   />
                 </Link>
               </SwiperSlide>
@@ -68,11 +68,11 @@ export default function Banner3Section({ banners }: Banner3SectionProps) {
 
   return (
     <div className="my-8 flex justify-center cursor-pointer">
-      <Link href={singleBannerLink} className="w-full max-w-[1000px] block">
+      <Link href={singleBannerLink} className="w-full block">
         <ResponsiveBannerImage
           banner={banners[0]}
           alt="Banner 3 Section"
-          className="w-full aspect-[16/9] max-h-[320px] min-h-[140px] object-contain object-center block mx-auto rounded-lg bg-white shadow-lg"
+          className="w-full h-auto block mx-auto rounded-lg"
         />
       </Link>
     </div>

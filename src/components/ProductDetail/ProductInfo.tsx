@@ -96,6 +96,14 @@ export default function ProductInfo({
         onSuccess: () => {
           toast.success("Product added Successfully!!!");
         },
+        onError: (error: any) => {
+          toast.dismiss();
+          if (error.response?.data?.message) {
+            toast.error(error.response.data.message);
+          } else {
+            toast.error("Product is out of stock or failed to load. Please try again.");
+          }
+        },
         onSettled: () => {
           setAdding(false);
         },
@@ -132,6 +140,14 @@ export default function ProductInfo({
       {
         onSuccess: () => {
           router.push("/cart");
+        },
+        onError: (error: any) => {
+          toast.dismiss();
+          if (error.response?.data?.message) {
+            toast.error(error.response.data.message);
+          } else {
+            toast.error("Product is out of stock or failed to load. Please try again.");
+          }
         },
         onSettled: () => {
           setAdding(false);

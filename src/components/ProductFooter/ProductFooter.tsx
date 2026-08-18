@@ -167,6 +167,8 @@ export function SimilarProductCard({
     const marketPrice = getVariantMarketPrice(firstVariantPricing);
     const sellingPrice = getVariantSellingPrice(firstVariantPricing);
     const discountPercent = getVariantDiscountPercent(firstVariantPricing);
+    const maxQuantity = Number(firstVariantPricing?.stock || 0);
+    const isOutOfStock = !isComboProduct && maxQuantity <= 0;
     const link = isComboProduct
       ? `/combo/${product?.id}`
       : isOffer
@@ -218,7 +220,7 @@ export function SimilarProductCard({
               ₹ {sellingPrice.toFixed(0)}/-
             </p>
           </div>
-          {product?.isBestSeller && (
+          {Boolean(product?.isBestSeller) && (
             <div className="flex gap-1 items-center rounded-md bg-gray-100 px-2 py-1">
               <BestsellerIcon />
               <p className="text-gradient text-xs not-italic font-normal">
@@ -231,8 +233,9 @@ export function SimilarProductCard({
         <PrimaryButton
           className="w-full h-fit mt-auto"
           loading={isPending}
+          disable={isOutOfStock}
           onClick={addCartHandler}
-          label="Add to cart"
+          label={isOutOfStock ? "OUT OF STOCK" : "Add to cart"}
         />
         {discountPercent > 0 && (
           <p className="absolute top-0 left-0 text-green-500 text-xs not-italic font-bold bg-[#DFF3E2] p-2 rounded-br-[15px]">

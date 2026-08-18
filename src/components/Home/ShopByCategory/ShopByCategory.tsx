@@ -26,7 +26,7 @@ export default function ShopByCategory({
   }, [categoriesData]);
 
   return (
-    <div className="w-[1200px] mx-auto mt-[60px] max-[1200px]:w-full sm:px-4">
+    <div className="w-[1200px] mx-auto mt-8 lg:mt-[60px] max-[1200px]:w-full flex flex-col gap-6 lg:gap-[40px]">
       <SectionHeader
         label="Shop by category"
         showBtn={true}
@@ -38,7 +38,7 @@ export default function ShopByCategory({
       ) : (
         <>
           {isMobile ? (
-            <div className="flex gap-4 overflow-x-auto px-4 pb-3 snap-x hide-scrollbar">
+            <div className="flex gap-4 overflow-x-auto pb-3 snap-x hide-scrollbar pr-4">
               {visibleCategories?.map((category) => (
                 <div key={category?.id} className="w-[150px] min-w-[150px] aspect-square snap-start">
                   <ShopCategoryCard
@@ -50,10 +50,10 @@ export default function ShopByCategory({
               ))}
             </div>
           ) : (
-            <div className="mt-6 relative overflow-hidden">
+            <div className="relative overflow-hidden">
               {/* Scrollable Category Grid with exactly 6 cards showing */}
               <div className="flex overflow-x-auto pb-4 snap-x hide-scrollbar">
-                <div className="flex gap-4">
+                <div className="flex gap-4 w-max pr-4">
                   {visibleCategories && visibleCategories.map((category) => (
                     <div
                       key={category?.id}

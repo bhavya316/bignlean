@@ -57,18 +57,18 @@ export default function BannerSection({
             clickable: true,
           }}
           modules={[Autoplay, Pagination, A11y]}
-          className="mySwiper w-full max-[500px] relative"
+          className="mySwiper w-full relative"
         >
           {banners.map((banner, index) => (
             <SwiperSlide
               key={banner.id}
-              className="flex items-center justify-center overflow-hidden cursor-pointer img-change h-[200px] sm:h-[250px] md:h-[300px]"
+              className="flex items-center justify-center overflow-hidden cursor-pointer img-change h-auto"
             >
               <Link href={getBannerLink(banner)} className="block h-full w-full">
                 <img
                   src={getMediaUrl(banner?.web)}
                   alt={`banner-${index}`}
-                  className="w-full max-w-[1000px] h-[200px] sm:h-[250px] md:h-[300px] object-cover object-center block mx-auto rounded-lg shadow-lg"
+                  className="w-full h-auto object-cover object-center block mx-auto rounded-lg"
                 />
               </Link>
             </SwiperSlide>
@@ -89,7 +89,7 @@ export default function BannerSection({
           <img
             src={getMediaUrl(banners[0]?.web)}
             alt="banner"
-            className="h-[386px] w-full rounded-[10px] object-cover"
+            className="h-auto w-full rounded-[10px] object-cover"
           />
         </Link>
       </div>

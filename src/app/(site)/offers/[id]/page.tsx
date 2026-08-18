@@ -14,7 +14,7 @@ export default function page({}: Props) {
   const offer = data?.offer;
   const bannerImage = getMediaUrl(
     offer?.banner || offer?.image,
-    "/assets/product.png"
+    "/assets/logo.png"
   );
 
   return (

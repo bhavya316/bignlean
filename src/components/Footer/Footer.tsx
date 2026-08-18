@@ -16,7 +16,6 @@ type SiteLinks = {
   }[];
 }[];
 const aboutSite = [
-  { label: "About us", link: "/aboutus" },
   { label: "Contact us", link: "/contact-us" },
   { label: "Refer & Earn", link: "/refer-friend" },
   { label: "Authenticity Guaranteed", link: "/authenticity" },
@@ -49,11 +48,10 @@ export default function Footer() {
     <>
       {showBnlDesc && (
         <div
-          className={`text-sm w-[85%] max-xl:w-[95%] max-w-[1300px] mx-auto py-5 font-[Montserrat] ${
-            pathname?.includes("product/")
-              ? "max-sm:pb-[200px]"
-              : "max-sm:pb-[80px]"
-          }`}
+          className={`text-sm w-[85%] max-xl:w-[95%] max-w-[1300px] mx-auto py-5 font-[Montserrat] ${pathname?.includes("product/")
+            ? "max-sm:pb-[200px]"
+            : "max-sm:pb-[80px]"
+            }`}
         >
           <p className="montserrat text-base leading-relaxed">
             Bignlean.com is the only online & offline supplement store in India
@@ -82,11 +80,11 @@ export default function Footer() {
           </p>
         </div>
       )}
-      <div className="bg-black mt-auto py-[68px] px-5 max-[1060px]:hidden">
-        <div className="flex max-w-[1300px] gap-10 mx-auto mb-12">
+      <div className="bg-black mt-auto py-[68px] px-5 max-md:pb-[100px]">
+        <div className="flex flex-col lg:flex-row max-w-[1300px] gap-10 mx-auto mb-12">
           <div className="flex-[0.75]">
-            <div className="flex gap-10 mb-10">
-              <div className="flex-1 flex flex-col gap-2">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-10 mb-10">
+              <div className="flex-1 flex flex-col gap-2 min-w-[200px]">
                 <h3 className="text-lg not-italic font-semibold leading-6 text-gradient">
                   BignLean
                 </h3>
@@ -100,7 +98,7 @@ export default function Footer() {
                   </Link>
                 ))}
               </div>
-              <div className="flex-1 flex flex-col gap-2">
+              <div className="flex-1 flex flex-col gap-2 min-w-[200px]">
                 <h3 className="text-lg not-italic font-semibold leading-6 text-gradient">
                   Popular Brands
                 </h3>
@@ -116,7 +114,7 @@ export default function Footer() {
                     </p>
                   ))}
               </div>
-              <div className="flex-1 flex flex-col gap-2">
+              <div className="flex-1 flex flex-col gap-2 min-w-[200px]">
                 <h3 className="text-lg not-italic font-semibold leading-6 text-gradient">
                   UseFul Links
                 </h3>
@@ -131,7 +129,7 @@ export default function Footer() {
                 ))}
               </div>
             </div>
-            <div className="flex gap-10">
+            <div className="flex flex-col sm:flex-row gap-10">
               <div className="flex-[0.5]">
                 <h3 className="text-lg not-italic font-semibold leading-6 text-gradient">
                   Store Address
@@ -173,13 +171,10 @@ export default function Footer() {
           </div>
         </div>
         <div className="h-[2px] mt-[30px] bg-gray-400 max-w-[1300px] mx-auto"></div>
-        {/* <div className="flex justify-center pt-2">
-          <ProfileImages />
-        </div> */}
-        <div className="max-w-[1300px] mx-auto pt-[30px] flex item-center gap-48 ">
-          <p className="text-gray-600  text-sm not-italic font-normal leading-4">
+        <div className="max-w-[1300px] mx-auto pt-[30px] flex flex-col sm:flex-row items-center justify-between gap-6">
+          <p className="text-gray-600 text-sm not-italic font-normal leading-4 text-center sm:text-left">
             Copyright Protected 2017-{new Date().getFullYear()} © Bignlean.com.
-            All Rights Reserved.<br/> Designed and developed by <a href="https://digigoatindia.com/">Digigoat india</a>
+            All Rights Reserved.<br /> Designed and developed by <a href="https://digigoatindia.com/">Digigoat india</a>
           </p>
           <div className="flex justify-center">
             <ProfileImages />

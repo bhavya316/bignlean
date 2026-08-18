@@ -1,11 +1,12 @@
 import PrimaryButton from "@/components/Buttons/PrimaryButton";
 import InputField from "@/components/FormComponents/InputField";
 import { useSendContact } from "./contactHandler";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { toast } from "react-toastify";
 
 export default function ContactUsForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const { mutate } = useSendContact();
   const contactusHandler = (formData: FormData) => {
     setIsLoading(true);
@@ -18,13 +19,17 @@ export default function ContactUsForm() {
       onSuccess: () => {
         toast.success("submitted successfully!!!");
         setIsLoading(false);
+        formRef.current?.reset();
       },
+      onError: () => {
+        setIsLoading(false); // Handle loading state if submission fails
+      }
     });
   };
 
   return (
     <div>
-      <form className="flex flex-col gap-5" action={contactusHandler}>
+      <form className="flex flex-col gap-5" action={contactusHandler} ref={formRef}>
         <InputField
           name="name"
           required={true}

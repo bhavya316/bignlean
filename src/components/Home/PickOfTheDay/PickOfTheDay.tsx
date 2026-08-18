@@ -18,7 +18,7 @@ export default function PickOfTheDay() {
 
   if (isLoading) {
     return (
-      <div className="w-[1200px] mx-auto mt-[60px] max-[1200px]:w-full flex flex-col gap-[40px] px-5">
+      <div className="w-[1200px] mx-auto mt-8 lg:mt-[60px] max-[1200px]:w-full flex flex-col gap-6 lg:gap-[40px] px-5">
         <div className="h-8 bg-gray-200 rounded w-40 animate-pulse"></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {Array.from({ length: 4 }).map((_, index) => (
@@ -41,7 +41,7 @@ export default function PickOfTheDay() {
   return (
     <>
       {pickOfTheDayProducts?.length > 0 && (
-        <div className="w-[1200px] mx-auto mt-[60px] max-[1200px]:w-full flex flex-col gap-[40px]">
+        <div className="w-[1200px] mx-auto mt-8 lg:mt-[60px] max-[1200px]:w-full flex flex-col gap-6 lg:gap-[40px]">
           <SectionHeader
             onClick={() => router.push("/shop-by-brands")}
             label="Pick of the Day"

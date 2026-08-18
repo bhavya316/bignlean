@@ -1,10 +1,9 @@
-"use client";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { OutlinedButton } from "..";
-import { getMediaUrl } from "@/utils/media";
+import re
 
-const ImageViewer = ({ images }: any) => {
+with open("src/components/ProductOverview/ProductOverview.tsx", "r") as f:
+    content = f.read()
+
+replacement = """const ImageViewer = ({ images }: any) => {
   const [selectedImage, setSelectedImage] = useState(images?.[0]);
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -74,66 +73,14 @@ const ImageViewer = ({ images }: any) => {
       )}
     </div>
   );
-};
+};"""
 
-export default function ProductOverview({
-  images,
-  information,
-  id,
-}: {
-  images: string[];
-  information: any[];
-  id: number;
-}) {
-  return (
-    <div className="flex flex-col  gap-10 items-end max-lg:gap-5">
-      {images && <ImageViewer images={images} />}
-      <div className="w-full max-lg:hidden">
-        <ProductBenefits id={id} information={information} />
-      </div>
-    </div>
-  );
-}
+new_content = re.sub(
+    r"const ImageViewer = \(\{ images \}: any\) => \{[\s\S]*?\};\n", 
+    replacement + "\n", 
+    content,
+    count=1
+)
 
-export const ProductBenefits = ({
-  information,
-  id,
-}: {
-  information: any[];
-  id: number;
-}) => {
-  const router = useRouter();
-  return (
-    <div className="w-full flex flex-col items-center gap-5">
-      <div className="border w-full shadow-sm border-gray-300 bg-white rounded-lg overflow-hidden">
-        <div className="p-3 ">
-          <h2 className="text-black text-sm not-italic font-bold mb-3">
-            Product Benefits
-          </h2>
-        </div>
-        <div
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}
-          className="bg-[#f7f7f7] p-[20px] gap-5"
-        >
-          {information?.map((info, i) => (
-            <div key={i} className="flex flex-col items-center gap-2">
-              <p className="text-black text-xs not-italic font-normal">
-                {info.nutrients}
-              </p>
-              <p className="text-black text-lg not-italic font-semibold">
-                {info.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-      <OutlinedButton
-        label="+ Compare"
-        className="w-full"
-        onClick={() => {
-          router.push(`/comparison?productId=${id}`);
-        }}
-      />
-    </div>
-  );
-};
+with open("src/components/ProductOverview/ProductOverview.tsx", "w") as f:
+    f.write(new_content)

@@ -33,14 +33,14 @@ export default function Page() {
   return (
     <CustomPageWrapper heading="">
       <div className="flex gap-10 max-[890px]:flex-col max-[890px]:gap-5">
-        <div className="flex-1">
+        <div className="w-full min-[890px]:flex-1">
           <ProductOverview
             information={productData?.information}
             images={productData?.images}
             id={Number(productId)}
           />
         </div>
-        <div className="flex-1">
+        <div className="w-full min-[890px]:flex-1">
           <ProductDetail product={productData} isCombo />
         </div>
       </div>

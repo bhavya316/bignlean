@@ -37,7 +37,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   }, []);
   return (
     <div className="min-h-screen flex flex-col bg-[#f9f9f9]">
-      <ToastContainer position="top-right" style={{ top: "88px" }} />
+      <ToastContainer position="top-right" style={{ top: "88px", zIndex: 99999 }} />
       <NavBar />
       <SecondaryNavbar />
       <Suspense fallback={null}>

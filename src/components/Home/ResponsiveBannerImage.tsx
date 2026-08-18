@@ -32,7 +32,7 @@ export default function ResponsiveBannerImage({
   className?: string;
 }) {
   const desktopSource = banner?.web || banner?.banner || banner?.image;
-  const desktop = getMediaUrl(desktopSource, "/assets/product.png");
+  const desktop = getMediaUrl(desktopSource, "/assets/logo.png");
   const tablet = getMediaUrl(banner?.tab || desktopSource, desktop);
   const phone = getMediaUrl(banner?.phone || banner?.tab || desktopSource, tablet);
 

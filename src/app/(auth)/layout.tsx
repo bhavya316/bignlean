@@ -8,7 +8,7 @@ type Props = {
 export default function layout({ children }: Props) {
   return (
     <div className="flex items-center justify-center w-full h-screen">
-       <ToastContainer position="top-right" style={{ top: "24px" }} />
+       <ToastContainer position="top-right" style={{ top: "24px", zIndex: 99999 }} />
       {children}
     </div>
   );

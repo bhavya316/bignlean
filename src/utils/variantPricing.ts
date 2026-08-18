@@ -75,7 +75,7 @@ export function resolveVariantSelection(variant: any, selectedFlavor?: string) {
 
   return {
     ...variant,
-    stock: selectedFlavorData.stock ?? variant.stock,
+    stock: variant.stock ?? selectedFlavorData.stock,
     mrp: selectedFlavorData.mrp ?? variant.mrp,
     sellingPrice:
       selectedFlavorData.sellingPrice ??

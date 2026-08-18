@@ -36,7 +36,7 @@ export default function Page() {
       <Heading content="Information We Collect" />
       <ContactCard
         heading=""
-        paragraph={`We may collect personal identification information from Users in various ways, including, but not limited to, when Users visit our Website, register, place an order, subscribe to our newsletter, respond to a survey, fill out a form, or interact with other activities, services, features, or resources we make available. Users may be asked for name, email address, mailing address, phone number, and credit card information. Users may visit our Website anonymously. We collect personal identification information from Users only if they voluntarily submit such information to us.`}
+        paragraph={`We may collect personal identification information from Users in various ways, including, but not limited to, when Users visit our Website, register on the Website, place an order, subscribe to our newsletter, respond to a survey, fill out a form, or interact with other activities, services, features, or resources we make available on our Website. Users may be asked for, as appropriate, name, email address, mailing address, phone number, and credit card information. Users may, however, visit our Website anonymously. We will collect personal identification information from Users only if they voluntarily submit such information to us.`}
       />
       <Heading content="How We Use Collected Information" />
       <ContactCard
@@ -76,25 +76,25 @@ export default function Page() {
             When you use our Services, we collect information about you in the following general categories:
             <ul className="mt-3 space-y-2">
               <li>
-                <span className="font-bold text-black">Location Information:</span> We collect precise location data (GPS and network-based) if you permit the Bignlean.com app/website to access location services. We may also derive your approximate location from your IP address.
+                <span className="font-bold text-black">Location Information:</span> When you use the Services for placing order(s) or delivery, we collect precise location data (GPS and network-based). If you permit the Bignlean.com app/website to access location services through the permission system used by your mobile operating system ("platform"), we may also collect the precise location of your device when the app is running in the foreground or background to send the retail store's promotion. We may also derive your approximate location from your IP address in order to make the app/website faster.
               </li>
               <li>
-                <span className="font-bold text-black">Contacts Information:</span> If you permit, we may access and store names and contact information from your address book to facilitate social interactions through our Services.
+                <span className="font-bold text-black">Contacts Information:</span> If you permit the Bignlean.com app/website to access the address book on your device through the permission system used by your mobile platform or website, we may access and store names and contact information from your address book on the device to facilitate social interactions through our Services. We may use the said information to check if the user is connected to a network or not and to let the user call in case if user taps on the contact number.
               </li>
               <li>
-                <span className="font-bold text-black">Transaction Information:</span> We collect transaction details related to your use of our Services, including the type of service requested, the date and time, the amount charged, and other related transaction details.
+                <span className="font-bold text-black">Transaction Information:</span> We collect transaction details related to your use of our Services, including the type of service requested, the date and time the service was provided, the amount charged, the order(s) placed, and other related transaction details. Additionally, if someone uses your promo code, we may associate your name with that person. We may access information for data caching and making the app faster.
               </li>
               <li>
-                <span className="font-bold text-black">Usage and Preference Information:</span> We collect information about how you and site visitors interact with our Services, preferences expressed, and settings chosen. In some cases, we do this through cookies and similar technologies.
+                <span className="font-bold text-black">Usage and Preference Information:</span> We collect information about how you and site visitors interact with our Services, preferences expressed, and settings chosen. In some cases, we do this through the use of cookies and similar technologies that create and maintain unique identifiers.
               </li>
               <li>
-                <span className="font-bold text-black">Device Information:</span> We may collect information about your mobile device, including hardware model, operating system and version, software and file names and versions, preferred language, unique device identifier, advertising identifiers, serial number, device motion information, and mobile network information.
+                <span className="font-bold text-black">Device Information:</span> We may collect information about your mobile device, including, for example, the hardware model, operating system and version, software and file names and versions, preferred language, unique device identifier, advertising identifiers, serial number, device motion information, and mobile network information to retrieve running apps and to improve performance. We may access information to find accounts on the device such as directly calling phone numbers, reading phone status and identity.
               </li>
               <li>
                 <span className="font-bold text-black">Call and SMS Data:</span> Our app/website facilitates communication between Users and Customer Support. In connection with this service, we receive call data, including the date and time of the call or SMS message, the parties' phone numbers, and the content of the SMS message and sending OTP(s).
               </li>
               <li>
-                <span className="font-bold text-black">Log Information:</span> We collect server logs, which may include information like device IP address, access dates and times, app features or pages viewed, app crashes and other system activity, type of browser, and the third-party site or service you were using before interacting with our Services.
+                <span className="font-bold text-black">Log Information:</span> When you interact with the Services, we collect server logs, which may include information like device IP address, access dates and times, app features or pages viewed, app crashes and other system activity, type of browser, and the third-party site or service you were using before interacting with our Services. This information may be used to check network connection, receive data from the internet, prevent the device from sleeping, enable reading phone status, and view Wi-Fi connection.
               </li>
             </ul>
           </>
@@ -105,6 +105,10 @@ export default function Page() {
         heading=""
         paragraph={`The Services may integrate with social sharing features and other related tools that let you share actions you take on our Services with other apps, sites, or media, and vice versa. Your use of such features enables the sharing of information with your friends or the public, depending on the settings you establish with the social sharing service. Please refer to the privacy policies for more information about how they handle the data you provide to or share through them.`}
       />
+      <ContactCard
+        heading=""
+        paragraph={`Our promotional offers/discounts are not sitewide and are limited to selected categories. Coupon codes may not be applicable on categories like diapers, baby food etc. or such other product or service as may be determined by us in our sole discretion.`}
+      />
       <Heading content="Analytics and Advertising Services Provided by Others" />
       <ContactCard
         heading=""
@@ -114,17 +118,21 @@ export default function Page() {
       <ContactCard
         heading=""
         unorderList={[
-          { heading: "Account Information: You may correct your account information at any time by logging into your online or in-app account. In some cases, we may retain certain information about you as required by law, or for legitimate business purposes." },
-          { heading: "Access Rights: Bignlean.com will comply with individual requests regarding access, correction, and/or deletion of the personal data it stores in accordance with applicable law. You can write to us at support@bignlean.com or call our Toll-Free Number - 1800-266-1313." },
+          { heading: "Account Information: You may correct your account information at any time by logging into your online or in-app account. Please note that in some cases we may retain certain information about you as required by law, or for legitimate business purposes to the extent permitted by law. For instance, if you have a standing credit or debt on your account, or if we believe you have committed fraud or violated our Terms, we may seek to resolve the issue before deleting your information." },
+          { heading: "Access Rights: Bignlean.com will comply with individual requests regarding access, correction, and/or deletion of the personal data it stores in accordance with applicable law. You can write to us at support@bignlean.com Or Simply Call our Toll-Free Number - 1800-266-1313 to raise a concern to assist you with your request to correct and/or delete your personal data, and we shall comply with such request in accordance with the applicable laws." },
           { heading: "Location Information: We request permission for our app's collection of precise locations from your device per the permission system used by your mobile operating system." },
           { heading: "Contact Information: We may also seek permission for our app's collection and syncing of contact information from your device per the permission system used by your mobile operating system." },
-          { heading: "Promotional Communications: You may opt out of receiving promotional messages from us by following the instructions in those messages. If you opt-out, we may still send you non-promotional communications, such as those about your account or our ongoing business relations." }
+          { heading: "Promotional Communications: You may opt out of receiving promotional messages from us by following the instructions in those messages. If you opt-out, we may still send you non-promotional communications, such as those about your account, about Services you have requested, or our ongoing business relations." }
         ]}
+      />
+      <ContactCard
+        heading=""
+        paragraph={`If you initially permit the collection of any information, you can later disable it by changing the settings on your mobile device. However, this will limit your ability to use certain features of our Services.`}
       />
       <Heading content="Promotional Communication Through WhatsApp Messenger" />
       <ContactCard
         heading=""
-        paragraph={`By opting in/accepting the terms and conditions, you give consent to Bignlean.com to communicate with you on WhatsApp for all its transactional and promotional messages/communication needs. We shall store your details responsibly and use them to enrich your experience with us & provide the best deals & discounts.`}
+        paragraph={`By opting in/accepting the terms and conditions, you (the “User”) give consent to Bignlean.com to communicate with you on WhatsApp for all its transactional and promotional messages/communication needs. We shall store your details responsibly and use them to enrich your experience with us & and provide the best deals & and discounts.`}
       />
       <Heading content="Changes to the Statement" />
       <ContactCard
@@ -139,3 +147,4 @@ export default function Page() {
     </CustomPageWrapper>
   );
 }
+

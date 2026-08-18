@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function DownloadBanner() {
   return (
-    <div className="w-[1050px] mx-auto mt-[60px] max-[1050px]:w-full relative flex justify-end bg-[#e5e7eb] rounded-xl p-9 mb-9 overflow-hidden">
+    <div className="w-[1050px] mx-auto mt-8 lg:mt-[60px] max-[1050px]:w-full relative flex justify-end bg-[#e5e7eb] rounded-xl p-9 mb-9 overflow-hidden">
       <Image
         src={"/assets/download.png"}
         alt="download"

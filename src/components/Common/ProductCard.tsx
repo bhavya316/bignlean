@@ -133,6 +133,8 @@ export default function ProductCard({
     const marketPrice = getVariantMarketPrice(firstVariantPricing);
     const sellingPrice = getVariantSellingPrice(firstVariantPricing);
     const discountPercent = getVariantDiscountPercent(firstVariantPricing);
+    const maxQuantity = Number(firstVariantPricing?.stock || 0);
+    const isOutOfStock = !isCombo && maxQuantity <= 0;
     const link = isCombo
       ? `/combo/${product?.id}`
       : isOffer
@@ -194,7 +196,7 @@ export default function ProductCard({
               ₹ {sellingPrice.toFixed(0)}/-
             </p>
           </div>
-          {(showBestsellerBadge || product?.isBestSeller) && (
+          {Boolean(showBestsellerBadge || product?.isBestSeller) && (
             <div className="flex gap-1 items-center rounded-md bg-gray-100 px-2 py-1">
               <BestsellerIcon />
               <p className="text-gradient text-xs not-italic font-normal">
@@ -207,6 +209,7 @@ export default function ProductCard({
       <PrimaryButton
         className="w-full h-fit mt-auto"
         loading={isPending}
+        disable={isOutOfStock}
         onClick={() => {
           // First check if user is logged in
           if (!userData?.id) {
@@ -250,13 +253,13 @@ export default function ProductCard({
                 if (error.response?.data?.message) {
                   toast.error(error.response.data.message);
                 } else {
-                  toast.error("Failed to add product to cart. Please try again.");
+                  toast.error("Product is out of stock or failed to load. Please try again.");
                 }
               }
             }
           );
         }}
-        label="Add to cart"
+        label={isOutOfStock ? "OUT OF STOCK" : "Add to cart"}
       />
         {discountPercent > 0 && (
           <p className="absolute top-0 left-0 text-green-500 text-xs not-italic font-bold bg-[#DFF3E2] p-2 rounded-br-[15px]">
@@ -275,7 +278,7 @@ export default function ProductCard({
     </div>
   )}
 </button>
-        {product?.isOnFlashSale && (
+        {Boolean(product?.isOnFlashSale) && (
           <div className="absolute top-12 right-4">
             <ThunderIcon />
           </div>

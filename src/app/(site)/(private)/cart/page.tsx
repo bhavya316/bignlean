@@ -385,7 +385,15 @@ export default function Page() {
 
         const loadingToast = toast.loading("Opening Razorpay...");
         try {
-          await makePayment({ payload, amount });
+          await makePayment({
+            payload,
+            amount,
+            prefill: {
+              name: userData?.name || "",
+              email: userData?.email || "",
+              contact: userData?.phone || "",
+            },
+          });
           toast.success("Order placed. Please wait for admin confirmation.");
           setCouponId(null);
           setTimeout(() => {

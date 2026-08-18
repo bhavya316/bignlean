@@ -14,19 +14,16 @@ export default function FollowUs() {
         Follow us
       </h3>
       <div className="flex items-center gap-6">
-        <Link href={"/facebook"}>
+        <Link href={"https://www.facebook.com/bignleanindia/photos/"}>
           <FacebookIcon />
         </Link>
-        <Link href={"/instagram"}>
+        <Link href={"https://www.instagram.com/bignleancom?igsh=MXMxcnMwb3gya2w1ZA=="}>
           <InstagramIcon />
         </Link>
-        <Link href={"/linkedin"}>
-          <LinkedinIcon />
-        </Link>
-        <Link href={"/youtube"}>
+        <Link href={"https://youtube.com/@bignleancom?si=aNbfngVLUcT_qeXC"}>
           <YoutubeIcon />
         </Link>
-        <Link href={"/twitter"}>
+        <Link href={"https://x.com/bignlean"}>
           <TwitterIcon />
         </Link>
       </div>

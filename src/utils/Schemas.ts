@@ -19,6 +19,7 @@ export type Banners = {
 export type Categories = {
   id: number;
   name: string;
+  image?: string;
   imageOn: string;
   imageOff: string;
   brandId: string;

@@ -19,7 +19,7 @@ export default function PopularProducts({ isLoading = false }: { isLoading?: boo
   return (
     <>
       {(popularProducts?.length > 0 || isLoading) && (
-        <div className="w-[1200px] mx-auto mt-[60px] max-[1200px]:w-full flex flex-col gap-[40px]">
+        <div className="w-[1200px] mx-auto mt-8 lg:mt-[60px] max-[1200px]:w-full flex flex-col gap-6 lg:gap-[40px]">
           <SectionHeader
             onClick={() => router.push("/shop-by-brands")}
             label="Popular Products"

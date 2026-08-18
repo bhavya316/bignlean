@@ -19,7 +19,7 @@ export default function PriceSlashAlert({ isLoading = false }: { isLoading?: boo
   return (
     <>
       {(priceSlashProducts?.length > 0 || isLoading) && (
-        <div className="w-[1200px] mx-auto mt-[60px] max-[1200px]:w-full flex flex-col gap-[40px]">
+        <div className="w-[1200px] mx-auto mt-8 lg:mt-[60px] max-[1200px]:w-full flex flex-col gap-6 lg:gap-[40px]">
           <SectionHeader
             onClick={() => router.push("/offers")}
             label="Price slash alert"

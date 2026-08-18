@@ -29,7 +29,7 @@ export default function OffersPage() {
             >
               <div className="aspect-[16/9] overflow-hidden bg-white p-4">
                 <img
-                  src={getMediaUrl(offer.banner || offer.image || offer.logo, "/assets/product.png")}
+                  src={getMediaUrl(offer.banner || offer.image || offer.logo, "/assets/logo.png")}
                   alt={offer.name}
                   className="h-full w-full object-contain object-center transition duration-300 group-hover:scale-[1.03]"
                 />
