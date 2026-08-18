@@ -102,6 +102,10 @@ const Order = sequelize.define("orders", {
     type: DataTypes.JSON,
     allowNull: true,
   },
+  shippingAddress: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
   address: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -135,6 +139,10 @@ const Order = sequelize.define("orders", {
   },
   transactionId: {
     type: DataTypes.STRING,
+    allowNull: true,
+  },
+  paymentDetails: {
+    type: DataTypes.JSON,
     allowNull: true,
   },
   usedBGLCash: {

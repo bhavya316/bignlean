@@ -90,6 +90,55 @@ const markOrderCancelledForAwb = async (awb) => {
 
   if (order.status !== "Cancelled") {
     await order.update({ status: "Cancelled" });
+    
+    // Increment stock for cancelled order items
+    if (Array.isArray(order.items)) {
+      for (const item of order.items) {
+        if (!item.isCombo) {
+          const Product = require("../../../admin/model/product");
+          const productToUpdate = await Product.findByPk(item.productId || item.product);
+          if (productToUpdate && Array.isArray(productToUpdate.varients)) {
+            let stockUpdated = false;
+            const newVariants = productToUpdate.varients.map(variant => {
+              if (String(variant.id) === String(item.varientId || item.variantId)) {
+                const flavors = Array.isArray(variant.flavors) ? variant.flavors : 
+                               (Array.isArray(variant.flavour) ? variant.flavour : 
+                               (Array.isArray(variant.flavor) ? variant.flavor : []));
+                
+                let flavorUpdated = false;
+                const newFlavors = flavors.map(flavor => {
+                  const fName = typeof flavor === "string" ? flavor : (flavor.name || flavor.flavor || flavor.label || "");
+                  if (String(fName).toLowerCase() === String(item.flavour || item.flavor).toLowerCase()) {
+                    if (typeof flavor !== "string" && flavor.stock !== undefined) {
+                      flavorUpdated = true;
+                      return { ...flavor, stock: Number(flavor.stock || 0) + Number(item.qty || 1) };
+                    }
+                  }
+                  return flavor;
+                });
+
+                if (flavorUpdated) {
+                  stockUpdated = true;
+                  if (variant.flavors) return { ...variant, flavors: newFlavors };
+                  if (variant.flavour) return { ...variant, flavour: newFlavors };
+                  if (variant.flavor) return { ...variant, flavor: newFlavors };
+                } else {
+                  stockUpdated = true;
+                  return { ...variant, stock: Number(variant.stock || 0) + Number(item.qty || 1) };
+                }
+              }
+              return variant;
+            });
+            
+            if (stockUpdated) {
+              productToUpdate.varients = newVariants;
+              productToUpdate.changed('varients', true);
+              await productToUpdate.save();
+            }
+          }
+        }
+      }
+    }
   }
 
   return order;
@@ -122,7 +171,7 @@ router.post("/cancel-shipment", async (req, res) => {
     const cancelledRemotely =
       result && (result.status !== false || trackingPayloadHasCancelledStatus(result));
     if (cancelledRemotely && order) {
-      await order.update({ status: "Cancelled" });
+      await markOrderCancelledForAwb(shipmentAwb);
     }
 
     res.json({

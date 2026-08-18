@@ -129,7 +129,7 @@ const deleteComboProduct = async (req, res) => {
     }
 
     const products = comboProduct.products;
-    const productIndex = products.indexOf(parseInt(productId));
+    const productIndex = products.findIndex(p => p.toString() === productId.toString());
 
     if (productIndex === -1) {
       return res

@@ -84,6 +84,38 @@ const parseAmount = (value) => {
   return Number.isFinite(amount) ? amount : 0;
 };
 
+const normalizePaymentMethod = (value) => {
+  const rawValue = String(value || "").trim();
+  const normalized = rawValue.toLowerCase().replace(/[\s_-]+/g, "");
+
+  if (normalized === "cod" || normalized === "cashondelivery") return "COD";
+  if (normalized === "razorpay" || normalized === "razor") return "RazorPay";
+  return rawValue;
+};
+
+const getPlainModelData = (value) =>
+  value && typeof value.toJSON === "function" ? value.toJSON() : value || null;
+
+const getOrderShippingAddress = (orderJson, addressRecord) =>
+  orderJson.shippingAddress ||
+  orderJson.shippedToAddress ||
+  orderJson.deliveryAddress ||
+  getPlainModelData(addressRecord);
+
+const getOrderPaymentStatus = (orderJson) => {
+  const method = normalizePaymentMethod(orderJson.paymentMethod);
+  if (method === "COD") return "COD";
+  if (orderJson.transactionId) return "Payment Confirmed";
+  return "Payment Pending";
+};
+
+const getOrderPaymentLabel = (orderJson) => {
+  const method = normalizePaymentMethod(orderJson.paymentMethod);
+  if (method === "COD") return "Cash On Delivery";
+  if (method === "RazorPay") return "Razorpay";
+  return method || "N/A";
+};
+
 const getFlavorLabel = (flavor) => {
   if (flavor == null) return "";
   if (typeof flavor === "string" || typeof flavor === "number") return String(flavor);
@@ -369,7 +401,14 @@ router.get("/orders", async (req, res) => {
       orderData.payableAmount = orderSummary.payable;
       orderData.walletDiscount = orderSummary.walletDiscount;
       orderData.shippingCharge = orderSummary.shipping;
-      orderData.address = await Address.findByPk(order.address);
+      const addressRecord = await Address.findByPk(order.address);
+      const shippingAddress = getOrderShippingAddress(orderJson, addressRecord);
+      orderData.address = shippingAddress;
+      orderData.shippingAddress = shippingAddress;
+      orderData.addressId = order.address;
+      orderData.paymentMethod = normalizePaymentMethod(orderData.paymentMethod);
+      orderData.paymentLabel = getOrderPaymentLabel(orderData);
+      orderData.paymentStatus = getOrderPaymentStatus(orderData);
       orderData.user = await User.findByPk(order.user);
 
       return orderData;
@@ -419,6 +458,54 @@ const rejectPendingOrder = async (req, res) => {
     }
 
     await order.update({ status: "Cancelled" });
+    
+    // Increment stock for cancelled order items
+    if (Array.isArray(order.items)) {
+      for (const item of order.items) {
+        if (!item.isCombo) {
+          const productToUpdate = await Product.findByPk(item.productId || item.product);
+          if (productToUpdate && Array.isArray(productToUpdate.varients)) {
+            let stockUpdated = false;
+            const newVariants = productToUpdate.varients.map(variant => {
+              if (String(variant.id) === String(item.varientId || item.variantId)) {
+                const flavors = Array.isArray(variant.flavors) ? variant.flavors : 
+                               (Array.isArray(variant.flavour) ? variant.flavour : 
+                               (Array.isArray(variant.flavor) ? variant.flavor : []));
+                
+                let flavorUpdated = false;
+                const newFlavors = flavors.map(flavor => {
+                  const fName = typeof flavor === "string" ? flavor : (flavor.name || flavor.flavor || flavor.label || "");
+                  if (String(fName).toLowerCase() === String(item.flavour || item.flavor).toLowerCase()) {
+                    if (typeof flavor !== "string" && flavor.stock !== undefined) {
+                      flavorUpdated = true;
+                      return { ...flavor, stock: Number(flavor.stock || 0) + Number(item.qty || 1) };
+                    }
+                  }
+                  return flavor;
+                });
+
+                if (flavorUpdated) {
+                  stockUpdated = true;
+                  if (variant.flavors) return { ...variant, flavors: newFlavors };
+                  if (variant.flavour) return { ...variant, flavour: newFlavors };
+                  if (variant.flavor) return { ...variant, flavor: newFlavors };
+                } else {
+                  stockUpdated = true;
+                  return { ...variant, stock: Number(variant.stock || 0) + Number(item.qty || 1) };
+                }
+              }
+              return variant;
+            });
+            
+            if (stockUpdated) {
+              productToUpdate.varients = newVariants;
+              productToUpdate.changed('varients', true);
+              await productToUpdate.save();
+            }
+          }
+        }
+      }
+    }
 
     if (Number(order.earnedBglCash) > 0) {
       await addTransaction(

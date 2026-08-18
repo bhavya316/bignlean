@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
+const crypto = require("crypto");
 const User = require("../user/model/user");
 const Address = require("../user/model/address");
 const Cart = require("../user/model/cart");
@@ -64,6 +65,199 @@ const resolveVariantPricing = (variant, selectedFlavour) => {
 const parseAmount = (value) => {
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : 0;
+};
+
+const normalizePaymentMethod = (value) => {
+  const rawValue = String(value || "").trim();
+  const normalized = rawValue.toLowerCase().replace(/[\s_-]+/g, "");
+
+  if (normalized === "cod" || normalized === "cashondelivery") return "COD";
+  if (normalized === "razorpay" || normalized === "razor") return "RazorPay";
+  return rawValue;
+};
+
+const isRazorpayPayment = (paymentMethod) =>
+  normalizePaymentMethod(paymentMethod).toLowerCase() === "razorpay";
+
+const sanitizeAddressSnapshot = (address) => {
+  const data =
+    address && typeof address.toJSON === "function"
+      ? address.toJSON()
+      : address || {};
+
+  return {
+    id: data.id,
+    user: data.user,
+    flat: data.flat || "",
+    landmark: data.landmark || "",
+    city: data.city || "",
+    state: data.state || "",
+    pincode: data.pincode || "",
+    name: data.name || "",
+    phone: data.phone || "",
+    type: data.type || "",
+  };
+};
+
+const getRazorpayCredentials = () => {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!keyId || !keySecret) {
+    throw new Error("Razorpay credentials are not configured.");
+  }
+
+  return { keyId, keySecret };
+};
+
+const getRazorpayCheckoutConfig = () => ({
+  name: process.env.RAZORPAY_CHECKOUT_NAME || "BigNLean",
+  description:
+    process.env.RAZORPAY_CHECKOUT_DESCRIPTION ||
+    "Fitness Supplements & Sports Nutrition",
+  image:
+    process.env.RAZORPAY_CHECKOUT_LOGO ||
+    "https://bignlean.com/assets/logo.png",
+  themeColor: process.env.RAZORPAY_CHECKOUT_THEME_COLOR || "#E70F0F",
+});
+
+const createRazorpayGatewayOrder = async ({ amountPaise, receipt, notes }) => {
+  const { keyId, keySecret } = getRazorpayCredentials();
+  const response = await axios.post(
+    "https://api.razorpay.com/v1/orders",
+    {
+      amount: amountPaise,
+      currency: "INR",
+      receipt,
+      payment_capture: 1,
+      notes,
+    },
+    {
+      auth: {
+        username: keyId,
+        password: keySecret,
+      },
+    }
+  );
+
+  return {
+    ...response.data,
+    keyId,
+  };
+};
+
+const fetchRazorpayPayment = async (paymentId) => {
+  const { keyId, keySecret } = getRazorpayCredentials();
+  const response = await axios.get(
+    `https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`,
+    {
+      auth: {
+        username: keyId,
+        password: keySecret,
+      },
+    }
+  );
+
+  return response.data;
+};
+
+const fetchRazorpayOrder = async (orderId) => {
+  const { keyId, keySecret } = getRazorpayCredentials();
+  const response = await axios.get(
+    `https://api.razorpay.com/v1/orders/${encodeURIComponent(orderId)}`,
+    {
+      auth: {
+        username: keyId,
+        password: keySecret,
+      },
+    }
+  );
+
+  return response.data;
+};
+
+const verifyRazorpayPayment = async ({
+  razorpayOrderId,
+  razorpayPaymentId,
+  razorpaySignature,
+  expectedAmountPaise,
+  expectedReceiptPrefix,
+}) => {
+  const { keySecret } = getRazorpayCredentials();
+
+  if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+    return {
+      status: false,
+      message: "Razorpay order id, payment id and signature are required.",
+    };
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", keySecret)
+    .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+    .digest("hex");
+
+  const expectedSignatureBuffer = Buffer.from(expectedSignature, "hex");
+  const receivedSignatureBuffer = Buffer.from(String(razorpaySignature), "hex");
+
+  if (
+    expectedSignatureBuffer.length !== receivedSignatureBuffer.length ||
+    !crypto.timingSafeEqual(expectedSignatureBuffer, receivedSignatureBuffer)
+  ) {
+    return {
+      status: false,
+      message: "Razorpay payment verification failed.",
+    };
+  }
+
+  const payment = await fetchRazorpayPayment(razorpayPaymentId);
+  const gatewayOrder = await fetchRazorpayOrder(razorpayOrderId);
+  if (payment.order_id !== razorpayOrderId) {
+    return {
+      status: false,
+      message: "Razorpay payment does not match the generated order.",
+    };
+  }
+
+  if (
+    expectedReceiptPrefix &&
+    !String(gatewayOrder.receipt || "").startsWith(expectedReceiptPrefix)
+  ) {
+    return {
+      status: false,
+      message: "Razorpay order does not match this checkout.",
+    };
+  }
+
+  if (Number(payment.amount) !== Number(expectedAmountPaise)) {
+    return {
+      status: false,
+      message: "Razorpay payment amount does not match the order amount.",
+    };
+  }
+
+  if (String(payment.status || "").toLowerCase() !== "captured") {
+    return {
+      status: false,
+      message: `Razorpay payment is not successful. Current status: ${payment.status || "unknown"}.`,
+    };
+  }
+
+  return {
+    status: true,
+    transactionId: razorpayPaymentId,
+    paymentDetails: {
+      gateway: "Razorpay",
+      razorpayOrderId,
+      razorpayPaymentId,
+      status: payment.status,
+      method: payment.method || null,
+      amount: payment.amount,
+      currency: payment.currency,
+      receipt: gatewayOrder.receipt || null,
+      verifiedAt: new Date().toISOString(),
+    },
+  };
 };
 
 const isComboCartItem = (item = {}) => {
@@ -1206,6 +1400,121 @@ router.post("/ndr/action", async (req, res) => {
 
 
 
+router.post("/razorpay/order", authMiddleware, requireSameUserBody("userid"), async (req, res) => {
+  try {
+    const { userid, addressid, couponCode, bglCash } = req.body;
+
+    if (!userid || !addressid) {
+      return res.status(400).json({
+        status: false,
+        message: "user and address are required",
+      });
+    }
+
+    const user = await User.findByPk(userid);
+    const address = await Address.findByPk(addressid);
+    const cartItems = await Cart.findAll({ where: { user: userid } });
+
+    if (!user) {
+      return res.status(404).json({ status: false, message: "User not found." });
+    }
+    if (!address) {
+      return res.status(404).json({ status: false, message: "Address not found." });
+    }
+    if (Number(address.user) !== Number(userid)) {
+      return res.status(403).json({ status: false, message: "Address does not belong to this user." });
+    }
+    if (cartItems.length === 0) {
+      return res.status(404).json({ status: false, message: "User's cart is empty." });
+    }
+
+    const cartDetails = await calculateCartDetails(userid, couponCode, addressid);
+    if (!cartDetails.status) {
+      return res.status(400).json(cartDetails);
+    }
+
+    const amount = Number(cartDetails.totalAmount || 0);
+    let shiping = Number(cartDetails.shiping);
+    if (!Number.isFinite(shiping)) {
+      shiping = amount >= 1000 ? 0 : 80;
+    }
+
+    const requestedBGLCash = Math.floor(Number(bglCash) || 0);
+    let usedBGL = 0;
+    if (requestedBGLCash > 0) {
+      const walletBalance = await Transaction.calculateFinalValueForUser(userid);
+      if (amount < 3000) {
+        return res.status(400).json({
+          status: false,
+          message: "Minimum cart value for redemption is ₹3,000",
+        });
+      }
+      if (walletBalance < 500) {
+        return res.status(400).json({
+          status: false,
+          message: "Minimum 500 Bignlean Coins required to redeem",
+        });
+      }
+      if (requestedBGLCash > walletBalance) {
+        return res.status(400).json({
+          status: false,
+          message: `Insufficient Bignlean Coins. Available: ${walletBalance}`,
+        });
+      }
+      if (requestedBGLCash > amount) {
+        return res.status(400).json({
+          status: false,
+          message: `You can redeem up to ₹${amount} on this order`,
+        });
+      }
+      usedBGL = requestedBGLCash;
+    }
+
+    const finalAmount = Math.max(0, amount + shiping - usedBGL);
+    const amountPaise = Math.round(finalAmount * 100);
+    if (amountPaise <= 0) {
+      return res.status(400).json({
+        status: false,
+        message: "Order amount must be greater than zero for online payment",
+      });
+    }
+
+    const gatewayOrder = await createRazorpayGatewayOrder({
+      amountPaise,
+      receipt: `bignlean_${userid}_${Date.now()}`,
+      notes: {
+        userId: String(userid),
+        addressId: String(addressid),
+        source: "bignlean-web",
+      },
+    });
+    const checkout = getRazorpayCheckoutConfig();
+
+    return res.status(200).json({
+      status: true,
+      message: "Razorpay order created.",
+      keyId: gatewayOrder.keyId,
+      amount: gatewayOrder.amount,
+      currency: gatewayOrder.currency,
+      orderId: gatewayOrder.id,
+      receipt: gatewayOrder.receipt,
+      checkout,
+    });
+  } catch (error) {
+    const gatewayMessage =
+      error?.response?.data?.error?.description ||
+      error?.response?.data?.message ||
+      error.message ||
+      "Unable to create Razorpay order.";
+
+    console.error("Error creating Razorpay order:", gatewayMessage);
+    return res.status(error?.response?.status ? 502 : 500).json({
+      status: false,
+      message: gatewayMessage,
+    });
+  }
+});
+
 router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async (req, res) => {
   try {
     const {
@@ -1216,17 +1525,38 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
       transactionId,
       bglCash,
     } = req.body;
+    const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
+    const razorpayPayload = req.body.razorpay || {};
+    const razorpayOrderId =
+      req.body.razorpayOrderId ||
+      req.body.razorpay_order_id ||
+      razorpayPayload.orderId ||
+      razorpayPayload.razorpay_order_id;
+    const razorpayPaymentId =
+      req.body.razorpayPaymentId ||
+      req.body.razorpay_payment_id ||
+      razorpayPayload.paymentId ||
+      razorpayPayload.razorpay_payment_id;
+    const razorpaySignature =
+      req.body.razorpaySignature ||
+      req.body.razorpay_signature ||
+      razorpayPayload.signature ||
+      razorpayPayload.razorpay_signature;
 
     console.log("Order request payload:", req.body);
 
-    if (!userid || !addressid || !paymentMethod) {
+    if (!userid || !addressid || !normalizedPaymentMethod) {
       return res.status(400).json({
         status: false,
         message: "user, address and payment method is required",
       });
     }
 
-    if (paymentMethod !== "COD" && !transactionId) {
+    if (
+      normalizedPaymentMethod !== "COD" &&
+      !transactionId &&
+      !razorpayPaymentId
+    ) {
       return res.status(400).json({
         status: false,
         message: "user, address, payment method and transactionId is required",
@@ -1295,6 +1625,7 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
     let couponDis = 0;
     let couponDiscount = cartDetails.couponDiscount || 0;
     let validCoupon = null;
+    let couponQtyReserved = false;
 
     if (couponCode) {
       validCoupon = await Coupon.findOne({ where: { coupon: couponCode } });
@@ -1316,7 +1647,6 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
       }
       usedCoupon = true;
       couponId = validCoupon.id;
-      await validCoupon.update({ qty: validCoupon.qty - 1 });
     }
 
     const orderID = generateRandomId();
@@ -1364,6 +1694,38 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
     const earnedCoins = Math.floor(eligibleSpend / 1000) * 10;
     const totalAmount = Math.max(0, amount - usedBGL);
     const orderItems = [];
+    let verifiedTransactionId = transactionId ?? null;
+    let paymentDetails = null;
+
+    if (isRazorpayPayment(normalizedPaymentMethod)) {
+      const expectedAmountPaise = Math.round(
+        Math.max(0, amount + shiping - usedBGL) * 100
+      );
+      const verification = await verifyRazorpayPayment({
+        razorpayOrderId,
+        razorpayPaymentId,
+        razorpaySignature,
+        expectedAmountPaise,
+        expectedReceiptPrefix: `bignlean_${userid}_`,
+      });
+
+      if (!verification.status) {
+        return res.status(400).json(verification);
+      }
+
+      verifiedTransactionId = verification.transactionId;
+      paymentDetails = verification.paymentDetails;
+
+      const existingPaymentOrder = await Order.findOne({
+        where: { transactionId: verifiedTransactionId },
+      });
+      if (existingPaymentOrder) {
+        return res.status(400).json({
+          status: false,
+          message: "This Razorpay payment has already been used for an order.",
+        });
+      }
+    }
 
     for (const item of cartItems) {
       const isComboItem = isComboCartItem(item);
@@ -1378,18 +1740,25 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
       }
     }
 
+    if (validCoupon) {
+      await validCoupon.update({ qty: validCoupon.qty - 1 });
+      couponQtyReserved = true;
+    }
+
     const orderData = {
       user: userid,
       product: itemsIDList,
       items: orderItems,
       address: addressid,
+      shippingAddress: sanitizeAddressSnapshot(address),
       usedCoupon,
       coupon: couponId,
       couponDiscount: couponDiscount || 0,
       amount,
       qty: qtyList,
-      paymentMethod,
-      transactionId: transactionId ?? null,
+      paymentMethod: normalizedPaymentMethod,
+      transactionId: verifiedTransactionId,
+      paymentDetails,
       usedBGLCash,
       usedBGL: usedBGL || 0,
       bglCash: usedBGL || 0,
@@ -1408,6 +1777,52 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
       });
       const order = await Order.create(orderData);
       await Cart.destroy({ where: { user: userid } });
+      
+      // Decrement stock for ordered items
+      for (const item of cartItems) {
+        if (!isComboCartItem(item)) {
+          const productToUpdate = await Product.findByPk(item.product);
+          if (productToUpdate && Array.isArray(productToUpdate.varients)) {
+            let stockUpdated = false;
+            const newVariants = productToUpdate.varients.map(variant => {
+              if (String(variant.id) === String(item.varientId)) {
+                const flavors = Array.isArray(variant.flavors) ? variant.flavors : 
+                               (Array.isArray(variant.flavour) ? variant.flavour : 
+                               (Array.isArray(variant.flavor) ? variant.flavor : []));
+                
+                let flavorUpdated = false;
+                const newFlavors = flavors.map(flavor => {
+                  const fName = typeof flavor === "string" ? flavor : (flavor.name || flavor.flavor || flavor.label || "");
+                  if (String(fName).toLowerCase() === String(item.flavour).toLowerCase()) {
+                    if (typeof flavor !== "string" && flavor.stock !== undefined) {
+                      flavorUpdated = true;
+                      return { ...flavor, stock: Math.max(0, Number(flavor.stock || 0) - Number(item.qty || 1)) };
+                    }
+                  }
+                  return flavor;
+                });
+
+                if (flavorUpdated) {
+                  stockUpdated = true;
+                  if (variant.flavors) return { ...variant, flavors: newFlavors };
+                  if (variant.flavour) return { ...variant, flavour: newFlavors };
+                  if (variant.flavor) return { ...variant, flavor: newFlavors };
+                } else {
+                  stockUpdated = true;
+                  return { ...variant, stock: Math.max(0, Number(variant.stock || 0) - Number(item.qty || 1)) };
+                }
+              }
+              return variant;
+            });
+            
+            if (stockUpdated) {
+              productToUpdate.varients = newVariants;
+              productToUpdate.changed('varients', true);
+              await productToUpdate.save();
+            }
+          }
+        }
+      }
       if (usedBGLCash) {
         await Transaction.create({
           user: userid,
@@ -1446,7 +1861,7 @@ router.post("/placeOrder", authMiddleware, requireSameUserBody("userid"), async 
       console.error("Error creating order:", orderError);
       
       // If the coupon was decremented but order failed, increment it back
-      if (validCoupon) {
+      if (validCoupon && couponQtyReserved) {
         await validCoupon.update({ qty: validCoupon.qty + 1 });
       }
       
@@ -1753,7 +2168,12 @@ router.put("/order/accept/:id", async (req, res) => {
     }
 
     // Get address details
-    const address = await Address.findByPk(order.address);
+    const addressRecord = await Address.findByPk(order.address);
+    const address =
+      order.shippingAddress ||
+      (addressRecord && typeof addressRecord.toJSON === "function"
+        ? addressRecord.toJSON()
+        : addressRecord);
     if (!address) {
       console.log("Address not found");
       return res.status(404).json({
@@ -1834,6 +2254,7 @@ router.put("/order/accept/:id", async (req, res) => {
           const price = product.unitPrice || product.sellingPrice || product.price || 100;
           const details = {
             name: product.name,
+            sku: product.sku || product.id || `SKU-${product.name.substring(0, 5).toUpperCase()}`,
             qty: product.qty || order.qty[i],
             price,
           };
@@ -1916,6 +2337,13 @@ router.put("/order/accept/:id", async (req, res) => {
       } else {
         console.log("Shipment creation failed, response:", response);
         
+        let exactError = response?.message || "Could not create shipment with courier service";
+        if (response?.details?.data?.message) {
+          exactError = response.details.data.message;
+        } else if (response?.details?.data && typeof response.details.data === 'object') {
+           exactError = JSON.stringify(response.details.data).substring(0, 100);
+        }
+        
         return res.status(400).json({
           status: false,
           message: "Shipment creation failed. Order was not accepted.",
@@ -1924,7 +2352,7 @@ router.put("/order/accept/:id", async (req, res) => {
             status: order.status,
             orderID: order.orderID
           },
-          shippingError: response?.message || "Could not create shipment with courier service",
+          shippingError: exactError,
           details: response
         });
       }
@@ -2068,6 +2496,7 @@ router.post("/order/create-shipment/:id", async (req, res) => {
         const price = product.unitPrice || product.sellingPrice || product.price || 100;
         const details = {
           name: product.name,
+          sku: product.sku || product.id || `SKU-${product.name.substring(0, 5).toUpperCase()}`,
           qty: product.qty || order.qty[i],
           price,
         };
@@ -2122,9 +2551,16 @@ router.post("/order/create-shipment/:id", async (req, res) => {
         }
       });
     } else {
+      let exactError = response?.message || "Could not create shipment with courier service";
+      if (response?.details?.data?.message) {
+        exactError = response.details.data.message;
+      } else if (response?.details?.data && typeof response.details.data === 'object') {
+         exactError = JSON.stringify(response.details.data).substring(0, 100);
+      }
+      
       return res.status(400).json({
         status: false,
-        message: "Failed to create shipment",
+        message: exactError,
         details: response
       });
     }

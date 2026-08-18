@@ -86,6 +86,9 @@ const sendAuthResponse = async (res, statusCode, message, user) => {
 };
 
 const sendSmsOtp = async (phone, otp) => {
+  // Test credentials for Razorpay / App reviewers
+  if (phone === "9999999999") return true;
+
   if (process.env.NODE_ENV === "development") {
     logger.info({ phone, otp }, "Development OTP generated");
     return true;
@@ -214,8 +217,13 @@ const resendOtp = async (req, res, next) => {
   }
 };
 
-const validateOtp = (user, otp) =>
-  user.otp === otp && user.otpExpiry && user.otpExpiry >= new Date();
+const validateOtp = (user, otp) => {
+  // Test credentials for Razorpay / App reviewers
+  if (user.phone === "9999999999" && otp === "1234") {
+    return true;
+  }
+  return user.otp === otp && user.otpExpiry && user.otpExpiry >= new Date();
+};
 
 const verifyOtp = async (req, res, next) => {
   const { phone, otp } = req.body;
@@ -308,6 +316,7 @@ const getAllUsers = async (req, res, next) => {
           attributes: [
             "id",
             "product",
+            "shippingAddress",
             "address",
             "usedCoupon",
             "coupon",
@@ -316,6 +325,7 @@ const getAllUsers = async (req, res, next) => {
             "qty",
             "paymentMethod",
             "transactionId",
+            "paymentDetails",
             "usedBGLCash",
             "bglCash",
             "earnedBglCash",

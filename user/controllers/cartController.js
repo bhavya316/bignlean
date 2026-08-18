@@ -69,7 +69,7 @@ const resolveVariantPricing = (variant, selectedFlavour) => {
 
   return {
     ...variant,
-    stock: selectedFlavorData.stock ?? variant.stock,
+    stock: variant.stock ?? selectedFlavorData.stock,
     mrp: selectedFlavorData.mrp ?? variant.mrp,
     sellingPrice:
       selectedFlavorData.sellingPrice ??
@@ -173,10 +173,11 @@ const addToCart = async (req, res) => {
       );
 
       const availableStock = Number(selectedVariantPricing.stock || 0);
-      if (availableStock <= 0) {
+      const requestedQty = Number(qty || 1);
+      if (availableStock < requestedQty) {
         return res.status(400).json({
           status: false,
-          message: "Selected variant is out of stock.",
+          message: `Only ${availableStock} items available in stock.`,
         });
       }
 
@@ -197,7 +198,20 @@ const addToCart = async (req, res) => {
     });
 
     if (existingCartItem) {
-      existingCartItem.qty = existingCartItem.qty + qty;
+      const newTotalQty = existingCartItem.qty + Number(qty || 1);
+      
+      // We only need to check availableStock if it's not a combo product
+      if (!isCombo) {
+        const availableStock = Number(selectedVariantPricing?.stock || 0);
+        if (availableStock < newTotalQty) {
+          return res.status(400).json({
+            status: false,
+            message: `Only ${availableStock} items available in stock. You already have ${existingCartItem.qty} in your cart.`,
+          });
+        }
+      }
+
+      existingCartItem.qty = newTotalQty;
       existingCartItem.mrp = mrp;
       existingCartItem.sellingPrice = sellingPrice;
       existingCartItem.premiumPrice = premiumPrice;
@@ -251,7 +265,30 @@ const updateCartQty = async (req, res) => {
         .json({ status: false, message: "Cart item not found" });
     }
 
-    cartItem.qty = qty;
+    const newQty = Number(qty || 1);
+    
+    // Validate stock for non-combo products
+    const isCombo = isComboCartSignal(cartItem);
+    if (!isCombo) {
+      const productDetails = await Product.findByPk(cartItem.product);
+      if (productDetails && productDetails.varients) {
+        const selectedVariant = productDetails.varients.find(
+          (item) => `${item.id}` === `${cartItem.varientId}`
+        );
+        if (selectedVariant) {
+          const selectedVariantPricing = resolveVariantPricing(selectedVariant, cartItem.flavour);
+          const availableStock = Number(selectedVariantPricing.stock || 0);
+          if (availableStock < newQty) {
+            return res.status(400).json({
+              status: false,
+              message: `Only ${availableStock} items available in stock.`,
+            });
+          }
+        }
+      }
+    }
+
+    cartItem.qty = newQty;
     await cartItem.save();
 
     res

@@ -17,6 +17,18 @@ const numberOr = (value, fallback = 0) => {
   return Number.isFinite(number) ? number : fallback;
 };
 
+const parseBooleanFilter = (value) => {
+  if (Array.isArray(value)) value = value[0];
+  if (value === undefined || value === null || value === "") return undefined;
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+
+  const normalized = String(value).trim().toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return undefined;
+};
+
 const normalizeComboPricingPayload = (payload) => {
   const firstPayloadVariant =
     Array.isArray(payload?.varients) && payload.varients.length > 0
@@ -109,7 +121,7 @@ const serializeLegacyComboProduct = (product, comboCatId = null) => {
   };
 };
 
-const getLegacyComboProductsForCategory = async (comboCatId) => {
+const getLegacyComboProductsForCategory = async (comboCatId, flashSaleFilter) => {
   const legacyCombos = await Combo.findAll({
     where: { catId: comboCatId },
     order: [["createdAt", "DESC"]],
@@ -126,8 +138,11 @@ const getLegacyComboProductsForCategory = async (comboCatId) => {
 
   if (!productIds.length) return [];
 
+  const productWhere = { id: productIds };
+  if (flashSaleFilter !== undefined) productWhere.isOnFlashSale = flashSaleFilter;
+
   const products = await Product.findAll({
-    where: { id: productIds },
+    where: productWhere,
   });
   const productOrder = new Map(productIds.map((id, index) => [id, index]));
 
@@ -275,7 +290,14 @@ const addComboProduct = async (req, res) => {
 const getAllComboProducts = async (req, res) => {
   try {
     await ensureComboProductTable();
+    const flashSaleFilter = parseBooleanFilter(
+      req.query.isOnFlashSale ?? req.query.flashSale ?? req.query.flash
+    );
+    const where = {};
+    if (flashSaleFilter !== undefined) where.isOnFlashSale = flashSaleFilter;
+
     const comboProducts = await ComboProduct.findAll({
+      where,
       order: [["createdAt", "DESC"]],
     });
     res.status(200).json({
@@ -296,17 +318,21 @@ const getComboProductsByCategory = async (req, res) => {
 
   try {
     await ensureComboProductTable();
+    const flashSaleFilter = parseBooleanFilter(
+      req.query.isOnFlashSale ?? req.query.flashSale ?? req.query.flash
+    );
+    const where = { comboCatId };
+    if (flashSaleFilter !== undefined) where.isOnFlashSale = flashSaleFilter;
+
     const comboProducts = await ComboProduct.findAll({
-      where: {
-        comboCatId: comboCatId,
-      },
+      where,
       order: [["createdAt", "DESC"]],
     });
     const serializedComboProducts = comboProducts.map(serializeComboProduct);
     const products =
       serializedComboProducts.length > 0
         ? serializedComboProducts
-        : await getLegacyComboProductsForCategory(comboCatId);
+        : await getLegacyComboProductsForCategory(comboCatId, flashSaleFilter);
 
     res.status(200).json({
       status: true,
@@ -417,14 +443,19 @@ const getAllComboProductsPaginated = async (req, res) => {
       subCatId2,
       comboCatId,
       search,
+      isOnFlashSale,
+      flashSale,
+      flash,
     } = req.query;
 
+    const flashSaleFilter = parseBooleanFilter(isOnFlashSale ?? flashSale ?? flash);
     const where = {};
     if (brandId) where.brandId = brandId;
     if (catId) where.catId = catId;
     if (subCatId) where.subCatId = subCatId;
     if (subCatId2) where.subCatId2 = subCatId2;
     if (comboCatId) where.comboCatId = comboCatId;
+    if (flashSaleFilter !== undefined) where.isOnFlashSale = flashSaleFilter;
     if (search) {
       where.name = {
         [Op.like]: `%${search}%`,
@@ -499,7 +530,7 @@ const getAllComboCategoriesWithProducts = async (req, res) => {
           {
             model: Brand,
             as: 'brandInfo',
-            attributes: ['id', 'name', 'image', 'banner', 'description'],
+            attributes: ['id', 'name', 'image', 'banner', 'description', 'originCountry', 'originCountryCode'],
             required: false
           },
           {
@@ -631,7 +662,7 @@ const getComboProductByIdWithDetails = async (req, res) => {
         {
           model: Brand,
           as: 'brandInfo',
-          attributes: ['id', 'name', 'image', 'banner', 'description'],
+          attributes: ['id', 'name', 'image', 'banner', 'description', 'originCountry', 'originCountryCode'],
           required: false
         },
         {
@@ -716,6 +747,9 @@ const getComboProductByIdWithDetails = async (req, res) => {
       expiry_date: productData.expiry_date,
       createdAt: productData.createdAt,
       updatedAt: productData.updatedAt,
+      brandOriginCountry: comboProduct.brandInfo?.originCountry || null,
+      brandOriginCountryCode: comboProduct.brandInfo?.originCountryCode || null,
+      countryOfOrigin: comboProduct.countryOfOrigin || comboProduct.brandInfo?.originCountry || null,
       // Rating related fields (set to defaults for combo products)
       ratings: [],
       userRating: [],
@@ -741,7 +775,7 @@ const getComboProductByIdWithDetails = async (req, res) => {
         {
           model: Brand,
           as: 'brandInfo',
-          attributes: ['id', 'name', 'image', 'banner', 'description'],
+          attributes: ['id', 'name', 'image', 'banner', 'description', 'originCountry', 'originCountryCode'],
           required: false
         },
         {
@@ -793,6 +827,9 @@ const getComboProductByIdWithDetails = async (req, res) => {
         brandInfo: comboData.brandInfo || null,
         categoryInfo: comboData.categoryInfo || null,
         subCategoryInfo: comboData.subCategoryInfo || null,
+        brandOriginCountry: combo.brandInfo?.originCountry || null,
+        brandOriginCountryCode: combo.brandInfo?.originCountryCode || null,
+        countryOfOrigin: combo.countryOfOrigin || combo.brandInfo?.originCountry || null,
         // Rating related fields (set to defaults for combo products)
         ratings: [],
         userRating: [],

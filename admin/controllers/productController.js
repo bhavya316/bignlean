@@ -19,6 +19,18 @@ const parseAmount = (v) => {
   }
 };
 
+const parseBooleanFilter = (value) => {
+  if (Array.isArray(value)) value = value[0];
+  if (value === undefined || value === null || value === "") return undefined;
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+
+  const normalized = String(value).trim().toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return undefined;
+};
+
 const getFlavorLabel = (flavor) => {
   if (typeof flavor === "string") return flavor;
   return flavor?.name || flavor?.flavor || flavor?.label || "";
@@ -293,14 +305,16 @@ const addProduct = async (req, res) => {
 
 
 const getProductsByCategoryAndSubCategory = async (req, res) => {
-  const { catId, subCatId, subCatId2 } = req.query;
+  const { catId, subCatId, subCatId2, isOnFlashSale, flashSale, flash } = req.query;
 
   try {
     // Build the where clause dynamically
+    const flashSaleFilter = parseBooleanFilter(isOnFlashSale ?? flashSale ?? flash);
     const where = {};
     if (catId) where.catId = catId;
     if (subCatId) where.subCatId = subCatId;
     if (subCatId2) where.subCatId2 = subCatId2;
+    if (flashSaleFilter !== undefined) where.isOnFlashSale = flashSaleFilter;
     const selectedBrandIds = await getRequestedBrandIds(req.query);
     if (selectedBrandIds.length > 0) where.brandId = { [Op.in]: selectedBrandIds };
 
@@ -332,13 +346,15 @@ const getProductsByCategoryAndSubCategory = async (req, res) => {
 
 // Add this function to productController.js
 const getProductsByCategory = async (req, res) => {
-  const { catId, subCatId, subCatId2 } = req.query;
+  const { catId, subCatId, subCatId2, isOnFlashSale, flashSale, flash } = req.query;
 
   try {
+    const flashSaleFilter = parseBooleanFilter(isOnFlashSale ?? flashSale ?? flash);
     const where = {};
     if (catId) where.catId = catId;
     if (subCatId) where.subCatId = subCatId;
     if (subCatId2) where.subCatId2 = subCatId2;
+    if (flashSaleFilter !== undefined) where.isOnFlashSale = flashSaleFilter;
     const selectedBrandIds = await getRequestedBrandIds(req.query);
     if (selectedBrandIds.length > 0) where.brandId = { [Op.in]: selectedBrandIds };
 
@@ -606,6 +622,13 @@ const deleteProduct = async (req, res) => {
     }
     const product = await Product.findByPk(id);
     if (!product) {
+      const ComboProduct = require("../model/comboProduct");
+      const comboProduct = await ComboProduct.findByPk(id);
+      if (comboProduct) {
+        await comboProduct.destroy();
+        return res.status(200).json({ status: true, message: "Product deleted." });
+      }
+
       return res
         .status(404)
         .json({ status: false, message: "Product not found" });
@@ -630,6 +653,9 @@ const getAllProducts = async (req, res) => {
       category = 0,
       minRating = 0,
       isBestSeller,
+      isOnFlashSale,
+      flashSale,
+      flash,
       id,
       query = "nothing",
       sorting = "nothing",
@@ -658,6 +684,7 @@ const getAllProducts = async (req, res) => {
       ...requestedBrands.filter((brand) => /^\d+$/.test(brand)),
       ...brandRecordsByName.map((brand) => String(brand.id)),
     ].filter((brand, index, list) => list.indexOf(brand) === index);
+    const flashSaleFilter = parseBooleanFilter(isOnFlashSale ?? flashSale ?? flash);
 
     if (id && query != "nothing") {
       await RecentSearches.addToRecentSearch(id, query);
@@ -713,6 +740,10 @@ const getAllProducts = async (req, res) => {
           isBestSeller === undefined
             ? true
             : product.isBestSeller === (isBestSeller === "true");
+        const flashSaleMatch =
+          flashSaleFilter === undefined
+            ? true
+            : parseBooleanFilter(product.isOnFlashSale) === flashSaleFilter;
         const queryMatched =
           query === "nothing" || (product.name && product.name.includes(query));
 
@@ -737,6 +768,7 @@ const getAllProducts = async (req, res) => {
           discountMatch &&
           ratingMatch &&
           isBestSellerMatch &&
+          flashSaleMatch &&
           queryMatched
         ) {
           const productBrandInfo = await Brand.findByPk(product.brandId);
@@ -1622,14 +1654,19 @@ const getAllProductsPaginated = async (req, res) => {
       subCatId,
       subCatId2,
       search,
+      isOnFlashSale,
+      flashSale,
+      flash,
     } = req.query;
 
     // Build dynamic where clause based on filters
+    const flashSaleFilter = parseBooleanFilter(isOnFlashSale ?? flashSale ?? flash);
     const where = {};
     if (brandId) where.brandId = brandId;
     if (catId) where.catId = catId;
     if (subCatId) where.subCatId = subCatId;
     if (subCatId2) where.subCatId2 = subCatId2;
+    if (flashSaleFilter !== undefined) where.isOnFlashSale = flashSaleFilter;
     if (search) {
       where.name = {
         [Op.like]: `%${search}%`,

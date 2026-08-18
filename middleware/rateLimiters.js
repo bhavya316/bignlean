@@ -4,6 +4,13 @@ const createAuthLimiter = (message) =>
   rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 5,
+    skip: (req, res) => {
+      // Bypass rate limit for the test account
+      if (req.body && req.body.phone === "9999999999") {
+        return true;
+      }
+      return false;
+    },
     standardHeaders: true,
     legacyHeaders: false,
     message: {
